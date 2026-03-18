@@ -26,9 +26,24 @@ export default function ChatPanel({ messages, isStreaming, error, onSendMessage 
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const userScrolledUp = useRef(false);
+
+  // Track user scroll position
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) {
+    if (!el) return;
+    const handleScroll = () => {
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      userScrolledUp.current = !isNearBottom;
+    };
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Only auto-scroll if user hasn't scrolled up
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && !userScrolledUp.current) {
       el.scrollTop = el.scrollHeight;
     }
   }, [messages]);
@@ -72,7 +87,7 @@ export default function ChatPanel({ messages, isStreaming, error, onSendMessage 
         </div>
       }
     >
-      <div ref={scrollRef} style={{ maxHeight: '500px', overflowY: 'auto', padding: '4px 0' }}>
+      <div ref={scrollRef} style={{ maxHeight: 'calc(100vh - 380px)', minHeight: '300px', overflowY: 'auto', padding: '4px 0' }}>
         <SpaceBetween size="m">
           {messages.length === 0 && !error && (
             <Box textAlign="center" padding="l">

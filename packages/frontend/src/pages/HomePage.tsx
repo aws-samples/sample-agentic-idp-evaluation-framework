@@ -41,14 +41,9 @@ import {
   Globe,
   Shield,
   EyeOff,
-  Receipt,
-  ShoppingCart,
-  CreditCard,
-  ShieldCheck,
-  HeartPulse,
-  Scale,
 } from 'lucide-react';
 import DocumentUpload from '../components/upload/DocumentUpload';
+import OnboardingBanner from '../components/common/OnboardingBanner';
 
 interface HomePageProps {
   onUploadComplete: (doc: UploadResponse) => void;
@@ -73,17 +68,14 @@ const CAPABILITY_ICONS: Record<string, React.ReactNode> = {
   language_detection: <Globe size={18} color={ICON_COLOR} />,
   pii_detection: <Shield size={18} color={ICON_COLOR} />,
   pii_redaction: <EyeOff size={18} color={ICON_COLOR} />,
-  invoice_processing: <Receipt size={18} color={ICON_COLOR} />,
-  receipt_parsing: <ShoppingCart size={18} color={ICON_COLOR} />,
-  check_processing: <CreditCard size={18} color={ICON_COLOR} />,
-  insurance_claims: <ShieldCheck size={18} color={ICON_COLOR} />,
-  medical_records: <HeartPulse size={18} color={ICON_COLOR} />,
-  contract_analysis: <Scale size={18} color={ICON_COLOR} />,
   video_summarization: <FileText size={18} color={ICON_COLOR} />,
   video_chapter_extraction: <Scissors size={18} color={ICON_COLOR} />,
   audio_transcription: <FileText size={18} color={ICON_COLOR} />,
   audio_summarization: <AlignLeft size={18} color={ICON_COLOR} />,
   content_moderation: <Shield size={18} color={ICON_COLOR} />,
+  image_separation: <Scissors size={18} color={ICON_COLOR} />,
+  embedding_generation: <GitCompareArrows size={18} color={ICON_COLOR} />,
+  knowledge_base_ingestion: <FolderOpen size={18} color={ICON_COLOR} />,
 };
 
 const FAMILY_NAMES: Record<string, string> = {
@@ -91,6 +83,7 @@ const FAMILY_NAMES: Record<string, string> = {
   claude: 'Claude Models',
   nova: 'Nova Models',
   'textract-llm': 'Textract + LLM',
+  embeddings: 'Embeddings',
 };
 
 const STEPS = [
@@ -129,8 +122,8 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
             <SpaceBetween size="s">
               <Box variant="h2" fontSize="display-l">Find the Right IDP Approach</Box>
               <Box color="text-body-secondary" fontSize="heading-s" padding={{ horizontal: 'xxxl' }}>
-                Upload a sample document. Our AI advisor runs 11 processing methods in parallel
-                and tells you which gives the best accuracy, cost, and speed for your use case.
+                Upload a document and let our AI advisor analyze it, recommend the right capabilities,
+                then compare processing methods side-by-side for accuracy, cost, and speed.
               </Box>
               <div style={{ paddingTop: 12 }}>
                 <Button variant="primary" iconName="upload" onClick={scrollToUpload}>
@@ -143,7 +136,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
 
         {/* How It Works */}
         <Container header={<Header variant="h2">How It Works</Header>}>
-          <ColumnLayout columns={4} variant="text-grid">
+          <ColumnLayout columns={4} minColumnWidth={200} variant="text-grid">
             {STEPS.map((step, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
                 <SpaceBetween size="xs">
@@ -164,9 +157,9 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
 
         {/* Capabilities */}
         <div id="capabilities">
-          <Container header={<Header variant="h2" counter="(27)">Capabilities</Header>}>
+          <Container header={<Header variant="h2" counter="(21)">Capabilities</Header>}>
             <SpaceBetween size="m">
-              {CAPABILITY_CATEGORIES.map((catId) => {
+              {CAPABILITY_CATEGORIES.filter((c) => c !== 'industry_specific').map((catId) => {
                 const cat = CATEGORY_INFO[catId];
                 const caps = getCapabilitiesByCategory(catId);
                 return (
@@ -177,18 +170,21 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                         display: 'flex', flexWrap: 'wrap', gap: 6,
                       }}>
                         {caps.map((cap) => {
-                          const families: MethodFamily[] = ['claude', 'bda', 'textract-llm', 'nova'];
+                          const families: MethodFamily[] = ['claude', 'bda', 'textract-llm', 'nova', 'embeddings'];
                           const familyLabels: Record<string, string> = {
                             claude: 'Claude (LLM)',
                             bda: 'BDA',
                             'textract-llm': 'Textract+LLM',
                             nova: 'Nova (LLM)',
+                            embeddings: 'Nova Embeddings',
                           };
-                          const supportEntries = families.map((f) => ({
-                            family: f,
-                            label: familyLabels[f],
-                            level: (CAPABILITY_SUPPORT[f]?.[cap.id as keyof typeof CAPABILITY_SUPPORT[typeof f]] ?? 'none') as SupportLevel,
-                          }));
+                          const supportEntries = families
+                            .map((f) => ({
+                              family: f,
+                              label: familyLabels[f],
+                              level: (CAPABILITY_SUPPORT[f]?.[cap.id as keyof typeof CAPABILITY_SUPPORT[typeof f]] ?? 'none') as SupportLevel,
+                            }))
+                            .filter((s) => s.level !== 'none' || families.slice(0, 4).includes(s.family as MethodFamily));
 
                           return (
                             <Popover
@@ -249,8 +245,8 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
         </div>
 
         {/* Methods */}
-        <Container header={<Header variant="h2" counter="(11)">Processing Methods</Header>}>
-          <ColumnLayout columns={4} variant="text-grid">
+        <Container header={<Header variant="h2" counter="(12)">Processing Methods</Header>}>
+          <ColumnLayout columns={5} minColumnWidth={180} variant="text-grid">
             {METHOD_FAMILIES.map((family) => {
               const methods = getMethodsByFamily(family);
               return (
@@ -261,22 +257,25 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                   </div>
                   {methods.map((m) => (
                     <div key={m.id} style={{ padding: '4px 0', borderBottom: '1px solid #f2f3f3' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <Box fontSize="body-s" fontWeight="bold">{m.shortName}</Box>
-                        {m.family === 'textract-llm' ? (
-                          <Box fontSize="body-s" color="text-body-secondary">
-                            $0.0015/pg + ${m.tokenPricing.inputPer1MTokens}/${m.tokenPricing.outputPer1MTokens} MTok
-                          </Box>
-                        ) : m.tokenPricing.inputPer1MTokens > 0 ? (
-                          <Box fontSize="body-s" color="text-body-secondary">
-                            ${m.tokenPricing.inputPer1MTokens} / ${m.tokenPricing.outputPer1MTokens} MTok
-                          </Box>
-                        ) : (
-                          <Box fontSize="body-s" color="text-body-secondary">
-                            ${m.estimatedCostPerPage.toFixed(2)}/page
-                          </Box>
+                        {m.family !== 'textract-llm' && (
+                          m.tokenPricing.inputPer1MTokens > 0 ? (
+                            <Box fontSize="body-s" color="text-body-secondary">
+                              ${m.tokenPricing.inputPer1MTokens} / ${m.tokenPricing.outputPer1MTokens} MTok
+                            </Box>
+                          ) : (
+                            <Box fontSize="body-s" color="text-body-secondary">
+                              ${m.estimatedCostPerPage.toFixed(2)}/page
+                            </Box>
+                          )
                         )}
                       </div>
+                      {m.family === 'textract-llm' && (
+                        <Box fontSize="body-s" color="text-body-secondary">
+                          Textract $0.0015/pg + LLM ${m.tokenPricing.inputPer1MTokens}/${m.tokenPricing.outputPer1MTokens} MTok
+                        </Box>
+                      )}
                     </div>
                   ))}
                 </SpaceBetween>

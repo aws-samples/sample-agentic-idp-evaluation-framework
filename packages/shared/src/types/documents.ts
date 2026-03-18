@@ -4,6 +4,8 @@ export const DOCUMENT_TYPES = [
   'docx',
   'pptx',
   'xlsx',
+  'video',
+  'audio',
 ] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
@@ -67,6 +69,34 @@ export const DOCUMENT_TYPE_INFO: Record<DocumentType, DocumentTypeInfo> = {
     ],
     description: 'Spreadsheets with tabular data, formulas, and charts',
     icon: 'file-excel',
+  },
+  video: {
+    id: 'video',
+    name: 'Video',
+    extensions: ['.mp4', '.mov', '.avi', '.mkv', '.webm'],
+    mimeTypes: [
+      'video/mp4',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/x-matroska',
+      'video/webm',
+    ],
+    description: 'Video files for summarization, chapter extraction, and content moderation',
+    icon: 'file-video',
+  },
+  audio: {
+    id: 'audio',
+    name: 'Audio',
+    extensions: ['.mp3', '.wav', '.flac', '.m4a', '.ogg'],
+    mimeTypes: [
+      'audio/mpeg',
+      'audio/wav',
+      'audio/flac',
+      'audio/mp4',
+      'audio/ogg',
+    ],
+    description: 'Audio files for transcription, summarization, and content moderation',
+    icon: 'file-audio',
   },
 };
 

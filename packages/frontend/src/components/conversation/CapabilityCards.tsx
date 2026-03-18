@@ -2,23 +2,61 @@ import Cards from '@cloudscape-design/components/cards';
 import Header from '@cloudscape-design/components/header';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import Box from '@cloudscape-design/components/box';
+import Button from '@cloudscape-design/components/button';
 import Toggle from '@cloudscape-design/components/toggle';
 import ProgressBar from '@cloudscape-design/components/progress-bar';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import Badge from '@cloudscape-design/components/badge';
+import Spinner from '@cloudscape-design/components/spinner';
+import Tabs from '@cloudscape-design/components/tabs';
 import type { CapabilityRecommendation, Capability, CapabilityCategory } from '@idp/shared';
 import { CAPABILITY_INFO, CAPABILITY_CATEGORIES, CATEGORY_INFO } from '@idp/shared';
+import type { PreviewResponse, MethodResult } from '../../hooks/usePreview';
 
 interface CapabilityCardsProps {
   recommendations: CapabilityRecommendation[];
   selected: Capability[];
   onToggle: (capability: Capability, enabled: boolean) => void;
+  onRunPreview?: () => void;
+  isPreviewLoading?: boolean;
+  preview?: PreviewResponse | null;
+}
+
+/** Render extraction result for a single capability from a method */
+function ExtractionResult({ result, capId }: { result: MethodResult; capId: string }) {
+  if (result.error) return <Box color="text-status-error" fontSize="body-s">{result.error}</Box>;
+
+  // Try to find capability-specific data in results
+  const data = result.results as Record<string, unknown>;
+  const extractions = (data?.extractions ?? data) as Record<string, unknown>;
+  const capData = extractions?.[capId] as Record<string, unknown> | undefined;
+
+  if (!capData && !data?.raw) {
+    return <Box color="text-body-secondary" fontSize="body-s">No data extracted</Box>;
+  }
+
+  const content = capData?.data ?? capData ?? data?.raw ?? '';
+  const displayText = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+
+  return (
+    <pre style={{
+      fontSize: '12px', lineHeight: 1.4, margin: 0,
+      maxHeight: '200px', overflow: 'auto',
+      background: '#f8f9fa', padding: '8px', borderRadius: '4px',
+      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+    }}>
+      {displayText.substring(0, 2000)}
+    </pre>
+  );
 }
 
 export default function CapabilityCards({
   recommendations,
   selected,
   onToggle,
+  onRunPreview,
+  isPreviewLoading,
+  preview,
 }: CapabilityCardsProps) {
   // Group recommendations by category
   const groupedByCategory: Record<CapabilityCategory, CapabilityRecommendation[]> = {} as Record<CapabilityCategory, CapabilityRecommendation[]>;
@@ -40,6 +78,21 @@ export default function CapabilityCards({
         variant="h2"
         description="Based on your document analysis, these capabilities are recommended"
         counter={`(${selected.length} selected)`}
+        actions={
+          selected.length > 0 && onRunPreview ? (
+            <SpaceBetween direction="horizontal" size="xs">
+              {isPreviewLoading && <Spinner />}
+              <Button
+                variant={preview ? 'normal' : 'primary'}
+                onClick={onRunPreview}
+                loading={isPreviewLoading}
+                iconName="play"
+              >
+                {preview ? 'Re-run Preview' : `Run Preview (${selected.length})`}
+              </Button>
+            </SpaceBetween>
+          ) : undefined
+        }
       >
         Recommended Capabilities
       </Header>

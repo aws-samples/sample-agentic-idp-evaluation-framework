@@ -18,14 +18,9 @@ output "backend_role_arn" {
   value       = aws_iam_role.backend.arn
 }
 
-output "apprunner_service_url" {
-  description = "App Runner service URL"
-  value       = aws_apprunner_service.backend.service_url
-}
-
-output "apprunner_service_arn" {
-  description = "App Runner service ARN"
-  value       = aws_apprunner_service.backend.arn
+output "agentcore_runtime_arn" {
+  description = "AgentCore agent runtime ARN"
+  value       = aws_bedrockagentcore_agent_runtime.idp_agent.arn
 }
 
 output "cloudfront_domain" {

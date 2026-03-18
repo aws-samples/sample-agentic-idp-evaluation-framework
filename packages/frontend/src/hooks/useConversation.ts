@@ -45,15 +45,26 @@ function extractAmbiguity(text: string): AmbiguityScores | null {
   }
 }
 
-/** Extract <options>[...]</options> from text and return parsed options */
+/** Extract <options>[...]</options> from text and return parsed options.
+ *  Handles JSON array, markdown list (- item), and bracket format ([item1] [item2]). */
 function extractQuickReplies(text: string): string[] {
   const match = text.match(/<options>([\s\S]*?)<\/options>/);
   if (!match) return [];
+  const content = match[1].trim();
+  // Try JSON array first
   try {
-    return JSON.parse(match[1]) as string[];
-  } catch {
-    return [];
-  }
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) return parsed;
+  } catch { /* not JSON */ }
+  // Try bracket format: [option1] [option2] [option3]
+  const bracketItems = [...content.matchAll(/\[([^\]]+)\]/g)].map((m) => m[1].trim());
+  if (bracketItems.length > 1) return bracketItems;
+  // Try markdown list format (- item or * item)
+  const lines = content.split('\n').map((l) => l.trim()).filter(Boolean);
+  const items = lines
+    .map((l) => l.replace(/^[-*]\s+/, '').replace(/^\d+\.\s+/, '').trim())
+    .filter((l) => l.length > 0 && l.length < 200);
+  return items.length > 0 ? items : [];
 }
 
 /**
@@ -128,10 +139,26 @@ export function useConversation(
   documentId: string | null,
   s3Uri?: string,
 ): UseConversationResult {
-  const [baseMessages, setBaseMessages] = useState<ChatMessage[]>([]);
+  // Restore conversation from localStorage (#19)
+  const [baseMessages, setBaseMessages] = useState<ChatMessage[]>(() => {
+    if (!documentId) return [];
+    try {
+      const saved = localStorage.getItem(`idp-conversation-${documentId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [recommendations, setRecommendations] = useState<CapabilityRecommendation[] | null>(null);
   const [ambiguity, setAmbiguity] = useState<AmbiguityScores | null>(null);
   const initDone = useRef(false);
+
+  // Save conversation to localStorage on change (#19)
+  useEffect(() => {
+    if (documentId && baseMessages.length > 0) {
+      try {
+        localStorage.setItem(`idp-conversation-${documentId}`, JSON.stringify(baseMessages));
+      } catch { /* quota exceeded — ignore */ }
+    }
+  }, [documentId, baseMessages]);
   const eventsRef = useRef<ConversationEvent[]>([]);
 
   const { events, status, error, start } = useSSE<ConversationEvent>('/api/conversation');
