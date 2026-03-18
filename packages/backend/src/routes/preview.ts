@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import sharp from 'sharp';
+import YAML from 'yaml';
 import { ConverseCommand, type Message } from '@aws-sdk/client-bedrock-runtime';
 import { bedrockClient, config } from '../config/aws.js';
 import { getDocumentBuffer } from '../services/s3.js';
@@ -70,28 +71,25 @@ function calculateCost(method: string, usage: TokenUsage): ActualCost {
 }
 
 // Static extraction instructions (cached via CachePoint for 10x cost reduction)
+// YAML output saves 10-30% output tokens vs JSON (genaaiidp pattern)
 const EXTRACTION_SYSTEM_PROMPT = `You are a document extraction engine. Extract structured data from documents.
 
 RULES:
-- Return ONLY valid JSON. No markdown, no explanation, no code blocks.
+- Return ONLY valid YAML. No markdown, no explanation, no code blocks.
 - Extract actual values from the document, not placeholders.
 - Set confidence to 0.0-1.0 based on extraction quality.
-- If a capability is not found, set found=false with null data.
+- If a capability is not found, set found: false with data: null.
 
-Return format:
-{
-  "document_type": "detected type",
-  "language": "detected language",
-  "confidence": 0.0-1.0,
-  "extractions": {
-    "<capability_name>": {
-      "found": true/false,
-      "data": <extracted data>,
-      "confidence": 0.0-1.0
-    }
-  },
-  "summary": "one-line summary of document"
-}`;
+Return format (YAML):
+document_type: detected type
+language: detected language
+confidence: 0.0-1.0
+extractions:
+  capability_name:
+    found: true/false
+    data: extracted data
+    confidence: 0.0-1.0
+summary: one-line summary of document`;
 
 function buildExtractionPrompt(capabilities: Capability[]): string {
   const capList = capabilities.map((c) => `- ${c.replace(/_/g, ' ')}`).join('\n');
@@ -186,17 +184,26 @@ router.post('/', async (req, res) => {
         };
         const actualCost = calculateCost(m.method, tokenUsage);
 
-        // Try to parse JSON from response
+        // Try to parse YAML first (cheaper output), then JSON fallback
         let results: Record<string, unknown> = {};
         try {
-          const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/) ?? rawText.match(/(\{[\s\S]*\})/);
-          if (jsonMatch) {
-            results = JSON.parse(jsonMatch[1]);
+          // Strip code block markers if present
+          const clean = rawText.replace(/^```(?:ya?ml|json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
+          // Try YAML parse (handles both YAML and JSON since JSON is valid YAML)
+          const parsed = YAML.parse(clean);
+          if (parsed && typeof parsed === 'object') {
+            results = parsed;
           } else {
-            results = JSON.parse(rawText);
+            results = { raw: rawText };
           }
         } catch {
-          results = { raw: rawText };
+          // Last resort: try JSON extraction
+          try {
+            const jsonMatch = rawText.match(/(\{[\s\S]*\})/);
+            results = jsonMatch ? JSON.parse(jsonMatch[1]) : { raw: rawText };
+          } catch {
+            results = { raw: rawText };
+          }
         }
 
         return {
