@@ -83,10 +83,11 @@ router.post('/', async (req, res) => {
 
     const methods = selectPreviewMethods(body.capabilities, body.methods);
 
-    // Filter out methods without configured backends
+    // Filter out methods without configured backends or incompatible with local storage
+    const isLocal = body.s3Uri.startsWith('local://');
     const validMethods = methods.filter((m) => {
-      if (m === 'bda-standard' && !config.bdaProfileArn) return false;
-      if (m === 'bda-custom' && !config.bdaProjectArn) return false;
+      if (m === 'bda-standard' && (!config.bdaProfileArn || isLocal)) return false;
+      if (m === 'bda-custom' && (!config.bdaProjectArn || isLocal)) return false;
       return !!PROCESSOR_FACTORY[m];
     });
 
