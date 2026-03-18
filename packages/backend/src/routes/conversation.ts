@@ -127,6 +127,13 @@ CAPABILITY REFERENCE (22 capabilities, 4 method families):
 - medical_records [LLM:excellent, BDA:good, Textract:limited]
 - contract_analysis [LLM:excellent, BDA:limited, Textract:none]
 
+**Media Processing** — BDA exclusive for video/audio; LLM for moderation:
+- video_summarization [LLM:none, BDA:excellent] — full video + chapter summaries
+- video_chapter_extraction [LLM:none, BDA:excellent] — scene segmentation + IAB
+- audio_transcription [LLM:none, BDA:excellent] — 11 languages, 30 speakers
+- audio_summarization [LLM:none, BDA:excellent] — topic-based summaries
+- content_moderation [LLM:good, BDA:excellent] — 7 categories (image/video/audio)
+
 BUNDLING RULES:
 - A single LLM call (Claude/Nova) can handle ALL capabilities simultaneously via system prompt
 - BDA processes per-document with a fixed set of outputs (best for invoices, receipts, splitting)

@@ -164,7 +164,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
 
         {/* Capabilities */}
         <div id="capabilities">
-          <Container header={<Header variant="h2" counter="(22)">Capabilities</Header>}>
+          <Container header={<Header variant="h2" counter="(27)">Capabilities</Header>}>
             <SpaceBetween size="m">
               {CAPABILITY_CATEGORIES.map((catId) => {
                 const cat = CATEGORY_INFO[catId];

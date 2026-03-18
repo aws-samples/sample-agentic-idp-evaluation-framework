@@ -57,13 +57,14 @@ IDP Evaluation Platform that helps AWS SAs and customers find the optimal docume
 | BDA Custom | $0.04/page | — |
 | Textract | $0.0015/page | — |
 
-## 22 Capabilities (5 Categories)
+## 27 Capabilities (6 Categories)
 
-1. **Core Extraction**: Text, Handwriting, Table, Key-Value, Entity
-2. **Visual Analysis**: Image/Chart, Bounding Box, Signature, Barcode/QR, Layout
-3. **Document Intelligence**: Classification, Splitting, Summarization, Language Detection
-4. **Compliance & Security**: PII Detection, PII Redaction
-5. **Industry-Specific**: Invoice, Receipt, Check, Insurance Claims, Medical Records, Contract
+1. **Core Extraction** (5): Text, Handwriting, Table, Key-Value, Entity
+2. **Visual Analysis** (5): Image/Chart, Bounding Box, Signature, Barcode/QR, Layout
+3. **Document Intelligence** (4): Classification, Splitting, Summarization, Language Detection
+4. **Compliance & Security** (2): PII Detection, PII Redaction
+5. **Industry-Specific** (6): Invoice, Receipt, Check, Insurance Claims, Medical Records, Contract
+6. **Media Processing** (5): Video Summarization, Video Chapter Extraction, Audio Transcription, Audio Summarization, Content Moderation
 
 ## Collaboration Context (Raj + WWSO Team)
 
