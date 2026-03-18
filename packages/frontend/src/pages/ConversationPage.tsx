@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
 import SpaceBetween from '@cloudscape-design/components/space-between';
@@ -35,7 +35,9 @@ export default function ConversationPage({
   const { preview, isLoading: isPreviewLoading, error: previewError, runPreview } = usePreview();
   const [selectedMethod, setSelectedMethod] = useState<string>('');
 
-  // Initialize selected capabilities from recommendations
+  // Initialize selected capabilities from recommendations and auto-run preview
+  const autoPreviewDone = useRef(false);
+
   useEffect(() => {
     if (recommendations && selectedCapabilities.length === 0) {
       const caps = recommendations
@@ -44,6 +46,21 @@ export default function ConversationPage({
       onCapabilitiesSelected(caps);
     }
   }, [recommendations, selectedCapabilities.length, onCapabilitiesSelected]);
+
+  // Auto-run preview once when capabilities are first selected from recommendations
+  useEffect(() => {
+    if (
+      document &&
+      selectedCapabilities.length > 0 &&
+      recommendations &&
+      !preview &&
+      !isPreviewLoading &&
+      !autoPreviewDone.current
+    ) {
+      autoPreviewDone.current = true;
+      runPreview(document.documentId, document.s3Uri, selectedCapabilities);
+    }
+  }, [document, selectedCapabilities, recommendations, preview, isPreviewLoading, runPreview]);
 
   const handleToggleCapability = useCallback(
     (cap: Capability, enabled: boolean) => {
