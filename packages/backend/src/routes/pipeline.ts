@@ -148,9 +148,11 @@ router.post('/execute', async (req, res) => {
       (node) => (node.config as any).capability,
     );
 
+    const fileName = s3Uri.split('/').pop() ?? 'document.pdf';
     const input: AdapterInput = {
       documentBuffer,
       s3Uri,
+      fileName,
       capabilities,
       pageCount,
     };

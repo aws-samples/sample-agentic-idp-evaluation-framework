@@ -10,6 +10,7 @@ export interface StreamAdapter {
 export interface AdapterInput {
   documentBuffer: Buffer;
   s3Uri: string;
+  fileName: string;
   capabilities: string[];
   pageCount: number;
 }

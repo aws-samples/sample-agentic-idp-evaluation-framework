@@ -199,8 +199,15 @@ export default function ConversationPage({
           </Alert>
         )}
 
-        {/* Preview Results Comparison */}
-        {preview && (
+        {/* All methods failed */}
+        {preview && !previewError && preview.results.every((r) => r.status === 'error') && (
+          <Alert type="warning" header="All preview methods failed">
+            {preview.results.map((r) => `${r.shortName}: ${r.error ?? 'Unknown error'}`).join(' | ')}
+          </Alert>
+        )}
+
+        {/* Preview Results Comparison — only show if at least one method succeeded */}
+        {preview && preview.results.some((r) => r.status === 'complete') && (
           <PreviewComparison
             preview={preview}
             selectedMethod={selectedMethod}

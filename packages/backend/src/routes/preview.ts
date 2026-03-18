@@ -76,6 +76,7 @@ router.post('/', async (req, res) => {
     const input: AdapterInput = {
       documentBuffer: docBuffer,
       s3Uri: body.s3Uri,
+      fileName,
       capabilities: body.capabilities,
       pageCount,
     };

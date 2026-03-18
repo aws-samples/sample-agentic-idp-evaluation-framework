@@ -27,6 +27,12 @@ export class TwoPhaseAdapter implements StreamAdapter {
 
   async run(res: Response | null, input: AdapterInput): Promise<AdapterOutput> {
     const start = Date.now();
+    const fileName = input.fileName;
+    const isSupported = /\.(pdf|jpg|jpeg|png|tiff|tif)$/i.test(fileName);
+
+    if (!isSupported) {
+      throw new Error(`Textract does not support ${fileName.split('.').pop()?.toUpperCase()} files. Use a direct LLM method instead.`);
+    }
 
     // Phase 1: Textract extraction
     emitProgress(res, this.method, 'all', 0, 'Running Textract OCR...');

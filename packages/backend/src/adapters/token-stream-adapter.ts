@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import type { ProcessingMethod } from '@idp/shared';
 import { METHOD_INFO } from '@idp/shared';
+import sharp from 'sharp';
 import {
   ConverseStreamCommand,
   type ContentBlock,
@@ -10,6 +11,30 @@ import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapte
 import { emitProgress } from './stream-adapter.js';
 import { bedrockClient } from '../config/aws.js';
 import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
+
+const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
+const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp)$/i;
+const PDF_EXTENSION = /\.pdf$/i;
+
+type ImageFormat = 'jpeg' | 'png' | 'gif' | 'webp';
+
+async function resizeImageIfNeeded(buffer: Buffer, format: string): Promise<Buffer> {
+  if (buffer.length <= MAX_IMAGE_BYTES) return buffer;
+  const ratio = Math.sqrt(MAX_IMAGE_BYTES / buffer.length);
+  const metadata = await sharp(buffer).metadata();
+  const newWidth = Math.round((metadata.width ?? 2000) * ratio);
+  let img = sharp(buffer).resize({ width: newWidth, withoutEnlargement: true });
+  if (format === 'jpeg' || format === 'jpg') img = img.jpeg({ quality: 80 });
+  else if (format === 'png') img = img.png({ compressionLevel: 8 });
+  else img = img.jpeg({ quality: 80 });
+  return img.toBuffer();
+}
+
+function getImageFormat(fileName: string): ImageFormat {
+  const ext = fileName.match(/\.(\w+)$/)?.[1]?.toLowerCase() ?? 'jpeg';
+  const map: Record<string, ImageFormat> = { jpg: 'jpeg', jpeg: 'jpeg', png: 'png', gif: 'gif', webp: 'webp', tiff: 'jpeg', tif: 'jpeg', bmp: 'jpeg' };
+  return map[ext] ?? 'jpeg';
+}
 
 function buildSystemPrompt(capabilities: string[]): string {
   return `You are a document processing AI. Extract the following capabilities from the provided document:
@@ -41,24 +66,29 @@ export class TokenStreamAdapter implements StreamAdapter {
 
     emitProgress(res, this.method, 'all', 0, 'Sending document to model...');
 
-    const documentContent: ContentBlock = {
-      document: {
-        name: 'document',
-        format: 'pdf',
-        source: {
-          bytes: input.documentBuffer,
-        },
-      },
-    };
+    const contentBlocks: ContentBlock[] = [];
+    const fileName = input.fileName;
+
+    if (IMAGE_EXTENSIONS.test(fileName)) {
+      const format = getImageFormat(fileName);
+      const resized = await resizeImageIfNeeded(input.documentBuffer, format);
+      contentBlocks.push({
+        image: { format, source: { bytes: resized } },
+      });
+    } else if (PDF_EXTENSION.test(fileName)) {
+      contentBlocks.push({
+        document: { name: 'document', format: 'pdf', source: { bytes: input.documentBuffer } },
+      });
+    } else {
+      // Office/text files: buffer contains extracted text from file-converter
+      const text = input.documentBuffer.toString('utf-8');
+      contentBlocks.push({ text: `Document content:\n${text}` });
+    }
+
+    contentBlocks.push({ text: `Process this document and extract: ${input.capabilities.join(', ')}` });
 
     const messages: Message[] = [
-      {
-        role: 'user',
-        content: [
-          documentContent,
-          { text: `Process this document and extract: ${input.capabilities.join(', ')}` },
-        ],
-      },
+      { role: 'user', content: contentBlocks },
     ];
 
     const command = new ConverseStreamCommand({

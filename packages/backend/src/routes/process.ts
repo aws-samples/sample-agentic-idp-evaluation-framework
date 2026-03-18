@@ -42,10 +42,12 @@ router.post('/', async (req, res) => {
   try {
     const documentBuffer = await getDocumentBuffer(body.s3Uri);
     const pageCount = estimatePageCount(documentBuffer);
+    const fileName = body.s3Uri.split('/').pop() ?? 'document.pdf';
 
     const input: AdapterInput = {
       documentBuffer,
       s3Uri: body.s3Uri,
+      fileName,
       capabilities: body.capabilities,
       pageCount,
     };
