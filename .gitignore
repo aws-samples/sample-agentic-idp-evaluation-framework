@@ -39,3 +39,7 @@ reference/*/dist/
 reference/*/.terraform/
 reference/*/venv/
 reference/*/__pycache__/
+reference/.omc/
+.omc/state/
+.omc/handoffs/
+packages/backend/.local-uploads/
