@@ -12,7 +12,7 @@ const MAX_POLL_ATTEMPTS = 200; // ~10 minutes
 export class SyncPollAdapter implements StreamAdapter {
   constructor(public readonly method: ProcessingMethod) {}
 
-  async run(res: Response, input: AdapterInput): Promise<AdapterOutput> {
+  async run(res: Response | null, input: AdapterInput): Promise<AdapterOutput> {
     const start = Date.now();
 
     emitProgress(res, this.method, 'all', 0, 'Invoking BDA...');

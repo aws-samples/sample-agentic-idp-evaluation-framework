@@ -11,6 +11,7 @@ import { generatePipeline } from '../services/pipeline-generator.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { getDocumentBuffer } from '../services/s3.js';
 import { calculateCost } from '../services/pricing.js';
+import { config } from '../config/aws.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
 import {
@@ -30,7 +31,7 @@ import {
   TextractNovaProProcessor,
 } from '../processors/textract-llm.js';
 
-const PROCESSOR_MAP: Record<ProcessingMethod, () => ProcessorBase> = {
+const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Record<string, () => ProcessorBase> = {
   'bda-standard': () => new BdaStandardProcessor(),
   'bda-custom': () => new BdaCustomProcessor(),
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
@@ -154,63 +155,88 @@ router.post('/execute', async (req, res) => {
       pageCount,
     };
 
+    // Filter out BDA methods with missing ARNs
+    const validMethodNodes = methodNodes.filter((node) => {
+      const method: ProcessingMethod = (node.config as any).method;
+      if (method === 'bda-standard' && !config.bdaProfileArn) {
+        emitSSE(res, {
+          type: 'node_error',
+          nodeId: node.id,
+          error: 'BDA Standard not configured (BDA_PROFILE_ARN is empty)',
+        } as PipelineExecutionEvent);
+        return false;
+      }
+      if (method === 'bda-custom' && !config.bdaProjectArn) {
+        emitSSE(res, {
+          type: 'node_error',
+          nodeId: node.id,
+          error: 'BDA Custom not configured (BDA_PROJECT_ARN is empty)',
+        } as PipelineExecutionEvent);
+        return false;
+      }
+      return true;
+    });
+
     // Track total cost and results
     let totalCost = 0;
     const allResults: Record<string, CapabilityResult> = {};
 
-    // Execute method nodes
-    for (const methodNode of methodNodes) {
-      const methodConfig = methodNode.config as any;
-      const method: ProcessingMethod = methodConfig.method;
+    // Execute method nodes in PARALLEL
+    const settled = await Promise.allSettled(
+      validMethodNodes.map(async (methodNode) => {
+        const methodConfig = methodNode.config as any;
+        const method: ProcessingMethod = methodConfig.method;
 
-      // Emit node start
-      emitSSE(res, {
-        type: 'node_start',
-        nodeId: methodNode.id,
-        nodeType: 'method',
-      } as PipelineExecutionEvent);
+        // Emit node start
+        emitSSE(res, {
+          type: 'node_start',
+          nodeId: methodNode.id,
+          nodeType: 'method',
+        } as PipelineExecutionEvent);
 
-      try {
-        const processor = PROCESSOR_MAP[method]();
+        try {
+          const factory = PROCESSOR_MAP[method];
+          if (!factory) {
+            emitSSE(res, { type: 'node_error', nodeId: methodNode.id, error: `No processor for method: ${method}` } as PipelineExecutionEvent);
+            return;
+          }
+          const processor = factory();
+          const result = await processor.process(res, input);
 
-        // Execute processor (this internally emits method_start, method_complete events)
-        const result = await processor.process(res, input);
+          if (result.status === 'complete') {
+            Object.assign(allResults, result.results);
+            totalCost += result.metrics.cost;
 
-        if (result.status === 'complete') {
-          // Merge results
-          Object.assign(allResults, result.results);
+            emitSSE(res, {
+              type: 'node_complete',
+              nodeId: methodNode.id,
+              result: result.results,
+              metrics: {
+                latencyMs: result.metrics.latencyMs,
+                cost: result.metrics.cost,
+              },
+            } as PipelineExecutionEvent);
 
-          totalCost += result.metrics.cost;
-
-          // Emit node complete
-          emitSSE(res, {
-            type: 'node_complete',
-            nodeId: methodNode.id,
-            result: result.results,
-            metrics: {
-              latencyMs: result.metrics.latencyMs,
-              cost: result.metrics.cost,
-            },
-          } as PipelineExecutionEvent);
-        } else {
-          // Emit node error
+            return result;
+          } else {
+            emitSSE(res, {
+              type: 'node_error',
+              nodeId: methodNode.id,
+              error: `Method ${method} failed`,
+            } as PipelineExecutionEvent);
+          }
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Unknown error';
           emitSSE(res, {
             type: 'node_error',
             nodeId: methodNode.id,
-            error: `Method ${method} failed`,
+            error: errorMsg,
           } as PipelineExecutionEvent);
         }
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-        emitSSE(res, {
-          type: 'node_error',
-          nodeId: methodNode.id,
-          error: errorMsg,
-        } as PipelineExecutionEvent);
-      }
-    }
+      }),
+    );
 
-    // Emit pipeline complete
+    // Emit pipeline complete AFTER all methods finish
     const totalLatencyMs = Date.now() - startTime;
     emitSSE(res, {
       type: 'pipeline_complete',

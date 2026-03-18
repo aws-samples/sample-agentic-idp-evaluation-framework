@@ -3,9 +3,11 @@ import type { AuthUser } from '../../services/api';
 
 interface TopNavProps {
   user: AuthUser | null;
+  darkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
 
-export default function TopNav({ user }: TopNavProps) {
+export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps) {
   return (
     <TopNavigation
       identity={{
@@ -17,6 +19,12 @@ export default function TopNav({ user }: TopNavProps) {
         },
       }}
       utilities={[
+        {
+          type: 'button',
+          iconName: darkMode ? 'status-positive' : 'status-stopped',
+          text: darkMode ? 'Light Mode' : 'Dark Mode',
+          onClick: onToggleDarkMode,
+        },
         {
           type: 'button',
           text: 'GitHub',

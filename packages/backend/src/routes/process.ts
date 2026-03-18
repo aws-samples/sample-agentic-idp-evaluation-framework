@@ -11,7 +11,7 @@ import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.j
 import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor, TextractNovaProProcessor } from '../processors/textract-llm.js';
 import { config } from '../config/aws.js';
 
-const PROCESSOR_MAP: Record<ProcessingMethod, () => ProcessorBase> = {
+const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Record<string, () => ProcessorBase> = {
   'bda-standard': () => new BdaStandardProcessor(),
   'bda-custom': () => new BdaCustomProcessor(),
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
@@ -50,7 +50,7 @@ router.post('/', async (req, res) => {
       pageCount,
     };
 
-    // Filter methods: skip bda-custom if no project ARN
+    // Filter methods: skip BDA methods if ARNs not configured
     const methods = body.methods.filter((m) => {
       if (m === 'bda-custom' && !config.bdaProjectArn) {
         emitSSE(res, {
@@ -60,14 +60,24 @@ router.post('/', async (req, res) => {
         });
         return false;
       }
+      if (m === 'bda-standard' && !config.bdaProfileArn) {
+        emitSSE(res, {
+          type: 'method_error',
+          method: m,
+          error: 'BDA Standard not configured (BDA_PROFILE_ARN is empty)',
+        });
+        return false;
+      }
       return true;
     });
 
     // Run all processors in parallel
-    const processorPromises = methods.map(async (method) => {
-      const processor = PROCESSOR_MAP[method]();
-      return processor.process(res, input);
-    });
+    const processorPromises = methods
+      .filter((method) => PROCESSOR_MAP[method]) // skip methods without processors (e.g. embeddings)
+      .map(async (method) => {
+        const processor = PROCESSOR_MAP[method]!();
+        return processor.process(res, input);
+      });
 
     const settledResults = await Promise.allSettled(processorPromises);
 

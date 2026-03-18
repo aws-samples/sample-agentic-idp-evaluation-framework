@@ -7,6 +7,7 @@ export const CAPABILITY_CATEGORIES = [
   'compliance_security',
   'industry_specific',
   'media_processing',
+  'advanced_ai',
 ] as const;
 
 export type CapabilityCategory = (typeof CAPABILITY_CATEGORIES)[number];
@@ -55,6 +56,12 @@ export const CATEGORY_INFO: Record<CapabilityCategory, CategoryInfo> = {
     description: 'Video summarization, audio transcription, and content moderation via BDA',
     color: '#9469d6',
   },
+  advanced_ai: {
+    id: 'advanced_ai',
+    name: 'Advanced AI',
+    description: 'Image separation, multimodal embeddings, and knowledge base integration',
+    color: '#2563eb',
+  },
 };
 
 // ─── Capabilities ────────────────────────────────────────────────────────────
@@ -93,6 +100,10 @@ export const CAPABILITIES = [
   'audio_transcription',
   'audio_summarization',
   'content_moderation',
+  // Advanced AI
+  'image_separation',
+  'embedding_generation',
+  'knowledge_base_ingestion',
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -388,6 +399,38 @@ export const CAPABILITY_INFO: Record<Capability, CapabilityInfo> = {
     tags: ['moderation', 'safety', 'nsfw', 'violence', 'explicit', 'compliance'],
     exampleInput: 'User-uploaded image or video',
     exampleOutput: 'Moderation flags with confidence scores per category',
+  },
+
+  // ─── Advanced AI ─────────────────────────────────────────────────────────────
+  image_separation: {
+    id: 'image_separation',
+    name: 'Image Separation',
+    description: 'Extract embedded images, charts, and figures from documents. Separate visual elements from text for independent OCR and analysis.',
+    category: 'advanced_ai',
+    icon: 'image-off',
+    tags: ['image', 'extract', 'separate', 'figure', 'chart', 'embedded', 'ocr'],
+    exampleInput: 'PDF with embedded product photos and charts',
+    exampleOutput: 'Individual images extracted with captions and page locations',
+  },
+  embedding_generation: {
+    id: 'embedding_generation',
+    name: 'Embedding Generation',
+    description: 'Generate multimodal vector embeddings for text, images, documents, video, and audio using Nova Multimodal Embeddings. Enables semantic search and RAG.',
+    category: 'advanced_ai',
+    icon: 'database',
+    tags: ['embedding', 'vector', 'semantic', 'search', 'rag', 'multimodal', 'similarity'],
+    exampleInput: 'Document pages, images, or text passages',
+    exampleOutput: 'Vector embeddings (256-3072 dimensions) for indexing in vector stores',
+  },
+  knowledge_base_ingestion: {
+    id: 'knowledge_base_ingestion',
+    name: 'Knowledge Base Ingestion',
+    description: 'Ingest processed documents into Amazon Bedrock Knowledge Base for retrieval-augmented generation. Final pipeline step that enables AI-powered Q&A over your document corpus.',
+    category: 'advanced_ai',
+    icon: 'library',
+    tags: ['knowledge', 'base', 'rag', 'ingestion', 'bedrock', 'retrieval', 'qa'],
+    exampleInput: 'Extracted text + embeddings from processing pipeline',
+    exampleOutput: 'Documents indexed in Bedrock Knowledge Base, queryable via RetrieveAndGenerate API',
   },
 };
 

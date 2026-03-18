@@ -9,9 +9,10 @@ import ExpandableSection from '@cloudscape-design/components/expandable-section'
 import Badge from '@cloudscape-design/components/badge';
 import Spinner from '@cloudscape-design/components/spinner';
 import Tabs from '@cloudscape-design/components/tabs';
+import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import type { CapabilityRecommendation, Capability, CapabilityCategory } from '@idp/shared';
 import { CAPABILITY_INFO, CAPABILITY_CATEGORIES, CATEGORY_INFO } from '@idp/shared';
-import type { PreviewResponse, MethodResult } from '../../hooks/usePreview';
+import type { PreviewResponse, MethodResult, CapabilityResult } from '../../hooks/usePreview';
 
 interface CapabilityCardsProps {
   recommendations: CapabilityRecommendation[];
@@ -22,21 +23,19 @@ interface CapabilityCardsProps {
   preview?: PreviewResponse | null;
 }
 
-/** Render extraction result for a single capability from a method */
-function ExtractionResult({ result, capId }: { result: MethodResult; capId: string }) {
-  if (result.error) return <Box color="text-status-error" fontSize="body-s">{result.error}</Box>;
+function renderExtraction(data: unknown, format: string): React.ReactNode {
+  if (data == null) return <Box color="text-body-secondary" fontSize="body-s">No data</Box>;
 
-  // Try to find capability-specific data in results
-  const data = result.results as Record<string, unknown>;
-  const extractions = (data?.extractions ?? data) as Record<string, unknown>;
-  const capData = extractions?.[capId] as Record<string, unknown> | undefined;
+  const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
 
-  if (!capData && !data?.raw) {
-    return <Box color="text-body-secondary" fontSize="body-s">No data extracted</Box>;
+  if (format === 'html' && typeof data === 'string') {
+    return (
+      <div
+        style={{ fontSize: '12px', maxHeight: '200px', overflow: 'auto' }}
+        dangerouslySetInnerHTML={{ __html: data }}
+      />
+    );
   }
-
-  const content = capData?.data ?? capData ?? data?.raw ?? '';
-  const displayText = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
 
   return (
     <pre style={{
@@ -45,8 +44,53 @@ function ExtractionResult({ result, capId }: { result: MethodResult; capId: stri
       background: '#f8f9fa', padding: '8px', borderRadius: '4px',
       whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     }}>
-      {displayText.substring(0, 2000)}
+      {text.substring(0, 2000)}
     </pre>
+  );
+}
+
+function InlinePreviewResult({ capId, preview }: { capId: string; preview: PreviewResponse }) {
+  const methodResults = preview.results.filter((r) => r.status === 'complete');
+  if (methodResults.length === 0) return null;
+
+  const tabs = methodResults.map((r) => {
+    const capResult = r.results[capId] as CapabilityResult | undefined;
+    const hasData = capResult && capResult.data != null;
+
+    return {
+      id: r.method,
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {r.shortName}
+          {hasData ? (
+            <span style={{ color: '#037f0c', fontSize: '11px' }}>
+              {capResult.confidence != null ? `${Math.round(capResult.confidence * 100)}%` : ''}
+            </span>
+          ) : (
+            <span style={{ color: '#9ba7b6', fontSize: '11px' }}>N/A</span>
+          )}
+        </span>
+      ) as unknown as string,
+      content: hasData ? (
+        <div style={{ padding: '4px 0' }}>
+          {renderExtraction(capResult.data, capResult.format)}
+        </div>
+      ) : (
+        <Box color="text-body-secondary" fontSize="body-s" padding={{ top: 'xs' }}>
+          Not extracted by this method
+        </Box>
+      ),
+    };
+  });
+
+  return (
+    <div style={{
+      marginTop: '8px',
+      borderTop: '1px solid #e9ebed',
+      paddingTop: '8px',
+    }}>
+      <Tabs tabs={tabs} />
+    </div>
   );
 }
 
@@ -58,7 +102,6 @@ export default function CapabilityCards({
   isPreviewLoading,
   preview,
 }: CapabilityCardsProps) {
-  // Group recommendations by category
   const groupedByCategory: Record<CapabilityCategory, CapabilityRecommendation[]> = {} as Record<CapabilityCategory, CapabilityRecommendation[]>;
 
   for (const category of CAPABILITY_CATEGORIES) {
@@ -96,6 +139,31 @@ export default function CapabilityCards({
       >
         Recommended Capabilities
       </Header>
+
+      {/* Preview summary bar */}
+      {preview && !isPreviewLoading && (
+        <div style={{
+          display: 'flex', gap: '16px', flexWrap: 'wrap',
+          padding: '10px 16px', background: '#f0f8ff', borderRadius: '8px', border: '1px solid #d1e4f6',
+        }}>
+          {preview.results.filter((r) => r.status === 'complete').map((r) => (
+            <div key={r.method} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+              <StatusIndicator type="success">{r.shortName}</StatusIndicator>
+              <span style={{ color: '#5f6b7a' }}>{r.latencyMs}ms</span>
+              {r.estimatedCost != null && (
+                <span style={{ color: '#037f0c', fontWeight: 600 }}>
+                  ~${r.estimatedCost.toFixed(4)}
+                </span>
+              )}
+            </div>
+          ))}
+          {preview.results.filter((r) => r.status === 'error').map((r) => (
+            <div key={r.method} style={{ fontSize: '13px' }}>
+              <StatusIndicator type="error">{r.shortName}: {r.error}</StatusIndicator>
+            </div>
+          ))}
+        </div>
+      )}
 
       {CAPABILITY_CATEGORIES.map((category) => {
         const items = groupedByCategory[category];
@@ -176,13 +244,12 @@ export default function CapabilityCards({
                     ),
                   },
                   {
-                    id: 'rationale',
-                    header: 'Rationale',
-                    content: (item) => (
-                      <Box variant="small" color="text-body-secondary">
-                        {item.rationale}
-                      </Box>
-                    ),
+                    id: 'preview-results',
+                    content: (item) => {
+                      if (!preview || isPreviewLoading) return null;
+                      if (!selected.includes(item.capability)) return null;
+                      return <InlinePreviewResult capId={item.capability} preview={preview} />;
+                    },
                   },
                 ],
               }}

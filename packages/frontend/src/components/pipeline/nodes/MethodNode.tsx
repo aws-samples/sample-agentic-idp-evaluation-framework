@@ -16,7 +16,7 @@ const FAMILY_COLORS: Record<MethodFamily, string> = {
   bda: '#0972d3',
   claude: '#8b5cf6',
   nova: '#ec7211',
-  'textract-llm': '#037f0c',
+  'textract-llm': '#037f0c', embeddings: '#2563eb',
 };
 
 export default memo(function MethodNode({ data }: { data: MethodNodeData }) {

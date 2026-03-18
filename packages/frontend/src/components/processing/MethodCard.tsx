@@ -32,7 +32,7 @@ export default function MethodCard({ progress, capabilities }: MethodCardProps) 
     bda: 'BDA',
     claude: 'Claude',
     nova: 'Nova',
-    'textract-llm': 'Textract+LLM',
+    'textract-llm': 'Textract+LLM', embeddings: 'Embeddings',
   };
 
   return (

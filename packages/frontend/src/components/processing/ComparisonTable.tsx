@@ -37,7 +37,7 @@ export default function ComparisonTable({ comparison }: ComparisonTableProps) {
     bda: 'BDA',
     claude: 'Claude',
     nova: 'Nova',
-    'textract-llm': 'Textract+LLM',
+    'textract-llm': 'Textract+LLM', embeddings: 'Embeddings',
   };
 
   return (

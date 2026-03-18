@@ -33,7 +33,7 @@ export default function MetricsChart({ comparison }: MetricsChartProps) {
     bda: '#0972d3',
     claude: '#8b5cf6',
     nova: '#ec7211',
-    'textract-llm': '#037f0c',
+    'textract-llm': '#037f0c', embeddings: '#2563eb',
   };
 
   // Group by family for multiple series
@@ -42,6 +42,7 @@ export default function MetricsChart({ comparison }: MetricsChartProps) {
     claude: [],
     nova: [],
     'textract-llm': [],
+    embeddings: [],
   };
 
   for (const item of items) {

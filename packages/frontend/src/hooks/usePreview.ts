@@ -1,33 +1,31 @@
 import { useState, useCallback } from 'react';
-import type { Capability } from '@idp/shared';
+import type { Capability, MethodFamily } from '@idp/shared';
 
-export interface TokenUsage {
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-}
-
-export interface ActualCost {
-  inputCost: number;
-  outputCost: number;
-  totalCost: number;
+export interface CapabilityResult {
+  capability: string;
+  data: unknown;
+  confidence: number;
+  format: string;
 }
 
 export interface MethodResult {
   method: string;
   shortName: string;
-  results: Record<string, unknown>;
-  rawText: string;
+  family: MethodFamily;
+  status: 'complete' | 'error';
+  results: Record<string, CapabilityResult>;
+  rawOutput?: string;
   latencyMs: number;
-  tokenUsage?: TokenUsage;
-  actualCost?: ActualCost;
+  estimatedCost?: number;
+  confidence?: number;
   error?: string;
 }
 
 export interface MethodInfo {
   method: string;
   shortName: string;
-  tokenPricing?: { input: number; output: number };
+  family: string;
+  tokenPricing?: { inputPer1MTokens: number; outputPer1MTokens: number };
 }
 
 export interface PreviewResponse {

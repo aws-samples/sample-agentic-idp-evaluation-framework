@@ -12,6 +12,7 @@ import {
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
 import { textractClient, bedrockClient } from '../config/aws.js';
+import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
 
 export class TwoPhaseAdapter implements StreamAdapter {
   public readonly method: ProcessingMethod;
@@ -24,7 +25,7 @@ export class TwoPhaseAdapter implements StreamAdapter {
     return METHOD_INFO[this.method].modelId;
   }
 
-  async run(res: Response, input: AdapterInput): Promise<AdapterOutput> {
+  async run(res: Response | null, input: AdapterInput): Promise<AdapterOutput> {
     const start = Date.now();
 
     // Phase 1: Textract extraction
@@ -69,7 +70,12 @@ Return ONLY valid JSON, no markdown code blocks.`;
       system: [{ text: systemPrompt }],
       messages,
       inferenceConfig: {
-        maxTokens: 4096,
+        maxTokens: calculateMaxTokens(
+          input.capabilities.length,
+          input.pageCount ?? 1,
+          'json',
+          input.capabilities.some(isMediaCapability),
+        ),
         temperature: 0,
       },
     });

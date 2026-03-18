@@ -9,6 +9,7 @@ import {
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
 import { bedrockClient } from '../config/aws.js';
+import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
 
 function buildSystemPrompt(capabilities: string[]): string {
   return `You are a document processing AI. Extract the following capabilities from the provided document:
@@ -35,7 +36,7 @@ export class TokenStreamAdapter implements StreamAdapter {
     return METHOD_INFO[this.method].modelId;
   }
 
-  async run(res: Response, input: AdapterInput): Promise<AdapterOutput> {
+  async run(res: Response | null, input: AdapterInput): Promise<AdapterOutput> {
     const start = Date.now();
 
     emitProgress(res, this.method, 'all', 0, 'Sending document to model...');
@@ -65,7 +66,12 @@ export class TokenStreamAdapter implements StreamAdapter {
       system: [{ text: buildSystemPrompt(input.capabilities) }],
       messages,
       inferenceConfig: {
-        maxTokens: 4096,
+        maxTokens: calculateMaxTokens(
+          input.capabilities.length,
+          input.pageCount ?? 1,
+          'json',
+          input.capabilities.some(isMediaCapability),
+        ),
         temperature: 0,
       },
     });
@@ -74,6 +80,7 @@ export class TokenStreamAdapter implements StreamAdapter {
 
     let fullText = '';
     let tokenCount = 0;
+    let tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number } | undefined;
 
     if (response.stream) {
       for await (const event of response.stream) {
@@ -84,6 +91,14 @@ export class TokenStreamAdapter implements StreamAdapter {
 
           const progress = Math.min(Math.floor((tokenCount / 100) * 90), 90);
           emitProgress(res, this.method, 'all', progress, chunk);
+        }
+        if (event.metadata?.usage) {
+          const u = event.metadata.usage;
+          tokenUsage = {
+            inputTokens: u.inputTokens ?? 0,
+            outputTokens: u.outputTokens ?? 0,
+            totalTokens: (u.inputTokens ?? 0) + (u.outputTokens ?? 0),
+          };
         }
       }
     }
@@ -96,6 +111,7 @@ export class TokenStreamAdapter implements StreamAdapter {
       results,
       rawOutput: fullText,
       latencyMs: Date.now() - start,
+      tokenUsage,
     };
   }
 

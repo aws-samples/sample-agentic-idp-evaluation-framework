@@ -9,10 +9,10 @@ export abstract class ProcessorBase {
   abstract readonly adapter: StreamAdapter;
 
   async process(
-    res: Response,
+    res: Response | null,
     input: AdapterInput,
   ): Promise<ProcessorResult> {
-    emitSSE(res, { type: 'method_start', method: this.method });
+    if (res) emitSSE(res, { type: 'method_start', method: this.method });
 
     try {
       const output = await this.adapter.run(res, input);
@@ -45,11 +45,11 @@ export abstract class ProcessorBase {
         rawOutput: output.rawOutput,
       };
 
-      emitSSE(res, { type: 'method_complete', method: this.method, data: result });
+      if (res) emitSSE(res, { type: 'method_complete', method: this.method, data: result });
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      emitSSE(res, { type: 'method_error', method: this.method, error: message });
+      if (res) emitSSE(res, { type: 'method_error', method: this.method, error: message });
 
       return {
         method: this.method,

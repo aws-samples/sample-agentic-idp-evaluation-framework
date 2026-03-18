@@ -14,11 +14,12 @@ export const METHODS = [
   'textract-claude-haiku',
   'textract-nova-lite',
   'textract-nova-pro',
+  'nova-embeddings',
 ] as const;
 
 export type ProcessingMethod = (typeof METHODS)[number];
 
-export const METHOD_FAMILIES = ['bda', 'claude', 'nova', 'textract-llm'] as const;
+export const METHOD_FAMILIES = ['bda', 'claude', 'nova', 'textract-llm', 'embeddings'] as const;
 export type MethodFamily = (typeof METHOD_FAMILIES)[number];
 
 export interface TokenPricing {
@@ -179,6 +180,20 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     strengths: ['Textract precision + Nova Pro accuracy', 'Better structuring than Lite', 'Native bbox support'],
     limitations: ['Nova Pro is Gated Preview', 'Two-step process', 'Limited regional support'],
   },
+
+  // ─── Embeddings ──────────────────────────────────────────────────────────────
+  'nova-embeddings': {
+    id: 'nova-embeddings',
+    family: 'embeddings',
+    name: 'Nova Multimodal Embeddings',
+    shortName: 'Nova Embed',
+    description: 'Amazon Nova 2 Multimodal Embeddings — state-of-the-art unified embedding model for text, documents, images, video, and audio. Enables crossmodal semantic search and RAG.',
+    modelId: 'amazon.nova-2-multimodal-embeddings-v1:0',
+    tokenPricing: { inputPer1MTokens: 0.018, outputPer1MTokens: 0 },
+    estimatedCostPerPage: 0.0002,
+    strengths: ['Unified multimodal embeddings', 'Text+image+doc+video+audio', 'Crossmodal search', '4 dimension options (256-3072)', 'Batch inference', 'Segmentation for long content'],
+    limitations: ['us-east-1 only', 'Embedding only (no generation)', '8K token context for text'],
+  },
 };
 
 // ─── Capability Support Matrix ────────────────────────────────────────────────
@@ -216,6 +231,10 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     audio_transcription: 'excellent',      // 11 languages, speaker labeling, 30 speakers
     audio_summarization: 'excellent',      // topic-based summaries with timestamps
     content_moderation: 'excellent',       // 7 categories: image, video, audio
+    // Advanced AI
+    image_separation: 'good',              // BDA can extract figures/images from documents
+    embedding_generation: 'none',
+    knowledge_base_ingestion: 'none',
   },
   claude: {
     text_extraction: 'excellent',
@@ -246,6 +265,10 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     audio_transcription: 'none',
     audio_summarization: 'none',
     content_moderation: 'good',        // can detect via vision
+    // Advanced AI
+    image_separation: 'good',          // vision can identify and describe embedded images
+    embedding_generation: 'none',
+    knowledge_base_ingestion: 'none',
   },
   nova: {
     text_extraction: 'good',
@@ -275,6 +298,10 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     audio_transcription: 'none',
     audio_summarization: 'none',
     content_moderation: 'good',        // can detect via vision
+    // Advanced AI
+    image_separation: 'good',          // Nova vision can identify embedded images
+    embedding_generation: 'none',
+    knowledge_base_ingestion: 'none',
   },
   'textract-llm': {
     text_extraction: 'excellent',
@@ -304,6 +331,43 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     audio_transcription: 'none',
     audio_summarization: 'none',
     content_moderation: 'none',
+    // Advanced AI
+    image_separation: 'none',
+    embedding_generation: 'none',
+    knowledge_base_ingestion: 'none',
+  },
+  embeddings: {
+    text_extraction: 'none',
+    handwriting_extraction: 'none',
+    table_extraction: 'none',
+    kv_extraction: 'none',
+    entity_extraction: 'none',
+    image_description: 'none',
+    bounding_box: 'none',
+    signature_detection: 'none',
+    barcode_qr: 'none',
+    layout_analysis: 'none',
+    document_classification: 'none',
+    document_splitting: 'none',
+    document_summarization: 'none',
+    language_detection: 'none',
+    pii_detection: 'none',
+    pii_redaction: 'none',
+    invoice_processing: 'none',
+    receipt_parsing: 'none',
+    check_processing: 'none',
+    insurance_claims: 'none',
+    medical_records: 'none',
+    contract_analysis: 'none',
+    video_summarization: 'none',
+    video_chapter_extraction: 'none',
+    audio_transcription: 'none',
+    audio_summarization: 'none',
+    content_moderation: 'none',
+    // Advanced AI — embeddings excel here
+    image_separation: 'none',
+    embedding_generation: 'excellent',
+    knowledge_base_ingestion: 'good',
   },
 };
 

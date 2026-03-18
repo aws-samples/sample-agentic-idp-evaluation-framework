@@ -3,20 +3,81 @@ import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { bedrockClient, config } from '../config/aws.js';
 import { generatePipeline } from '../services/pipeline-generator.js';
 import type { Capability, ProcessingMethod, PipelineGenerateRequest } from '@idp/shared';
+import { CAPABILITY_SUPPORT, getBestMethodsForCapability, getMethodFamily } from '@idp/shared';
+
+interface PreviewMethodResult {
+  method: string;
+  shortName: string;
+  family?: string;
+  status?: 'complete' | 'error';
+  results: Record<string, unknown>;
+  latencyMs: number;
+  estimatedCost?: number;
+  confidence?: number;
+  tokenUsage?: { inputTokens: number; outputTokens: number };
+  actualCost?: { totalCost: number };
+  error?: string;
+}
 
 interface SmartPipelineRequest {
   capabilities: Capability[];
   documentType: string;
-  previewResults: {
-    method: string;
-    shortName: string;
-    results: Record<string, unknown>;
-    latencyMs: number;
-    tokenUsage?: { inputTokens: number; outputTokens: number };
-    actualCost?: { totalCost: number };
-    error?: string;
-  }[];
+  previewResults: PreviewMethodResult[];
   preferredMethod?: string;
+}
+
+// ─── Rule-based fast path (skip Claude when confidence is high) ──────────────
+
+function tryRuleBasedRouting(
+  body: SmartPipelineRequest,
+): { optimizeFor: string; enableHybridRouting: boolean; methodAssignments: Record<string, string>; rationale: string; estimatedSavings: string } | null {
+  // Need preview results to determine confidence
+  const validPreviews = (body.previewResults ?? []).filter((r) => !r.error);
+  if (validPreviews.length === 0) return null;
+
+  // Determine optimizeFor from preview data
+  const optimizeFor = body.preferredMethod ? 'accuracy' : 'balanced';
+
+  // For each capability, select the best method using existing rule-based logic
+  const methodAssignments: Record<string, string> = {};
+  const supportLevels: string[] = [];
+
+  for (const cap of body.capabilities) {
+    const candidates = getBestMethodsForCapability(cap);
+    const bestMethod = candidates[0]; // Already sorted by support level
+    methodAssignments[cap] = bestMethod;
+
+    const family = getMethodFamily(bestMethod);
+    const support = CAPABILITY_SUPPORT[family]?.[cap] ?? 'none';
+    supportLevels.push(support);
+  }
+
+  // Calculate confidence: ratio of excellent/good support
+  const goodCount = supportLevels.filter((s) => s === 'excellent' || s === 'good').length;
+  const confidence = goodCount / supportLevels.length;
+
+  if (confidence >= 0.7) {
+    return {
+      optimizeFor,
+      enableHybridRouting: false,
+      methodAssignments,
+      rationale: `Rule-based routing (${(confidence * 100).toFixed(0)}% confidence): all capabilities have excellent/good support. Skipped LLM routing for faster response.`,
+      estimatedSavings: 'Saved ~$0.01 by skipping LLM routing call',
+    };
+  }
+
+  if (confidence >= 0.5) {
+    return {
+      optimizeFor,
+      enableHybridRouting: false,
+      methodAssignments,
+      rationale: `Rule-based routing (${(confidence * 100).toFixed(0)}% confidence): most capabilities have good support, some may benefit from hybrid routing.`,
+      estimatedSavings: 'Saved ~$0.01 by skipping LLM routing call',
+    };
+  }
+
+  // Low confidence — fall through to Claude
+  return null;
 }
 
 const router = Router();
@@ -30,16 +91,41 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    // Try rule-based fast path first (< 10ms, no AWS cost)
+    const ruleBasedResult = tryRuleBasedRouting(body);
+    if (ruleBasedResult) {
+      const preferredMethods = Object.values(ruleBasedResult.methodAssignments) as ProcessingMethod[];
+      const pipelineRequest: PipelineGenerateRequest = {
+        documentType: (body.documentType ?? 'pdf') as any,
+        capabilities: body.capabilities,
+        optimizeFor: (ruleBasedResult.optimizeFor ?? 'balanced') as any,
+        enableHybridRouting: ruleBasedResult.enableHybridRouting,
+        preferredMethods: preferredMethods.length > 0 ? preferredMethods : undefined,
+      };
+      const result = generatePipeline(pipelineRequest);
+      res.json({
+        ...result,
+        smartRecommendation: {
+          ...ruleBasedResult,
+          tokenUsage: { inputTokens: 0, outputTokens: 0 },
+        },
+      });
+      return;
+    }
+
     // Build a summary of preview results for Claude
     const previewSummary = (body.previewResults ?? [])
-      .filter((r) => !r.error)
+      .filter((r) => !r.error && r.status !== 'error')
       .map((r) => {
-        const parsed = r.results as Record<string, unknown>;
-        const extractions = (parsed?.extractions ?? {}) as Record<string, { found?: boolean; confidence?: number }>;
-        const found = Object.values(extractions).filter((e) => e?.found).length;
-        const total = Object.keys(extractions).length;
+        const capCount = Object.keys(r.results).length;
+        const costStr = r.estimatedCost != null
+          ? `$${r.estimatedCost.toFixed(4)}`
+          : r.actualCost?.totalCost != null
+            ? `$${r.actualCost.totalCost.toFixed(6)}`
+            : 'N/A';
+        const confStr = r.confidence != null ? `${Math.round(r.confidence * 100)}% avg confidence` : '';
 
-        return `- ${r.shortName}: ${found}/${total} fields found, ${r.latencyMs}ms latency, $${r.actualCost?.totalCost?.toFixed(6) ?? 'N/A'} cost, ${r.tokenUsage ? `${r.tokenUsage.inputTokens}+${r.tokenUsage.outputTokens} tokens` : 'N/A'}`;
+        return `- ${r.shortName} (${r.family ?? 'unknown'}): ${capCount} capabilities extracted, ${r.latencyMs}ms latency, ${costStr} cost${confStr ? `, ${confStr}` : ''}`;
       })
       .join('\n');
 

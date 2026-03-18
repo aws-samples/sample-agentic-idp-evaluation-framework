@@ -9,6 +9,9 @@ import Tabs from '@cloudscape-design/components/tabs';
 import Box from '@cloudscape-design/components/box';
 import ColumnLayout from '@cloudscape-design/components/column-layout';
 import CopyToClipboard from '@cloudscape-design/components/copy-to-clipboard';
+import Input from '@cloudscape-design/components/input';
+import FormField from '@cloudscape-design/components/form-field';
+import Table from '@cloudscape-design/components/table';
 import type {
   UploadResponse,
   Capability,
@@ -454,6 +457,9 @@ export default function ArchitecturePage({
           />
         </Container>
 
+        {/* Cost Projection Calculator (#12) */}
+        <CostProjectionCalculator methodSummary={methodSummary} />
+
         {/* Next Steps */}
         <Container header={<Header variant="h2">Next Steps</Header>}>
           <ColumnLayout columns={3} variant="text-grid">
@@ -511,5 +517,87 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
         <code>{code}</code>
       </pre>
     </div>
+  );
+}
+
+interface MethodSummaryItem {
+  method: string;
+  info: { shortName: string; estimatedCostPerPage: number; tokenPricing: { inputPer1MTokens: number; outputPer1MTokens: number } };
+  capabilities: string[];
+}
+
+function CostProjectionCalculator({ methodSummary }: { methodSummary: MethodSummaryItem[] }) {
+  const [docsPerMonth, setDocsPerMonth] = useState('1000');
+  const [avgPages, setAvgPages] = useState('5');
+
+  const projections = useMemo(() => {
+    const docs = parseInt(docsPerMonth) || 0;
+    const pages = parseInt(avgPages) || 0;
+    const totalPages = docs * pages;
+
+    return methodSummary.map((m) => {
+      const monthlyCost = m.info.estimatedCostPerPage * totalPages;
+      return {
+        method: m.info.shortName,
+        capabilities: m.capabilities.length,
+        costPerPage: `$${m.info.estimatedCostPerPage.toFixed(4)}`,
+        monthlyCost: `$${monthlyCost.toFixed(2)}`,
+        annualCost: `$${(monthlyCost * 12).toFixed(2)}`,
+      };
+    });
+  }, [methodSummary, docsPerMonth, avgPages]);
+
+  const totalMonthly = projections.reduce((sum, p) => sum + parseFloat(p.monthlyCost.slice(1)), 0);
+
+  return (
+    <Container
+      header={
+        <Header variant="h2" description="Estimate monthly and annual costs based on your document volume">
+          Cost Projection
+        </Header>
+      }
+    >
+      <SpaceBetween size="m">
+        <ColumnLayout columns={2}>
+          <FormField label="Documents per month">
+            <Input
+              type="number"
+              value={docsPerMonth}
+              onChange={({ detail }) => setDocsPerMonth(detail.value)}
+            />
+          </FormField>
+          <FormField label="Average pages per document">
+            <Input
+              type="number"
+              value={avgPages}
+              onChange={({ detail }) => setAvgPages(detail.value)}
+            />
+          </FormField>
+        </ColumnLayout>
+
+        <Table
+          columnDefinitions={[
+            { id: 'method', header: 'Method', cell: (item) => item.method },
+            { id: 'caps', header: 'Capabilities', cell: (item) => item.capabilities },
+            { id: 'perPage', header: 'Cost/Page', cell: (item) => item.costPerPage },
+            { id: 'monthly', header: 'Monthly', cell: (item) => <Box fontWeight="bold">{item.monthlyCost}</Box> },
+            { id: 'annual', header: 'Annual', cell: (item) => item.annualCost },
+          ]}
+          items={projections}
+          variant="embedded"
+          stripedRows
+          footer={
+            <Box textAlign="right" fontWeight="bold" fontSize="heading-s">
+              Total estimated monthly cost: ${totalMonthly.toFixed(2)} ({parseInt(docsPerMonth || '0') * parseInt(avgPages || '0')} pages/month)
+            </Box>
+          }
+        />
+
+        <Alert type="info">
+          Estimates use per-page cost approximations. Actual LLM costs depend on token count per document.
+          Use the Preview step for precise per-document token usage and cost.
+        </Alert>
+      </SpaceBetween>
+    </Container>
   );
 }

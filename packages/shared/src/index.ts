@@ -85,3 +85,23 @@ export {
   getMethodLimitsSummary,
 } from './constants/method-limits.js';
 export type { MethodLimitKey, MethodConstraintSummary } from './constants/method-limits.js';
+
+// Unified page representation (#4)
+export type {
+  UnifiedPageResult,
+  UnifiedDocumentResult,
+  ExtractedTable,
+  ExtractedKVPair,
+  ExtractedEntity,
+} from './types/unified-page.js';
+
+// Document schemas (#5)
+export {
+  DOCUMENT_SCHEMAS,
+  getDocumentSchema,
+  buildSchemaExtractionPrompt,
+} from './schemas/index.js';
+export type {
+  DocumentClassSchema,
+  DocumentFieldSchema,
+} from './schemas/index.js';

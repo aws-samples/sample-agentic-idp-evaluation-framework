@@ -25,7 +25,9 @@ export interface UsePipelineResult {
   isExecuting: boolean;
   error: string | null;
   generatePipeline: (request: PipelineGenerateRequest) => Promise<void>;
-  executePipeline: (pipeline: PipelineDefinition, documentId: string) => void;
+  executePipeline: (pipeline: PipelineDefinition, documentId: string, s3Uri: string) => void;
+  totalCost: number;
+  totalLatencyMs: number;
   switchPipeline: (pipeline: PipelineDefinition) => void;
   stopExecution: () => void;
 }
@@ -38,6 +40,8 @@ export function usePipeline(): UsePipelineResult {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [totalCost, setTotalCost] = useState(0);
+  const [totalLatencyMs, setTotalLatencyMs] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
   const generatePipeline = useCallback(async (request: PipelineGenerateRequest) => {
@@ -80,10 +84,12 @@ export function usePipeline(): UsePipelineResult {
     setIsExecuting(false);
   }, []);
 
-  const executePipeline = useCallback((pipelineDef: PipelineDefinition, documentId: string) => {
+  const executePipeline = useCallback((pipelineDef: PipelineDefinition, documentId: string, s3Uri: string) => {
     stopExecution();
     setError(null);
     setIsExecuting(true);
+    setTotalCost(0);
+    setTotalLatencyMs(0);
     setActiveEdges(new Set());
 
     // Reset node states
@@ -104,6 +110,8 @@ export function usePipeline(): UsePipelineResult {
           body: JSON.stringify({
             pipelineId: pipelineDef.id,
             documentId,
+            s3Uri,
+            pipeline: pipelineDef,
           }),
           signal: controller.signal,
         });
@@ -162,6 +170,13 @@ export function usePipeline(): UsePipelineResult {
                       metrics: event.metrics,
                     },
                   }));
+                  // Accumulate cost from completed nodes
+                  if (event.metrics?.cost) {
+                    setTotalCost((prev) => prev + event.metrics.cost);
+                  }
+                  if (event.metrics?.latencyMs) {
+                    setTotalLatencyMs((prev) => Math.max(prev, event.metrics.latencyMs));
+                  }
                   break;
 
                 case 'node_error':
@@ -179,6 +194,8 @@ export function usePipeline(): UsePipelineResult {
                   break;
 
                 case 'pipeline_complete':
+                  if (event.totalCost != null) setTotalCost(event.totalCost);
+                  if (event.totalLatencyMs != null) setTotalLatencyMs(event.totalLatencyMs);
                   setIsExecuting(false);
                   break;
 
@@ -223,6 +240,8 @@ export function usePipeline(): UsePipelineResult {
     isGenerating,
     isExecuting,
     error,
+    totalCost,
+    totalLatencyMs,
     generatePipeline,
     executePipeline,
     switchPipeline,

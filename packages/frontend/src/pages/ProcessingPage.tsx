@@ -115,14 +115,14 @@ export default function ProcessingPage({
                   bda: 'Bedrock Data Automation',
                   claude: 'Claude Models',
                   nova: 'Nova Models',
-                  'textract-llm': 'Textract + LLM Hybrid',
+                  'textract-llm': 'Textract + LLM Hybrid', embeddings: 'Multimodal Embeddings',
                 };
 
                 const familyDescriptions: Record<MethodFamily, string> = {
                   bda: 'Automated extraction with standard or custom blueprints',
                   claude: 'Anthropic Claude models via Bedrock Converse API',
                   nova: 'Amazon Nova multimodal models with bounding box support',
-                  'textract-llm': 'Amazon Textract OCR combined with LLM structuring',
+                  'textract-llm': 'Amazon Textract OCR combined with LLM structuring', embeddings: 'Nova Multimodal Embeddings for semantic search and RAG',
                 };
 
                 return (

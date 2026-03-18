@@ -44,6 +44,7 @@ IDP Evaluation Platform that helps AWS SAs and customers find the optimal docume
 - Claude Opus 4.6: `us.anthropic.claude-opus-4-6-v1`
 - Nova 2 Lite (GA): `us.amazon.nova-2-lite-v1:0`
 - Nova 2 Pro (Preview): `us.amazon.nova-2-pro-preview-20251202-v1:0`
+- Nova Multimodal Embeddings: `amazon.nova-2-multimodal-embeddings-v1:0`
 
 ### Pricing (Standard Tier, US regions)
 | Model | Input/1M tokens | Output/1M tokens |
@@ -56,8 +57,9 @@ IDP Evaluation Platform that helps AWS SAs and customers find the optimal docume
 | BDA Standard | $0.01/page | — |
 | BDA Custom | $0.04/page | — |
 | Textract | $0.0015/page | — |
+| Nova Embeddings | $0.018 | — |
 
-## 27 Capabilities (6 Categories)
+## 30 Capabilities (7 Categories)
 
 1. **Core Extraction** (5): Text, Handwriting, Table, Key-Value, Entity
 2. **Visual Analysis** (5): Image/Chart, Bounding Box, Signature, Barcode/QR, Layout
@@ -65,6 +67,7 @@ IDP Evaluation Platform that helps AWS SAs and customers find the optimal docume
 4. **Compliance & Security** (2): PII Detection, PII Redaction
 5. **Industry-Specific** (6): Invoice, Receipt, Check, Insurance Claims, Medical Records, Contract
 6. **Media Processing** (5): Video Summarization, Video Chapter Extraction, Audio Transcription, Audio Summarization, Content Moderation
+7. **Advanced AI** (3): Image Separation, Embedding Generation, Knowledge Base Ingestion
 
 ## Collaboration Context (Raj + WWSO Team)
 

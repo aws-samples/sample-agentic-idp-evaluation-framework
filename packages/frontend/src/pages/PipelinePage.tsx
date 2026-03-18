@@ -144,8 +144,8 @@ export default function PipelinePage({
   );
 
   const handleExecute = useCallback(() => {
-    if (!pipeline || !document) return;
-    executePipeline(pipeline, document.documentId);
+    if (!pipeline || !document || !document.s3Uri) return;
+    executePipeline(pipeline, document.documentId, document.s3Uri);
   }, [pipeline, document, executePipeline]);
 
   const handleExport = useCallback(() => {

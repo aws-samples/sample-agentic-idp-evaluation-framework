@@ -188,7 +188,7 @@ export default function ConversationPage({
             onToggle={handleToggleCapability}
             onRunPreview={handleRunPreview}
             isPreviewLoading={isPreviewLoading}
-            hasPreview={!!preview}
+            preview={preview}
           />
         )}
 
