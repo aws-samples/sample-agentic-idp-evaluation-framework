@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+
+# Local dev uploads (when USE_LOCAL_STORAGE=true)
+.local-uploads/
+
+# OMC state
+.omc/state/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+
+# Reference project artifacts
+reference/*/node_modules/
+reference/*/dist/
+reference/*/.terraform/
+reference/*/venv/
+reference/*/__pycache__/

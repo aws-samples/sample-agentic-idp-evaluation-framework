@@ -1,0 +1,396 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1773712354720,
+  "projectRoot": "/Users/sanghwa/workspaces/aws-samples/one-idp",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "concurrently \"npm run dev -w packages/backend\" \"npm run dev -w packages/frontend\"",
+      "build": "npm run build -w packages/shared && npm run build -w packages/backend && npm run build -w packages/frontend",
+      "build:shared": "npm run build -w packages/shared",
+      "dev:backend": "npm run dev -w packages/backend",
+      "dev:frontend": "npm run dev -w packages/frontend",
+      "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [
+      "packages/shared",
+      "packages/backend",
+      "packages/frontend"
+    ],
+    "mainDirectories": [
+      "assets"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 3,
+      "lastAccessed": 1773712354662,
+      "keyFiles": [
+        "logo-dark.svg",
+        "logo-light.svg",
+        "logo.svg"
+      ]
+    },
+    "infrastructure": {
+      "path": "infrastructure",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1773712354667,
+      "keyFiles": [
+        "apprunner.tf",
+        "cloudfront.tf",
+        "ecr.tf",
+        "iam.tf",
+        "main.tf"
+      ]
+    },
+    "packages": {
+      "path": "packages",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1773712354669,
+      "keyFiles": []
+    },
+    "reference": {
+      "path": "reference",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1773712354670,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "packages/frontend/src/hooks/useConversation.ts",
+      "accessCount": 24,
+      "lastAccessed": 1773784505286,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/routes/conversation.ts",
+      "accessCount": 17,
+      "lastAccessed": 1773784795879,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/pages/ConversationPage.tsx",
+      "accessCount": 15,
+      "lastAccessed": 1773784534466,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/conversation/ChatPanel.tsx",
+      "accessCount": 10,
+      "lastAccessed": 1773716302490,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/routes/preview.ts",
+      "accessCount": 10,
+      "lastAccessed": 1773720009946,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/pages/ArchitecturePage.tsx",
+      "accessCount": 9,
+      "lastAccessed": 1773720866877,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/types/capabilities.ts",
+      "accessCount": 9,
+      "lastAccessed": 1773787071808,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/types/processing.ts",
+      "accessCount": 9,
+      "lastAccessed": 1773791610690,
+      "type": "directory"
+    },
+    {
+      "path": "packages/backend/src/index.ts",
+      "accessCount": 8,
+      "lastAccessed": 1773784071813,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/services/pipeline-generator.ts",
+      "accessCount": 7,
+      "lastAccessed": 1773717212418,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/App.tsx",
+      "accessCount": 7,
+      "lastAccessed": 1773784088066,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/pages/HomePage.tsx",
+      "accessCount": 6,
+      "lastAccessed": 1773791618184,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/routes/upload.ts",
+      "accessCount": 5,
+      "lastAccessed": 1773715050072,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/conversation/PreviewComparison.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1773720047781,
+      "type": "file"
+    },
+    {
+      "path": "reference/genaaiidp",
+      "accessCount": 5,
+      "lastAccessed": 1773791830010,
+      "type": "directory"
+    },
+    {
+      "path": "packages/frontend/src/services/api.ts",
+      "accessCount": 3,
+      "lastAccessed": 1773714704043,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/hooks/useSSE.ts",
+      "accessCount": 3,
+      "lastAccessed": 1773715108665,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/services/s3.ts",
+      "accessCount": 3,
+      "lastAccessed": 1773715817997,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/pipeline/PipelineCanvas.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1773716968814,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/pipeline/nodes/CapabilityNode.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1773717677390,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/pages/PipelinePage.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1773784153666,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/types/api.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773712738756,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/layout/TopNav.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1773714730170,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/main.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1773715178415,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/pipeline/PipelineToolbar.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1773717242447,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/constants/methods.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773717711937,
+      "type": "directory"
+    },
+    {
+      "path": "packages/frontend/src/hooks/usePreview.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773720018902,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/layout/SideNav.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1773732672060,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src",
+      "accessCount": 2,
+      "lastAccessed": 1773784377027,
+      "type": "directory"
+    },
+    {
+      "path": "packages/shared/src/index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773784780693,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/agents/socratic-agent.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773712632261,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/upload/DocumentUpload.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1773712632373,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/config/aws.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773712643081,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/types/streaming.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773712659267,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/middleware/midway.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773712991492,
+      "type": "file"
+    },
+    {
+      "path": "packages",
+      "accessCount": 1,
+      "lastAccessed": 1773712991554,
+      "type": "directory"
+    },
+    {
+      "path": "packages/backend/src/routes/auth.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773713015698,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/middleware/upload.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773714965863,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/vite.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773715721344,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/pipeline/PipelineAlternatives.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1773716811878,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/hooks/usePipeline.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773716811981,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/components/conversation/CapabilityCards.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1773717688767,
+      "type": "file"
+    },
+    {
+      "path": "packages/frontend/src/pages/ProcessingPage.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1773720230490,
+      "type": "file"
+    },
+    {
+      "path": "packages/backend/src/routes/pipeline-smart.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773784059471,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/constants/capabilities.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773784383691,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/constants/method-limits.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773784767609,
+      "type": "file"
+    },
+    {
+      "path": "reference/genaaiidp/config.yaml",
+      "accessCount": 1,
+      "lastAccessed": 1773791784822,
+      "type": "file"
+    },
+    {
+      "path": "reference/genaaiidp/CLAUDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1773791784845,
+      "type": "file"
+    },
+    {
+      "path": "reference/genaaiidp/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1773791784876,
+      "type": "file"
+    },
+    {
+      "path": "reference/genaaiidp/docs/architecture.md",
+      "accessCount": 1,
+      "lastAccessed": 1773791804067,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
