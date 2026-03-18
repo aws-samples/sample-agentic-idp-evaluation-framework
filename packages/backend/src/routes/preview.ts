@@ -69,12 +69,14 @@ function calculateCost(method: string, usage: TokenUsage): ActualCost {
   return { inputCost, outputCost, totalCost: inputCost + outputCost };
 }
 
-function buildExtractionPrompt(capabilities: Capability[]): string {
-  const capList = capabilities.map((c) => `- ${c.replace(/_/g, ' ')}`).join('\n');
-  return `Extract the following from this document and return ONLY a valid JSON object. No markdown, no explanation.
+// Static extraction instructions (cached via CachePoint for 10x cost reduction)
+const EXTRACTION_SYSTEM_PROMPT = `You are a document extraction engine. Extract structured data from documents.
 
-Capabilities to extract:
-${capList}
+RULES:
+- Return ONLY valid JSON. No markdown, no explanation, no code blocks.
+- Extract actual values from the document, not placeholders.
+- Set confidence to 0.0-1.0 based on extraction quality.
+- If a capability is not found, set found=false with null data.
 
 Return format:
 {
@@ -89,9 +91,11 @@ Return format:
     }
   },
   "summary": "one-line summary of document"
-}
+}`;
 
-Be thorough but concise. Extract actual values from the document.`;
+function buildExtractionPrompt(capabilities: Capability[]): string {
+  const capList = capabilities.map((c) => `- ${c.replace(/_/g, ' ')}`).join('\n');
+  return `Extract the following capabilities from this document:\n${capList}`;
 }
 
 const router = Router();
@@ -158,6 +162,11 @@ router.post('/', async (req, res) => {
       try {
         const command = new ConverseCommand({
           modelId: m.modelId,
+          // CachePoint: static system prompt is cached (10x cheaper for repeated calls)
+          system: [
+            { text: EXTRACTION_SYSTEM_PROMPT },
+            ...(m.method.startsWith('claude') ? [{ cachePoint: { type: 'default' as const } }] : []),
+          ],
           messages,
           inferenceConfig: { maxTokens: 4096, temperature: 0.1 },
         });
@@ -167,7 +176,9 @@ router.post('/', async (req, res) => {
 
         const rawText = response.output?.message?.content?.[0]?.text ?? '';
 
-        // Capture token usage from Bedrock response
+        // Capture token usage from Bedrock response (includes cache metrics)
+        const cacheRead = (response.usage as any)?.cacheReadInputTokenCount ?? 0;
+        const cacheWrite = (response.usage as any)?.cacheWriteInputTokenCount ?? 0;
         const tokenUsage: TokenUsage = {
           inputTokens: response.usage?.inputTokens ?? 0,
           outputTokens: response.usage?.outputTokens ?? 0,
