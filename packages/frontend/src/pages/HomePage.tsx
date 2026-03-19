@@ -80,6 +80,7 @@ const CAPABILITY_ICONS: Record<string, React.ReactNode> = {
 
 const FAMILY_NAMES: Record<string, string> = {
   bda: 'Bedrock Data Automation',
+  'bda-llm': 'BDA + LLM Hybrid',
   claude: 'Claude Models',
   nova: 'Nova Models',
   'textract-llm': 'Textract + LLM',
@@ -170,10 +171,11 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                         display: 'flex', flexWrap: 'wrap', gap: 6,
                       }}>
                         {caps.map((cap) => {
-                          const families: MethodFamily[] = ['claude', 'bda', 'textract-llm', 'nova', 'embeddings'];
+                          const families: MethodFamily[] = ['claude', 'bda', 'bda-llm', 'textract-llm', 'nova', 'embeddings'];
                           const familyLabels: Record<string, string> = {
                             claude: 'Claude (LLM)',
                             bda: 'BDA',
+                            'bda-llm': 'BDA+LLM',
                             'textract-llm': 'Textract+LLM',
                             nova: 'Nova (LLM)',
                             embeddings: 'Nova Embeddings',
@@ -245,8 +247,8 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
         </div>
 
         {/* Methods */}
-        <Container header={<Header variant="h2" counter="(12)">Processing Methods</Header>}>
-          <ColumnLayout columns={5} minColumnWidth={180} variant="text-grid">
+        <Container header={<Header variant="h2" counter="(15)">Processing Methods</Header>}>
+          <ColumnLayout columns={3} minColumnWidth={250} variant="text-grid">
             {METHOD_FAMILIES.map((family) => {
               const methods = getMethodsByFamily(family);
               return (
@@ -259,7 +261,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                     <div key={m.id} style={{ padding: '4px 0', borderBottom: '1px solid #f2f3f3' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <Box fontSize="body-s" fontWeight="bold">{m.shortName}</Box>
-                        {m.family !== 'textract-llm' && (
+                        {m.family !== 'textract-llm' && m.family !== 'bda-llm' && (
                           m.tokenPricing.inputPer1MTokens > 0 ? (
                             <Box fontSize="body-s" color="text-body-secondary">
                               ${m.tokenPricing.inputPer1MTokens} / ${m.tokenPricing.outputPer1MTokens} MTok
@@ -271,6 +273,11 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                           )
                         )}
                       </div>
+                      {m.family === 'bda-llm' && (
+                        <Box fontSize="body-s" color="text-body-secondary">
+                          BDA $0.01/pg + LLM ${m.tokenPricing.inputPer1MTokens}/${m.tokenPricing.outputPer1MTokens} MTok
+                        </Box>
+                      )}
                       {m.family === 'textract-llm' && (
                         <Box fontSize="body-s" color="text-body-secondary">
                           Textract $0.0015/pg + LLM ${m.tokenPricing.inputPer1MTokens}/${m.tokenPricing.outputPer1MTokens} MTok
