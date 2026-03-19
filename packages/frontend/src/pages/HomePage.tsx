@@ -208,17 +208,37 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                                   <Box variant="strong">{cap.name}</Box>
                                   <Box color="text-body-secondary" fontSize="body-s">{cap.description}</Box>
                                   <div style={{ borderTop: '1px solid #e9ebed', paddingTop: 6, marginTop: 2 }}>
-                                    <Box variant="small" fontWeight="bold" padding={{ bottom: 'xxs' }}>Method Support:</Box>
-                                    {supportEntries.map((s) => (
-                                      <div key={s.family} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '1px 0' }}>
-                                        <span>{s.label}</span>
-                                        <StatusIndicator
-                                          type={s.level === 'excellent' ? 'success' : s.level === 'good' ? 'info' : s.level === 'limited' ? 'warning' : 'error'}
-                                        >
-                                          {s.level}
-                                        </StatusIndicator>
-                                      </div>
-                                    ))}
+                                    {cap.category === 'document_conversion' ? (
+                                      <>
+                                        <Box variant="small" fontWeight="bold" padding={{ bottom: 'xxs' }}>Execution Method:</Box>
+                                        <div style={{ fontSize: 12, padding: '1px 0' }}>
+                                          <StatusIndicator type="info">
+                                            Serverless preprocessing (Lambda + Python)
+                                          </StatusIndicator>
+                                        </div>
+                                        <Box variant="small" color="text-body-secondary" padding={{ top: 'xxs' }}>
+                                          Not a model-based capability. Runs as a pipeline preprocessing step before BDA/LLM extraction.
+                                        </Box>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Box variant="small" fontWeight="bold" padding={{ bottom: 'xxs' }}>Method Support:</Box>
+                                        {supportEntries.filter((s) => s.level !== 'none').length > 0 ? (
+                                          supportEntries.filter((s) => s.level !== 'none').map((s) => (
+                                            <div key={s.family} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '1px 0' }}>
+                                              <span>{s.label}</span>
+                                              <StatusIndicator
+                                                type={s.level === 'excellent' ? 'success' : s.level === 'good' ? 'info' : 'warning'}
+                                              >
+                                                {s.level}
+                                              </StatusIndicator>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <Box variant="small" color="text-body-secondary">No model support — preprocessing step</Box>
+                                        )}
+                                      </>
+                                    )}
                                   </div>
                                   <div style={{ borderTop: '1px solid #e9ebed', paddingTop: 6, marginTop: 2, fontSize: 12 }}>
                                     <Box variant="small" color="text-body-secondary">
