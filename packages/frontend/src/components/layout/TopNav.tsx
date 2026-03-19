@@ -12,10 +12,10 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
     <TopNavigation
       identity={{
         href: '/',
-        title: 'DocForge',
+        title: 'IDP Framework',
         logo: {
-          src: '/logo.svg',
-          alt: 'DocForge',
+          src: '/favicon.svg',
+          alt: 'IDP Framework',
         },
       }}
       utilities={[
@@ -39,7 +39,7 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
           title: 'Settings',
           items: [
             { id: 'settings', text: 'Settings' },
-            { id: 'about', text: 'About DocForge' },
+            { id: 'about', text: 'About IDP Framework' },
           ],
         },
         ...(user

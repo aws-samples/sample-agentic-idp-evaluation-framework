@@ -15,7 +15,7 @@ export default function OnboardingBanner() {
   return (
     <Alert
       type="info"
-      header="Welcome to ONE IDP Platform"
+      header="Welcome to IDP Evaluation Framework"
       dismissible
       onDismiss={() => {
         setDismissed(true);

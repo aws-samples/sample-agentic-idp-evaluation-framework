@@ -111,7 +111,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
     <ContentLayout
       header={
         <Header variant="h1" description="Evaluate, compare, and recommend the optimal AWS document processing approach.">
-          IDP Evaluation Platform
+          IDP Evaluation Framework
         </Header>
       }
     >
