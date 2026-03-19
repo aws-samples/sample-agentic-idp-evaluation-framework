@@ -5,6 +5,8 @@ import type {
   PipelineGenerateResponse,
   PipelineExecutionEvent,
   PipelineNodeType,
+  ProcessorResult,
+  ComparisonResult,
 } from '@idp/shared';
 
 export type NodeState = 'idle' | 'active' | 'complete' | 'error';
@@ -13,7 +15,15 @@ export interface NodeStateInfo {
   state: NodeState;
   progress?: number;
   metrics?: { latencyMs: number; cost: number };
+  result?: Record<string, unknown>;
   error?: string;
+}
+
+export interface CompletionData {
+  processorResults: ProcessorResult[];
+  comparison: ComparisonResult;
+  totalCost: number;
+  totalLatencyMs: number;
 }
 
 export interface UsePipelineResult {
@@ -23,6 +33,8 @@ export interface UsePipelineResult {
   activeEdges: Set<string>;
   isGenerating: boolean;
   isExecuting: boolean;
+  executionComplete: boolean;
+  completionData: CompletionData | null;
   error: string | null;
   generatePipeline: (request: PipelineGenerateRequest) => Promise<void>;
   executePipeline: (pipeline: PipelineDefinition, documentId: string, s3Uri: string) => void;
@@ -39,6 +51,8 @@ export function usePipeline(): UsePipelineResult {
   const [activeEdges, setActiveEdges] = useState<Set<string>>(new Set());
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [executionComplete, setExecutionComplete] = useState(false);
+  const [completionData, setCompletionData] = useState<CompletionData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [totalCost, setTotalCost] = useState(0);
   const [totalLatencyMs, setTotalLatencyMs] = useState(0);
@@ -88,6 +102,8 @@ export function usePipeline(): UsePipelineResult {
     stopExecution();
     setError(null);
     setIsExecuting(true);
+    setExecutionComplete(false);
+    setCompletionData(null);
     setTotalCost(0);
     setTotalLatencyMs(0);
     setActiveEdges(new Set());
@@ -168,9 +184,9 @@ export function usePipeline(): UsePipelineResult {
                     [event.nodeId]: {
                       state: 'complete',
                       metrics: event.metrics,
+                      result: event.result as Record<string, unknown> | undefined,
                     },
                   }));
-                  // Accumulate cost from completed nodes
                   if (event.metrics?.cost) {
                     setTotalCost((prev) => prev + event.metrics.cost);
                   }
@@ -193,11 +209,25 @@ export function usePipeline(): UsePipelineResult {
                   setActiveEdges((prev) => new Set(prev).add(event.edgeId));
                   break;
 
-                case 'pipeline_complete':
-                  if (event.totalCost != null) setTotalCost(event.totalCost);
-                  if (event.totalLatencyMs != null) setTotalLatencyMs(event.totalLatencyMs);
+                case 'pipeline_complete': {
+                  const tc = event.totalCost ?? 0;
+                  const tl = event.totalLatencyMs ?? 0;
+                  if (event.totalCost != null) setTotalCost(tc);
+                  if (event.totalLatencyMs != null) setTotalLatencyMs(tl);
+                  // Store full completion data for downstream pages
+                  const evt = event as any;
+                  if (evt.processorResults && evt.comparison) {
+                    setCompletionData({
+                      processorResults: evt.processorResults,
+                      comparison: evt.comparison,
+                      totalCost: tc,
+                      totalLatencyMs: tl,
+                    });
+                  }
+                  setExecutionComplete(true);
                   setIsExecuting(false);
                   break;
+                }
 
                 case 'pipeline_error':
                   setError(event.error);
@@ -239,6 +269,8 @@ export function usePipeline(): UsePipelineResult {
     activeEdges,
     isGenerating,
     isExecuting,
+    executionComplete,
+    completionData,
     error,
     totalCost,
     totalLatencyMs,

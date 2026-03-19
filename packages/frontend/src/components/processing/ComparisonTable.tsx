@@ -35,9 +35,11 @@ export default function ComparisonTable({ comparison }: ComparisonTableProps) {
 
   const familyLabels: Record<MethodFamily, string> = {
     bda: 'BDA',
+    'bda-llm': 'BDA+LLM',
     claude: 'Claude',
     nova: 'Nova',
-    'textract-llm': 'Textract+LLM', embeddings: 'Embeddings',
+    'textract-llm': 'Textract+LLM',
+    embeddings: 'Embeddings',
   };
 
   return (

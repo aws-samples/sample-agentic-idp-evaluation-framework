@@ -5,9 +5,11 @@ import type {
   PipelineDefinition,
   PipelineExecutionEvent,
   ProcessingMethod,
+  ProcessorResult,
   CapabilityResult,
 } from '@idp/shared';
 import { generatePipeline } from '../services/pipeline-generator.js';
+import { buildComparison } from '../services/comparison.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { getDocumentBuffer } from '../services/s3.js';
 import { calculateCost } from '../services/pricing.js';
@@ -238,11 +240,21 @@ router.post('/execute', async (req, res) => {
       }),
     );
 
-    // Emit pipeline complete AFTER all methods finish
+    // Collect completed ProcessorResults for comparison
+    const processorResults: ProcessorResult[] = settled
+      .filter((s): s is PromiseFulfilledResult<ProcessorResult> =>
+        s.status === 'fulfilled' && s.value != null)
+      .map((s) => s.value);
+
+    const comparison = buildComparison(processorResults);
+
+    // Emit pipeline complete with full results + comparison
     const totalLatencyMs = Date.now() - startTime;
     emitSSE(res, {
       type: 'pipeline_complete',
       results: allResults,
+      processorResults,
+      comparison,
       totalCost,
       totalLatencyMs,
     } as PipelineExecutionEvent);

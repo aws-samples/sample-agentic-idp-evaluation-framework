@@ -5,6 +5,9 @@ import type { Capability } from './capabilities.js';
 export const METHODS = [
   'bda-standard',
   'bda-custom',
+  'bda-claude-sonnet',
+  'bda-claude-haiku',
+  'bda-nova-lite',
   'claude-sonnet',
   'claude-haiku',
   'claude-opus',
@@ -19,7 +22,7 @@ export const METHODS = [
 
 export type ProcessingMethod = (typeof METHODS)[number];
 
-export const METHOD_FAMILIES = ['bda', 'claude', 'nova', 'textract-llm', 'embeddings'] as const;
+export const METHOD_FAMILIES = ['bda', 'bda-llm', 'claude', 'nova', 'textract-llm', 'embeddings'] as const;
 export type MethodFamily = (typeof METHOD_FAMILIES)[number];
 
 export interface TokenPricing {
@@ -65,6 +68,44 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     estimatedCostPerPage: 0.04,
     strengths: ['Custom schema', 'Field-level confidence', 'Explainability info'],
     limitations: ['Requires blueprint setup', 'Higher cost', 'No bounding boxes'],
+  },
+
+  // ─── BDA + LLM ──────────────────────────────────────────────────────────────
+  'bda-claude-sonnet': {
+    id: 'bda-claude-sonnet',
+    family: 'bda-llm',
+    name: 'BDA + Claude Sonnet',
+    shortName: 'BDA+Sonnet',
+    description: 'Amazon Bedrock Data Automation followed by Claude Sonnet 4.6 for enrichment',
+    modelId: 'us.anthropic.claude-sonnet-4-6',
+    tokenPricing: { inputPer1MTokens: 3.00, outputPer1MTokens: 15.00 },
+    estimatedCostPerPage: 0.025,
+    strengths: ['BDA precision + Claude reasoning', 'Best hybrid accuracy', 'Structured enrichment'],
+    limitations: ['Two-phase latency', 'Higher combined cost'],
+  },
+  'bda-claude-haiku': {
+    id: 'bda-claude-haiku',
+    family: 'bda-llm',
+    name: 'BDA + Claude Haiku',
+    shortName: 'BDA+Haiku',
+    description: 'Amazon Bedrock Data Automation followed by Claude Haiku 4.5 for fast enrichment',
+    modelId: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+    tokenPricing: { inputPer1MTokens: 1.00, outputPer1MTokens: 5.00 },
+    estimatedCostPerPage: 0.014,
+    strengths: ['BDA precision + fast LLM', 'Cost-effective hybrid', 'Good for simple structuring'],
+    limitations: ['Haiku may miss complex patterns', 'Two-phase process'],
+  },
+  'bda-nova-lite': {
+    id: 'bda-nova-lite',
+    family: 'bda-llm',
+    name: 'BDA + Nova 2 Lite',
+    shortName: 'BDA+Nova',
+    description: 'Amazon Bedrock Data Automation followed by Nova 2 Lite (GA) for enrichment',
+    modelId: 'us.amazon.nova-2-lite-v1:0',
+    tokenPricing: { inputPer1MTokens: 0.30, outputPer1MTokens: 2.50 },
+    estimatedCostPerPage: 0.012,
+    strengths: ['BDA precision + Nova speed', 'Lowest cost hybrid', 'GA models only'],
+    limitations: ['Lite model for structuring', 'Two-phase process'],
   },
 
   // ─── Claude ─────────────────────────────────────────────────────────────────
@@ -233,6 +274,39 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     content_moderation: 'excellent',       // 7 categories: image, video, audio
     // Advanced AI
     image_separation: 'good',              // BDA can extract figures/images from documents
+    embedding_generation: 'none',
+    knowledge_base_ingestion: 'none',
+  },
+  'bda-llm': {
+    // BDA extraction + LLM enrichment — inherits BDA's extraction strengths with LLM structuring
+    text_extraction: 'excellent',
+    handwriting_extraction: 'excellent',
+    table_extraction: 'excellent',
+    kv_extraction: 'excellent',
+    entity_extraction: 'excellent',
+    image_description: 'excellent',
+    bounding_box: 'excellent',
+    signature_detection: 'good',
+    barcode_qr: 'limited',
+    layout_analysis: 'excellent',
+    document_classification: 'excellent',
+    document_splitting: 'excellent',
+    document_summarization: 'excellent',
+    language_detection: 'excellent',
+    pii_detection: 'excellent',
+    pii_redaction: 'good',
+    invoice_processing: 'excellent',
+    receipt_parsing: 'excellent',
+    check_processing: 'excellent',
+    insurance_claims: 'excellent',
+    medical_records: 'excellent',
+    contract_analysis: 'excellent',
+    video_summarization: 'excellent',
+    video_chapter_extraction: 'excellent',
+    audio_transcription: 'excellent',
+    audio_summarization: 'excellent',
+    content_moderation: 'excellent',
+    image_separation: 'excellent',
     embedding_generation: 'none',
     knowledge_base_ingestion: 'none',
   },

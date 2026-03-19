@@ -6,6 +6,7 @@ import { buildComparison } from '../services/comparison.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
 import { BdaStandardProcessor, BdaCustomProcessor } from '../processors/bda-processor.js';
+import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor } from '../processors/bda-llm.js';
 import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor } from '../processors/claude-direct.js';
 import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
 import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor, TextractNovaProProcessor } from '../processors/textract-llm.js';
@@ -14,6 +15,9 @@ import { config } from '../config/aws.js';
 const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Record<string, () => ProcessorBase> = {
   'bda-standard': () => new BdaStandardProcessor(),
   'bda-custom': () => new BdaCustomProcessor(),
+  'bda-claude-sonnet': () => new BdaClaudeSonnetProcessor(),
+  'bda-claude-haiku': () => new BdaClaudeHaikuProcessor(),
+  'bda-nova-lite': () => new BdaNovaLiteProcessor(),
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
   'claude-haiku': () => new ClaudeHaikuProcessor(),
   'claude-opus': () => new ClaudeOpusProcessor(),
@@ -62,11 +66,11 @@ router.post('/', async (req, res) => {
         });
         return false;
       }
-      if (m === 'bda-standard' && !config.bdaProfileArn) {
+      if ((m === 'bda-standard' || m === 'bda-claude-sonnet' || m === 'bda-claude-haiku' || m === 'bda-nova-lite') && !config.bdaProfileArn) {
         emitSSE(res, {
           type: 'method_error',
           method: m,
-          error: 'BDA Standard not configured (BDA_PROFILE_ARN is empty)',
+          error: 'BDA not configured (BDA_PROFILE_ARN is empty)',
         });
         return false;
       }

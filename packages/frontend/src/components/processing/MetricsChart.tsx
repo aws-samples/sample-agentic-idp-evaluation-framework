@@ -31,14 +31,17 @@ export default function MetricsChart({ comparison }: MetricsChartProps) {
   // Color mapping by family
   const familyColors: Record<MethodFamily, string> = {
     bda: '#0972d3',
+    'bda-llm': '#0891b2',
     claude: '#8b5cf6',
     nova: '#ec7211',
-    'textract-llm': '#037f0c', embeddings: '#2563eb',
+    'textract-llm': '#037f0c',
+    embeddings: '#2563eb',
   };
 
   // Group by family for multiple series
   const familyGroups: Record<MethodFamily, typeof items> = {
     bda: [],
+    'bda-llm': [],
     claude: [],
     nova: [],
     'textract-llm': [],

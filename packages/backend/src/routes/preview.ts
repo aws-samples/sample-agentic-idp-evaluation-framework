@@ -6,6 +6,7 @@ import { convertOfficeDocument, isOfficeFormat } from '../services/file-converte
 import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
 import { BdaStandardProcessor } from '../processors/bda-processor.js';
+import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor } from '../processors/bda-llm.js';
 import { ClaudeSonnetProcessor, ClaudeHaikuProcessor } from '../processors/claude-direct.js';
 import { NovaLiteProcessor } from '../processors/nova-direct.js';
 import { TextractClaudeHaikuProcessor } from '../processors/textract-llm.js';
@@ -38,6 +39,9 @@ function selectPreviewMethods(capabilities: Capability[], requestedMethods?: Pro
 
 const PROCESSOR_FACTORY: Partial<Record<ProcessingMethod, () => ProcessorBase>> = {
   'bda-standard': () => new BdaStandardProcessor(),
+  'bda-claude-sonnet': () => new BdaClaudeSonnetProcessor(),
+  'bda-claude-haiku': () => new BdaClaudeHaikuProcessor(),
+  'bda-nova-lite': () => new BdaNovaLiteProcessor(),
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
   'claude-haiku': () => new ClaudeHaikuProcessor(),
   'nova-lite': () => new NovaLiteProcessor(),
@@ -85,7 +89,7 @@ router.post('/', async (req, res) => {
 
     // Filter out methods without configured backends
     const validMethods = methods.filter((m) => {
-      if (m === 'bda-standard' && !config.bdaProfileArn) return false;
+      if ((m === 'bda-standard' || m === 'bda-claude-sonnet' || m === 'bda-claude-haiku' || m === 'bda-nova-lite') && !config.bdaProfileArn) return false;
       if (m === 'bda-custom' && !config.bdaProjectArn) return false;
       return !!PROCESSOR_FACTORY[m];
     });

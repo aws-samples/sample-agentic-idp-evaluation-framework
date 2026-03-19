@@ -14,6 +14,7 @@ interface MethodNodeData {
 
 const FAMILY_COLORS: Record<MethodFamily, string> = {
   bda: '#0972d3',
+  'bda-llm': '#0891b2',
   claude: '#8b5cf6',
   nova: '#ec7211',
   'textract-llm': '#037f0c', embeddings: '#2563eb',

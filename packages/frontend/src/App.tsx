@@ -86,6 +86,15 @@ export default function App() {
     (results: ProcessorResult[], comp: ComparisonResult) => {
       setProcessingResults(results);
       setComparison(comp);
+      navigate('/architecture');
+    },
+    [navigate],
+  );
+
+  const handlePipelineComplete = useCallback(
+    (results: ProcessorResult[], comp: ComparisonResult) => {
+      setProcessingResults(results);
+      setComparison(comp);
     },
     [],
   );
@@ -133,6 +142,7 @@ export default function App() {
                       previewData={previewData}
                       preferredMethod={preferredMethod}
                       onViewArchitecture={handleViewArchitecture}
+                      onPipelineComplete={handlePipelineComplete}
                     />
                   }
                 />

@@ -8,7 +8,8 @@ import Button from '@cloudscape-design/components/button';
 import Box from '@cloudscape-design/components/box';
 import ColumnLayout from '@cloudscape-design/components/column-layout';
 import Spinner from '@cloudscape-design/components/spinner';
-import type { UploadResponse, Capability } from '@idp/shared';
+import type { UploadResponse, Capability, ProcessorResult, ComparisonResult } from '@idp/shared';
+import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import { marked } from 'marked';
 import PipelineCanvas from '../components/pipeline/PipelineCanvas';
 import PipelineToolbar from '../components/pipeline/PipelineToolbar';
@@ -22,6 +23,7 @@ interface PipelinePageProps {
   previewData: PreviewResponse | null;
   preferredMethod?: string;
   onViewArchitecture: () => void;
+  onPipelineComplete?: (results: ProcessorResult[], comparison: ComparisonResult) => void;
 }
 
 interface SmartRecommendation {
@@ -39,6 +41,7 @@ export default function PipelinePage({
   previewData,
   preferredMethod,
   onViewArchitecture,
+  onPipelineComplete,
 }: PipelinePageProps) {
   const {
     pipeline,
@@ -47,12 +50,23 @@ export default function PipelinePage({
     activeEdges,
     isGenerating,
     isExecuting,
+    executionComplete,
+    completionData,
     error,
+    totalCost,
+    totalLatencyMs,
     generatePipeline,
     executePipeline,
     switchPipeline,
     stopExecution,
   } = usePipeline();
+
+  // Notify parent when pipeline execution completes with results
+  useEffect(() => {
+    if (executionComplete && completionData && onPipelineComplete) {
+      onPipelineComplete(completionData.processorResults, completionData.comparison);
+    }
+  }, [executionComplete, completionData, onPipelineComplete]);
 
   const [smartRec, setSmartRec] = useState<SmartRecommendation | null>(null);
   const [isSmartGenerating, setIsSmartGenerating] = useState(false);
@@ -338,8 +352,53 @@ export default function PipelinePage({
           </Container>
         )}
 
+        {/* Execution Summary */}
+        {executionComplete && completionData && (
+          <Container
+            header={
+              <Header
+                variant="h2"
+                actions={
+                  <Button variant="primary" onClick={onViewArchitecture} iconName="external">
+                    View Architecture & Code
+                  </Button>
+                }
+              >
+                Execution Complete
+              </Header>
+            }
+          >
+            <ColumnLayout columns={4} variant="text-grid">
+              <div>
+                <Box variant="awsui-key-label">Total Cost</Box>
+                <Box variant="awsui-value-large" color="text-status-success">
+                  ${totalCost.toFixed(4)}
+                </Box>
+              </div>
+              <div>
+                <Box variant="awsui-key-label">Total Latency</Box>
+                <Box variant="awsui-value-large">
+                  {(totalLatencyMs / 1000).toFixed(1)}s
+                </Box>
+              </div>
+              <div>
+                <Box variant="awsui-key-label">Methods</Box>
+                <Box variant="awsui-value-large">
+                  <StatusIndicator type="success">
+                    {completionData.processorResults.filter(r => r.status === 'complete').length} succeeded
+                  </StatusIndicator>
+                </Box>
+              </div>
+              <div>
+                <Box variant="awsui-key-label">Recommendation</Box>
+                <Box>{completionData.comparison.recommendation}</Box>
+              </div>
+            </ColumnLayout>
+          </Container>
+        )}
+
         {/* Alternatives */}
-        {pipeline && alternatives.length > 0 && (
+        {pipeline && alternatives.length > 0 && !executionComplete && (
           <PipelineAlternatives
             alternatives={alternatives}
             currentPipeline={pipeline}
