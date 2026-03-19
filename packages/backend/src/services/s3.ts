@@ -14,7 +14,7 @@ function useLocal(): boolean {
 
 function parseS3Uri(s3Uri: string): { bucket: string; key: string } {
   const url = new URL(s3Uri);
-  return { bucket: url.hostname, key: url.pathname.slice(1) };
+  return { bucket: url.hostname, key: decodeURIComponent(url.pathname.slice(1)) };
 }
 
 export async function uploadDocument(

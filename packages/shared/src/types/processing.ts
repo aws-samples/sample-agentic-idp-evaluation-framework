@@ -417,6 +417,7 @@ export interface ProcessorResult {
     confidence?: number;
   };
   rawOutput?: string;
+  error?: string;
 }
 
 export interface ComparisonResult {

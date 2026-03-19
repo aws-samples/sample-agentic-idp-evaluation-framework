@@ -59,6 +59,7 @@ export abstract class ProcessorBase {
           latencyMs: 0,
           cost: 0,
         },
+        error: message,
       };
     }
   }

@@ -22,6 +22,18 @@ variable "ecr_image_tag" {
   default     = "latest"
 }
 
+variable "bda_profile_arn" {
+  description = "BDA Standard profile ARN for document automation"
+  type        = string
+  default     = ""
+}
+
+variable "bda_project_arn" {
+  description = "BDA Custom project ARN (leave empty to skip BDA Custom)"
+  type        = string
+  default     = ""
+}
+
 variable "domain_name" {
   description = "Custom domain name (e.g., idp.sanghwa.people.aws.dev). Leave empty to use CloudFront default domain."
   type        = string

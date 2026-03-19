@@ -21,12 +21,15 @@ resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
   }
 
   environment_variables = {
-    AWS_REGION      = var.aws_region
-    S3_BUCKET       = aws_s3_bucket.uploads.id
-    NODE_ENV        = "production"
-    PORT            = "3001"
-    CLAUDE_MODEL_ID = "us.anthropic.claude-sonnet-4-6"
-    NOVA_MODEL_ID   = "us.amazon.nova-2-lite-v1:0"
+    AWS_REGION       = var.aws_region
+    S3_BUCKET        = aws_s3_bucket.uploads.id
+    S3_OUTPUT_PREFIX = "idp-outputs/"
+    BDA_PROFILE_ARN  = var.bda_profile_arn
+    BDA_PROJECT_ARN  = var.bda_project_arn
+    NODE_ENV         = "production"
+    PORT             = "3001"
+    CLAUDE_MODEL_ID  = "us.anthropic.claude-sonnet-4-6"
+    NOVA_MODEL_ID    = "us.amazon.nova-2-lite-v1:0"
   }
 
   depends_on = [

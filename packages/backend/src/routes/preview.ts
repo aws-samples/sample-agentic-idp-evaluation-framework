@@ -83,11 +83,10 @@ router.post('/', async (req, res) => {
 
     const methods = selectPreviewMethods(body.capabilities, body.methods);
 
-    // Filter out methods without configured backends or incompatible with local storage
-    const isLocal = body.s3Uri.startsWith('local://');
+    // Filter out methods without configured backends
     const validMethods = methods.filter((m) => {
-      if (m === 'bda-standard' && (!config.bdaProfileArn || isLocal)) return false;
-      if (m === 'bda-custom' && (!config.bdaProjectArn || isLocal)) return false;
+      if (m === 'bda-standard' && !config.bdaProfileArn) return false;
+      if (m === 'bda-custom' && !config.bdaProjectArn) return false;
       return !!PROCESSOR_FACTORY[m];
     });
 
@@ -114,6 +113,7 @@ router.post('/', async (req, res) => {
           latencyMs: result.metrics.latencyMs,
           estimatedCost: result.metrics.cost,
           confidence: result.metrics.confidence,
+          ...(result.error ? { error: result.error } : {}),
         };
       }
       const method = validMethods[i];

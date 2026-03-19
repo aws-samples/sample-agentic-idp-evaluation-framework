@@ -1,13 +1,16 @@
 import type { Response } from 'express';
 import type { ProcessingMethod } from '@idp/shared';
+import { v4 as uuidv4 } from 'uuid';
 import { InvokeDataAutomationAsyncCommand, GetDataAutomationStatusCommand } from '@aws-sdk/client-bedrock-data-automation-runtime';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
 import { bdaClient, s3Client, config } from '../config/aws.js';
 
-const POLL_INTERVAL_MS = 3_000;
-const MAX_POLL_ATTEMPTS = 200; // ~10 minutes
+// BDA status values from API: Created | InProgress | Success | ServiceError | ClientError
+const TERMINAL_STATUSES = ['Success', 'ServiceError', 'ClientError'];
+const POLL_INTERVAL_MS = 5_000;
+const MAX_POLL_ATTEMPTS = 60; // ~5 minutes
 
 export class SyncPollAdapter implements StreamAdapter {
   constructor(public readonly method: ProcessingMethod) {}
@@ -17,7 +20,12 @@ export class SyncPollAdapter implements StreamAdapter {
 
     emitProgress(res, this.method, 'all', 0, 'Invoking BDA...');
 
+    // BDA requires a project ARN: custom project if set, otherwise public-default
+    const projectArn = config.bdaProjectArn
+      || `arn:aws:bedrock:${config.region}:aws:data-automation-project/public-default`;
+
     const invokeCommand = new InvokeDataAutomationAsyncCommand({
+      clientToken: uuidv4(),
       inputConfiguration: {
         s3Uri: input.s3Uri,
       },
@@ -25,13 +33,10 @@ export class SyncPollAdapter implements StreamAdapter {
         s3Uri: `s3://${config.s3Bucket}/${config.s3OutputPrefix}${this.method}/`,
       },
       dataAutomationProfileArn: config.bdaProfileArn,
-      ...(config.bdaProjectArn
-        ? {
-            dataAutomationConfiguration: {
-              dataAutomationProjectArn: config.bdaProjectArn,
-            },
-          }
-        : {}),
+      dataAutomationConfiguration: {
+        dataAutomationProjectArn: projectArn,
+        stage: 'LIVE',
+      },
     });
 
     const invokeResponse = await bdaClient.send(invokeCommand);
@@ -39,57 +44,63 @@ export class SyncPollAdapter implements StreamAdapter {
 
     emitProgress(res, this.method, 'all', 10, 'Processing document...');
 
-    let status = 'IN_PROGRESS';
+    // Poll for completion (status: Created → InProgress → Success/ServiceError/ClientError)
+    let status = 'InProgress';
     let attempts = 0;
+    let outputUri = '';
 
-    while (status === 'IN_PROGRESS' && attempts < MAX_POLL_ATTEMPTS) {
+    while (!TERMINAL_STATUSES.includes(status) && attempts < MAX_POLL_ATTEMPTS) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       attempts++;
 
-      const statusCommand = new GetDataAutomationStatusCommand({
-        invocationArn,
-      });
-      const statusResponse = await bdaClient.send(statusCommand);
-      status = statusResponse.status ?? 'IN_PROGRESS';
+      const statusResponse = await bdaClient.send(
+        new GetDataAutomationStatusCommand({ invocationArn }),
+      );
+      status = statusResponse.status ?? 'InProgress';
 
       const progress = Math.min(10 + Math.floor((attempts / MAX_POLL_ATTEMPTS) * 80), 90);
       emitProgress(res, this.method, 'all', progress, `BDA processing... (${status})`);
 
-      if (status === 'COMPLETED') {
-        emitProgress(res, this.method, 'all', 95, 'Fetching results...');
-
-        const outputUri = statusResponse.outputConfiguration?.s3Uri;
-        if (!outputUri) {
-          throw new Error('BDA completed but no output URI returned');
-        }
-
-        const rawOutput = await this.fetchOutput(outputUri);
-
-        emitProgress(res, this.method, 'all', 100, 'Complete');
-
-        const results = this.parseResults(rawOutput, input.capabilities);
-
-        return {
-          results,
-          rawOutput,
-          latencyMs: Date.now() - start,
-        };
+      if (status === 'Success') {
+        outputUri = statusResponse.outputConfiguration?.s3Uri ?? '';
       }
 
-      if (status === 'FAILED' || status === 'STOPPED') {
-        throw new Error(`BDA invocation ${status}`);
+      if (status === 'ServiceError' || status === 'ClientError') {
+        const errorType = (statusResponse as any).errorType ?? status;
+        const errorMessage = (statusResponse as any).errorMessage ?? 'Unknown BDA error';
+        throw new Error(`BDA ${errorType}: ${errorMessage}`);
       }
     }
 
-    throw new Error('BDA invocation timed out');
+    if (status !== 'Success') {
+      throw new Error(`BDA invocation timed out after ${attempts * POLL_INTERVAL_MS / 1000}s (last status: ${status})`);
+    }
+
+    if (!outputUri) {
+      throw new Error('BDA completed but no output URI returned');
+    }
+
+    emitProgress(res, this.method, 'all', 95, 'Fetching results...');
+
+    const rawOutput = await this.fetchOutput(outputUri);
+
+    emitProgress(res, this.method, 'all', 100, 'Complete');
+
+    const results = this.parseResults(rawOutput, input.capabilities);
+
+    return {
+      results,
+      rawOutput,
+      latencyMs: Date.now() - start,
+    };
   }
 
   private async fetchOutput(s3Uri: string): Promise<string> {
     const url = new URL(s3Uri);
     const bucket = url.hostname;
-    const key = url.pathname.slice(1);
+    const key = decodeURIComponent(url.pathname.slice(1));
 
-    // BDA outputs a job_metadata.json with pointers; try fetching the standard output
+    // BDA outputs a job_metadata.json with pointers to actual results
     const metadataKey = key.endsWith('/') ? `${key}job_metadata.json` : `${key}/job_metadata.json`;
 
     try {
