@@ -4,15 +4,9 @@ import { BrowserRouter } from 'react-router-dom';
 import '@cloudscape-design/global-styles/index.css';
 import App from './App';
 
-// Global styles
+// Chat markdown styles
 const chatStyles = document.createElement('style');
 chatStyles.textContent = `
-/* TopNav logo: round corners */
-[class*="top-navigation"] [class*="logo"] img,
-[class*="top-navigation"] [class*="identity"] img {
-  border-radius: 8px !important;
-}
-
 .chat-markdown { word-break: break-word; }
 .chat-markdown p { margin: 0 0 8px 0; }
 .chat-markdown p:last-child { margin-bottom: 0; }

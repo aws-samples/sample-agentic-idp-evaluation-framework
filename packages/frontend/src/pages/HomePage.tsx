@@ -10,11 +10,13 @@ import Button from '@cloudscape-design/components/button';
 import Badge from '@cloudscape-design/components/badge';
 import type { UploadResponse } from '@idp/shared';
 import {
+  CAPABILITIES,
   CATEGORY_INFO,
   CAPABILITY_CATEGORIES,
   CAPABILITY_SUPPORT,
   getCapabilitiesByCategory,
   METHOD_FAMILIES,
+  METHODS,
   getMethodsByFamily,
 } from '@idp/shared';
 import type { SupportLevel, MethodFamily } from '@idp/shared';
@@ -158,7 +160,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
 
         {/* Capabilities */}
         <div id="capabilities">
-          <Container header={<Header variant="h2" counter="(21)">Capabilities</Header>}>
+          <Container header={<Header variant="h2" counter={`(${CAPABILITIES.length})`}>Capabilities</Header>}>
             <SpaceBetween size="m">
               {CAPABILITY_CATEGORIES.filter((c) => c !== 'industry_specific').map((catId) => {
                 const cat = CATEGORY_INFO[catId];
@@ -247,7 +249,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
         </div>
 
         {/* Methods */}
-        <Container header={<Header variant="h2" counter="(15)">Processing Methods</Header>}>
+        <Container header={<Header variant="h2" counter={`(${METHODS.length})`}>Processing Methods</Header>}>
           <ColumnLayout columns={3} minColumnWidth={250} variant="text-grid">
             {METHOD_FAMILIES.map((family) => {
               const methods = getMethodsByFamily(family);
