@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
 import SpaceBetween from '@cloudscape-design/components/space-between';
@@ -12,6 +12,7 @@ import CopyToClipboard from '@cloudscape-design/components/copy-to-clipboard';
 import Input from '@cloudscape-design/components/input';
 import FormField from '@cloudscape-design/components/form-field';
 import Table from '@cloudscape-design/components/table';
+import Spinner from '@cloudscape-design/components/spinner';
 import type {
   UploadResponse,
   Capability,
@@ -20,6 +21,8 @@ import type {
 } from '@idp/shared';
 import type { ProcessingMethod } from '@idp/shared';
 import { CAPABILITY_INFO, METHOD_INFO, getBestMethodsForCapability } from '@idp/shared';
+import { marked } from 'marked';
+import { useArchitecture } from '../hooks/useArchitecture';
 
 interface ArchitecturePageProps {
   document: UploadResponse | null;
@@ -286,9 +289,21 @@ function generateCDKCode(capabilities: Capability[]): string {
 
 export default function ArchitecturePage({
   document,
+  processingResults,
+  comparison,
   capabilities,
 }: ArchitecturePageProps) {
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
+  const { text: aiText, diagram, costProjections, isLoading: aiLoading, error: aiError, generate } = useArchitecture();
+  const aiGenerated = useRef(false);
+
+  // Auto-generate AI recommendation when we have processing results
+  useEffect(() => {
+    if (processingResults.length > 0 && !aiGenerated.current) {
+      aiGenerated.current = true;
+      generate({ capabilities, processingResults, comparison });
+    }
+  }, [processingResults, capabilities, comparison, generate]);
 
   const pythonCode = useMemo(() => generatePythonCode(capabilities), [capabilities]);
   const tsCode = useMemo(() => generateTypeScriptCode(capabilities), [capabilities]);
@@ -371,6 +386,82 @@ export default function ArchitecturePage({
       }
     >
       <SpaceBetween size="l">
+        {/* AI Architecture Recommendation */}
+        {(aiLoading || aiText) && (
+          <Container
+            header={
+              <Header variant="h2" description="AI-generated based on your actual extraction results">
+                {aiLoading ? (
+                  <span><Spinner size="normal" /> Generating Architecture Recommendation...</span>
+                ) : (
+                  'Architecture Recommendation'
+                )}
+              </Header>
+            }
+          >
+            <SpaceBetween size="m">
+              {aiText && (
+                <div
+                  className="chat-markdown"
+                  dangerouslySetInnerHTML={{
+                    __html: marked.parse(
+                      aiText
+                        .replace(/<diagram>[\s\S]*?<\/diagram>/g, '')
+                        .replace(/<costs>[\s\S]*?<\/costs>/g, '')
+                        .trim()
+                    ) as string,
+                  }}
+                  style={{ fontSize: '14px', lineHeight: '1.6' }}
+                />
+              )}
+              {diagram && (
+                <div>
+                  <Box variant="h3" padding={{ bottom: 'xs' }}>Architecture Diagram</Box>
+                  <pre style={{
+                    background: '#f8f9fa', padding: '16px', borderRadius: '8px',
+                    fontSize: '13px', overflow: 'auto', maxHeight: '400px',
+                  }}>
+                    <code>{diagram}</code>
+                  </pre>
+                </div>
+              )}
+              {costProjections.length > 0 && (
+                <Table
+                  header={<Header variant="h3">AI Cost Projections</Header>}
+                  columnDefinitions={[
+                    { id: 'scale', header: 'Scale', cell: (item) => item.scale },
+                    { id: 'docs', header: 'Docs/Month', cell: (item) => item.docsPerMonth.toLocaleString() },
+                    ...((costProjections[0]?.methods ?? []).map((m) => ({
+                      id: m.method,
+                      header: m.method,
+                      cell: (item: any) => {
+                        const method = item.methods?.find((x: any) => x.method === m.method);
+                        return method ? `$${method.monthlyCost.toFixed(2)}` : '-';
+                      },
+                    }))),
+                  ]}
+                  items={costProjections}
+                  variant="embedded"
+                  stripedRows
+                />
+              )}
+            </SpaceBetween>
+          </Container>
+        )}
+
+        {aiError && (
+          <Alert type="warning" header="AI recommendation unavailable">
+            {aiError}. Showing static code generation below.
+          </Alert>
+        )}
+
+        {processingResults.length === 0 && (
+          <Alert type="info" header="No pipeline execution data">
+            Run the pipeline first for AI-powered architecture recommendations.
+            Static code snippets are available below based on your selected capabilities.
+          </Alert>
+        )}
+
         {/* Architecture Summary */}
         <Container
           header={<Header variant="h2">Pipeline Architecture</Header>}

@@ -42,9 +42,17 @@ router.post('/', async (req, res) => {
   const keepalive = startKeepalive(res);
 
   try {
+    // Guard: skip AI generation if no processing data
+    if (!body.processingResults?.length) {
+      emitSSE(res, { type: 'text', data: 'No processing results available. Run the pipeline first to get AI-powered architecture recommendations.' } as ArchitectureEvent);
+      emitSSE(res, { type: 'done' } as ArchitectureEvent);
+      endSSE(res, keepalive);
+      return;
+    }
+
     const contextSummary = JSON.stringify({
       capabilities: body.capabilities,
-      comparison: body.comparison,
+      comparison: body.comparison ?? { methods: [], recommendation: 'N/A', capabilityMatrix: {} },
       processingResults: body.processingResults.map((r) => ({
         method: r.method,
         status: r.status,
@@ -113,7 +121,7 @@ router.post('/', async (req, res) => {
         // Enhance with actual calculated costs
         if (costData.docsPerMonth) {
           const avgPages = 5;
-          costData.methods = body.comparison.methods.map((m) => ({
+          costData.methods = (body.comparison?.methods ?? []).map((m) => ({
             method: m.method,
             monthlyCost: estimateMonthlyCost(m.method, costData.docsPerMonth, avgPages),
           }));

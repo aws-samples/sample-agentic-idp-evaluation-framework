@@ -225,12 +225,30 @@ export default function ConversationPage({
 
         {/* Preview Results Comparison — only show if at least one method succeeded */}
         {preview && preview.results.some((r) => r.status === 'complete') && (
-          <PreviewComparison
-            preview={preview}
-            selectedMethod={selectedMethod}
-            onMethodSelect={setSelectedMethod}
-            onBuildPipeline={handleBuildPipeline}
-          />
+          <>
+            <PreviewComparison
+              preview={preview}
+              selectedMethod={selectedMethod}
+              onMethodSelect={setSelectedMethod}
+              onBuildPipeline={handleBuildPipeline}
+            />
+
+            {/* Prominent Build Pipeline CTA */}
+            <Container>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+                <div>
+                  <Box variant="h3">Ready to build your pipeline</Box>
+                  <Box color="text-body-secondary">
+                    Preview analyzed your document with {preview.results.filter(r => r.status === 'complete').length} methods.
+                    Build an optimized pipeline for production use.
+                  </Box>
+                </div>
+                <Button variant="primary" onClick={handleBuildPipeline} iconName="angle-right">
+                  Build Pipeline
+                </Button>
+              </div>
+            </Container>
+          </>
         )}
       </SpaceBetween>
     </ContentLayout>

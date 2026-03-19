@@ -80,6 +80,11 @@ export default memo(function MethodNode({ data }: { data: MethodNodeData }) {
       {state === 'active' && (
         <div style={{ marginTop: '8px', textAlign: 'center' }}>
           <Spinner />
+          <Box variant="small" color="text-body-secondary" margin={{ top: 'xxs' }}>
+            {config.family === 'bda' || config.family === 'bda-llm' ? 'Polling BDA...' :
+             config.family === 'textract-llm' ? 'OCR + LLM...' :
+             'Streaming...'}
+          </Box>
         </div>
       )}
 
