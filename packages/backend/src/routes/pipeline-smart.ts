@@ -3,7 +3,7 @@ import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { bedrockClient, config } from '../config/aws.js';
 import { generatePipeline } from '../services/pipeline-generator.js';
 import type { Capability, ProcessingMethod, PipelineGenerateRequest } from '@idp/shared';
-import { CAPABILITY_SUPPORT, METHODS, METHOD_INFO, getBestMethodsForCapability, getMethodFamily } from '@idp/shared';
+import { CAPABILITY_SUPPORT, METHODS, METHOD_INFO, METHOD_FAMILIES } from '@idp/shared';
 
 interface PreviewMethodResult {
   method: string;
@@ -26,42 +26,19 @@ interface SmartPipelineRequest {
   preferredMethod?: string;
 }
 
-// ─── Rule-based fallback (only when NO preview results available) ─────────────
-
-function tryRuleBasedRouting(
-  body: SmartPipelineRequest,
-): { optimizeFor: string; enableHybridRouting: boolean; methodAssignments: Record<string, string>; rationale: string; estimatedSavings: string } | null {
-  // If preview results exist, ALWAYS let the LLM agent decide
-  // The LLM can see actual extraction quality, confidence, and cost from the preview
-  const validPreviews = (body.previewResults ?? []).filter((r) => !r.error && r.status !== 'error');
-  if (validPreviews.length > 0) return null;
-
-  // No preview results — use rule-based as fallback
-  const optimizeFor = body.preferredMethod ? 'accuracy' : 'balanced';
-
-  const methodAssignments: Record<string, string> = {};
-  const supportLevels: string[] = [];
-
-  for (const cap of body.capabilities) {
-    const candidates = getBestMethodsForCapability(cap);
-    const bestMethod = candidates[0];
-    methodAssignments[cap] = bestMethod;
-
-    const family = getMethodFamily(bestMethod);
-    const support = CAPABILITY_SUPPORT[family]?.[cap] ?? 'none';
-    supportLevels.push(support);
+// Build capability support reference for the LLM prompt
+function buildCapabilitySupportRef(capabilities: Capability[]): string {
+  const lines: string[] = ['Capability support levels (reference data — use your judgment):'];
+  for (const cap of capabilities) {
+    const supports = METHOD_FAMILIES
+      .map((f) => {
+        const level = CAPABILITY_SUPPORT[f]?.[cap] ?? 'none';
+        return level !== 'none' ? `${f}=${level}` : null;
+      })
+      .filter(Boolean);
+    lines.push(`  ${cap}: ${supports.join(', ')}`);
   }
-
-  const goodCount = supportLevels.filter((s) => s === 'excellent' || s === 'good').length;
-  const confidence = goodCount / supportLevels.length;
-
-  return {
-    optimizeFor,
-    enableHybridRouting: false,
-    methodAssignments,
-    rationale: `Rule-based fallback (no preview data): ${(confidence * 100).toFixed(0)}% of capabilities have excellent/good support. Run a preview for LLM-optimized routing.`,
-    estimatedSavings: 'N/A (no preview data for comparison)',
-  };
+  return lines.join('\n');
 }
 
 const router = Router();
@@ -75,43 +52,20 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // Try rule-based fast path first (< 10ms, no AWS cost)
-    const ruleBasedResult = tryRuleBasedRouting(body);
-    if (ruleBasedResult) {
-      const preferredMethods = Object.values(ruleBasedResult.methodAssignments) as ProcessingMethod[];
-      const pipelineRequest: PipelineGenerateRequest = {
-        documentType: (body.documentType ?? 'pdf') as any,
-        capabilities: body.capabilities,
-        optimizeFor: (ruleBasedResult.optimizeFor ?? 'balanced') as any,
-        enableHybridRouting: ruleBasedResult.enableHybridRouting,
-        preferredMethods: preferredMethods.length > 0 ? preferredMethods : undefined,
-      };
-      const result = generatePipeline(pipelineRequest);
-      res.json({
-        ...result,
-        smartRecommendation: {
-          ...ruleBasedResult,
-          tokenUsage: { inputTokens: 0, outputTokens: 0 },
-        },
-      });
-      return;
-    }
-
-    // Build a summary of preview results for Claude
-    const previewSummary = (body.previewResults ?? [])
-      .filter((r) => !r.error && r.status !== 'error')
-      .map((r) => {
-        const capCount = Object.keys(r.results).length;
-        const costStr = r.estimatedCost != null
-          ? `$${r.estimatedCost.toFixed(4)}`
-          : r.actualCost?.totalCost != null
-            ? `$${r.actualCost.totalCost.toFixed(6)}`
-            : 'N/A';
-        const confStr = r.confidence != null ? `${Math.round(r.confidence * 100)}% avg confidence` : '';
-
-        return `- ${r.shortName} (${r.family ?? 'unknown'}): ${capCount} capabilities extracted, ${r.latencyMs}ms latency, ${costStr} cost${confStr ? `, ${confStr}` : ''}`;
-      })
-      .join('\n');
+    // Build preview results summary (if available)
+    const validPreviews = (body.previewResults ?? []).filter((r) => !r.error && r.status !== 'error');
+    const previewSummary = validPreviews.length > 0
+      ? validPreviews.map((r) => {
+          const capCount = Object.keys(r.results).length;
+          const costStr = r.estimatedCost != null
+            ? `$${r.estimatedCost.toFixed(4)}`
+            : r.actualCost?.totalCost != null
+              ? `$${r.actualCost.totalCost.toFixed(6)}`
+              : 'N/A';
+          const confStr = r.confidence != null ? `${Math.round(r.confidence * 100)}% avg confidence` : '';
+          return `- ${r.shortName} (${r.family ?? 'unknown'}): ${capCount} capabilities extracted, ${r.latencyMs}ms latency, ${costStr} cost${confStr ? `, ${confStr}` : ''}`;
+        }).join('\n')
+      : 'No preview results available. Decide based on capability support levels and method characteristics.';
 
     // Build method list dynamically from METHOD_INFO
     const methodListStr = METHODS.map((m) => {
@@ -126,14 +80,19 @@ router.post('/', async (req, res) => {
       return `- ${m}: ${info.name} (${pricing}) - ${info.strengths[0] ?? info.description}`;
     }).join('\n');
 
-    const prompt = `You are an IDP pipeline architect. Analyze these extraction preview results and recommend the optimal pipeline configuration.
+    // Build capability support reference
+    const supportRef = buildCapabilitySupportRef(body.capabilities);
+
+    const prompt = `You are an IDP pipeline architect. Analyze the data below and recommend the optimal pipeline configuration.
 
 Document type: ${body.documentType ?? 'unknown'}
 Selected capabilities: ${body.capabilities.join(', ')}
 ${body.preferredMethod ? `User preferred method: ${body.preferredMethod}` : ''}
 
 Preview results:
-${previewSummary || 'No preview results available.'}
+${previewSummary}
+
+${supportRef}
 
 Available methods (${METHODS.length} total):
 ${methodListStr}
@@ -150,10 +109,11 @@ Return ONLY valid JSON:
 }
 
 Be practical. Consider:
-1. Which method actually extracted the most fields successfully in the preview
-2. Cost vs accuracy tradeoff
-3. Whether hybrid routing adds value for this document type
-4. Group capabilities that can share the same method`;
+1. If preview results exist, prioritize methods with highest actual confidence scores
+2. Cost vs accuracy tradeoff — cheaper methods are preferred when quality is similar
+3. Whether hybrid routing (different methods per capability) adds value
+4. Group capabilities that can share the same method to reduce cost
+5. BDA alone cannot do KV extraction well — use BDA+LLM or direct LLM for structured extraction`;
 
     const command = new ConverseCommand({
       modelId: config.claudeModelId,
@@ -177,7 +137,6 @@ Be practical. Consider:
       const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/) ?? rawText.match(/(\{[\s\S]*\})/);
       recommendation = JSON.parse(jsonMatch?.[1] ?? rawText);
     } catch {
-      // Fallback: use balanced defaults
       recommendation = {
         optimizeFor: 'balanced',
         enableHybridRouting: false,
@@ -187,10 +146,9 @@ Be practical. Consider:
       };
     }
 
-    // Build preferred methods list from Claude's assignments
+    // Generate pipeline using the standard generator with LLM's preferences
     const preferredMethods = Object.values(recommendation.methodAssignments) as ProcessingMethod[];
 
-    // Generate pipeline using the standard generator but with Claude's preferences
     const pipelineRequest: PipelineGenerateRequest = {
       documentType: (body.documentType ?? 'pdf') as any,
       capabilities: body.capabilities,
@@ -200,8 +158,6 @@ Be practical. Consider:
     };
 
     const result = generatePipeline(pipelineRequest);
-
-    // Add Claude's rationale and token usage
     const tokenUsage = response.usage;
 
     res.json({
@@ -217,7 +173,7 @@ Be practical. Consider:
   } catch (err) {
     console.error('[Smart Pipeline Error]', err);
 
-    // Fallback to standard generation
+    // Fallback: generate pipeline without LLM recommendation
     try {
       const fallbackRequest: PipelineGenerateRequest = {
         documentType: (body.documentType ?? 'pdf') as any,
@@ -232,11 +188,11 @@ Be practical. Consider:
           optimizeFor: 'balanced',
           enableHybridRouting: false,
           methodAssignments: {},
-          rationale: 'Fallback to rule-based generation (LLM unavailable).',
+          rationale: 'LLM routing unavailable. Pipeline generated with default balanced optimization.',
           estimatedSavings: 'N/A',
         },
       });
-    } catch (fallbackErr) {
+    } catch {
       res.status(500).json({ error: 'Failed to generate pipeline' });
     }
   }
