@@ -19,22 +19,12 @@ interface PreviewRequest {
   methods?: ProcessingMethod[];
 }
 
-// Default preview methods: 1 fast + 1 accurate + optionally BDA
-function selectPreviewMethods(capabilities: Capability[], requestedMethods?: ProcessingMethod[]): ProcessingMethod[] {
+// Return all available methods (filtered by config). Let the LLM/agent decide which to use.
+function getAvailableMethods(requestedMethods?: ProcessingMethod[]): ProcessingMethod[] {
   if (requestedMethods?.length) return requestedMethods;
 
-  const methods: ProcessingMethod[] = ['claude-haiku', 'claude-sonnet'];
-
-  const hasBdaCap = capabilities.some((cap) => {
-    const best = getBestMethodsForCapability(cap);
-    return best.length > 0 && METHOD_INFO[best[0]]?.family === 'bda';
-  });
-
-  if (hasBdaCap && config.bdaProfileArn) {
-    methods.push('bda-standard');
-  }
-
-  return methods;
+  // All methods that have processors registered
+  return (Object.keys(PROCESSOR_FACTORY) as ProcessingMethod[]);
 }
 
 const PROCESSOR_FACTORY: Partial<Record<ProcessingMethod, () => ProcessorBase>> = {
@@ -85,7 +75,7 @@ router.post('/', async (req, res) => {
       pageCount,
     };
 
-    const methods = selectPreviewMethods(body.capabilities, body.methods);
+    const methods = getAvailableMethods(body.methods);
 
     // Filter out methods without configured backends
     const validMethods = methods.filter((m) => {
