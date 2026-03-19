@@ -230,8 +230,8 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     shortName: 'Nova Embed',
     description: 'Amazon Nova 2 Multimodal Embeddings — state-of-the-art unified embedding model for text, documents, images, video, and audio. Enables crossmodal semantic search and RAG.',
     modelId: 'amazon.nova-2-multimodal-embeddings-v1:0',
-    tokenPricing: { inputPer1MTokens: 0.018, outputPer1MTokens: 0 },
-    estimatedCostPerPage: 0.0002,
+    tokenPricing: { inputPer1MTokens: 0.135, outputPer1MTokens: 0 },
+    estimatedCostPerPage: 0.0005,
     strengths: ['Unified multimodal embeddings', 'Text+image+doc+video+audio', 'Crossmodal search', '4 dimension options (256-3072)', 'Batch inference', 'Segmentation for long content'],
     limitations: ['us-east-1 only', 'Embedding only (no generation)', '8K token context for text'],
   },
@@ -243,7 +243,7 @@ export type SupportLevel = 'excellent' | 'good' | 'limited' | 'none';
 
 export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability, SupportLevel>>> = {
   bda: {
-    // Verified against BDA documentation (2026-03)
+    // BDA documentation (2026-03): document, image, video, audio modalities
     text_extraction: 'excellent',     // plain text, markdown, HTML output
     handwriting_extraction: 'good',   // supports handwritten + printed
     table_extraction: 'excellent',    // HTML, CSV, headers, footers, crop images
@@ -252,12 +252,12 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     image_description: 'good',        // generative figure captions
     bounding_box: 'excellent',        // all elements: text, tables, figures, words
     signature_detection: 'limited',   // not a dedicated feature
-    barcode_qr: 'none',              // not supported
+    barcode_qr: 'limited',           // BDA element detection includes barcodes
     layout_analysis: 'excellent',     // element-level with reading order, sub-types
     document_classification: 'good',  // via custom blueprints
     document_splitting: 'excellent',  // up to 3000 pages with splitter
     document_summarization: 'excellent', // 10-word + 250-word generative summaries
-    language_detection: 'good',       // dominant language detection in audio
+    language_detection: 'good',       // dominant language detection
     pii_detection: 'limited',         // not a dedicated feature
     pii_redaction: 'none',           // not supported
     invoice_processing: 'excellent',  // pre-defined blueprints
@@ -266,7 +266,7 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     insurance_claims: 'good',         // via custom blueprints
     medical_records: 'good',          // via custom blueprints
     contract_analysis: 'limited',     // basic text extraction only
-    // Media (BDA exclusive)
+    // Media — BDA natively supports video + audio modalities
     video_summarization: 'excellent',      // full video + chapter summaries, speaker ID
     video_chapter_extraction: 'excellent', // scene segmentation, IAB classification
     audio_transcription: 'excellent',      // 11 languages, speaker labeling, 30 speakers
@@ -281,35 +281,37 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     ocr_enhancement: 'none',
   },
   'bda-llm': {
-    // BDA extraction + LLM enrichment — inherits BDA's extraction strengths with LLM structuring
-    text_extraction: 'excellent',
-    handwriting_extraction: 'excellent',
-    table_extraction: 'excellent',
-    kv_extraction: 'excellent',
-    entity_extraction: 'excellent',
-    image_description: 'excellent',
-    bounding_box: 'excellent',
-    signature_detection: 'good',
-    barcode_qr: 'limited',
-    layout_analysis: 'excellent',
-    document_classification: 'excellent',
-    document_splitting: 'excellent',
-    document_summarization: 'excellent',
-    language_detection: 'excellent',
-    pii_detection: 'excellent',
-    pii_redaction: 'good',
+    // BDA extraction + LLM enrichment — quality = min(BDA, LLM) per capability
+    // BDA handles extraction, LLM structures/enriches. Not all-excellent.
+    text_extraction: 'excellent',      // BDA excellent + LLM structuring
+    handwriting_extraction: 'excellent', // BDA good + LLM enrichment → excellent
+    table_extraction: 'excellent',     // BDA excellent + LLM formatting
+    kv_extraction: 'excellent',        // BDA good + LLM structuring → excellent (key use case)
+    entity_extraction: 'excellent',    // BDA good + LLM NER → excellent
+    image_description: 'good',         // BDA extracts figures, LLM describes
+    bounding_box: 'excellent',         // inherits BDA's excellent bbox
+    signature_detection: 'good',       // BDA limited + LLM detection
+    barcode_qr: 'limited',            // BDA limited, LLM can't improve detection
+    layout_analysis: 'excellent',      // inherits BDA's excellent layout
+    document_classification: 'excellent', // BDA + LLM reasoning
+    document_splitting: 'excellent',   // inherits BDA splitter
+    document_summarization: 'excellent', // BDA summary + LLM refinement
+    language_detection: 'excellent',   // BDA + LLM multilingual
+    pii_detection: 'excellent',        // BDA limited + LLM detection → excellent
+    pii_redaction: 'good',            // LLM can identify, redaction needs post-processing
     invoice_processing: 'excellent',
     receipt_parsing: 'excellent',
     check_processing: 'excellent',
     insurance_claims: 'excellent',
     medical_records: 'excellent',
-    contract_analysis: 'excellent',
+    contract_analysis: 'excellent',    // BDA limited + LLM reasoning → excellent
+    // Media — BDA handles extraction, LLM enriches
     video_summarization: 'excellent',
     video_chapter_extraction: 'excellent',
     audio_transcription: 'excellent',
     audio_summarization: 'excellent',
     content_moderation: 'excellent',
-    image_separation: 'excellent',
+    image_separation: 'good',
     embedding_generation: 'none',
     knowledge_base_ingestion: 'none',
     pdf_conversion: 'none',
@@ -317,19 +319,20 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     ocr_enhancement: 'none',
   },
   claude: {
+    // Claude Sonnet 4.6 / Opus 4.6 / Haiku 4.5 — multimodal (image, PDF, audio, video)
     text_extraction: 'excellent',
     handwriting_extraction: 'excellent',
     table_extraction: 'excellent',
     kv_extraction: 'excellent',
     entity_extraction: 'excellent',
     image_description: 'excellent',
-    bounding_box: 'limited',
+    bounding_box: 'limited',          // no native bbox output format
     signature_detection: 'good',
-    barcode_qr: 'limited',
+    barcode_qr: 'limited',           // can identify but not decode reliably
     layout_analysis: 'good',
     document_classification: 'excellent',
     document_splitting: 'good',
-    document_summarization: 'excellent',
+    document_summarization: 'excellent', // 1M context window for long documents
     language_detection: 'excellent',
     pii_detection: 'excellent',
     pii_redaction: 'excellent',
@@ -338,15 +341,15 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     check_processing: 'excellent',
     insurance_claims: 'excellent',
     medical_records: 'excellent',
-    contract_analysis: 'excellent',
-    // Media — LLM can analyze video/audio if transcribed, but no native processing
-    video_summarization: 'none',
-    video_chapter_extraction: 'none',
-    audio_transcription: 'none',
-    audio_summarization: 'none',
-    content_moderation: 'good',        // can detect via vision
+    contract_analysis: 'excellent',    // Opus 1M context ideal for contracts
+    // Media — Sonnet 4.6 supports audio/video native input
+    video_summarization: 'good',       // native video input support
+    video_chapter_extraction: 'good',  // can segment via vision
+    audio_transcription: 'good',       // native audio input support
+    audio_summarization: 'good',       // native audio input support
+    content_moderation: 'good',        // can detect via vision + audio
     // Advanced AI
-    image_separation: 'good',          // vision can identify and describe embedded images
+    image_separation: 'good',          // vision can identify embedded images
     embedding_generation: 'none',
     knowledge_base_ingestion: 'none',
     pdf_conversion: 'none',
@@ -354,15 +357,16 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     ocr_enhancement: 'none',
   },
   nova: {
+    // Nova 2 Lite/Pro — multimodal (image, video, audio native input)
     text_extraction: 'good',
     handwriting_extraction: 'good',
     table_extraction: 'good',
     kv_extraction: 'good',
     entity_extraction: 'good',
-    image_description: 'good',
-    bounding_box: 'excellent',
+    image_description: 'excellent',    // native image/video input
+    bounding_box: 'excellent',         // Nova has strong spatial understanding
     signature_detection: 'good',
-    barcode_qr: 'good',
+    barcode_qr: 'good',              // vision-based detection
     layout_analysis: 'excellent',
     document_classification: 'good',
     document_splitting: 'good',
@@ -376,13 +380,14 @@ export const CAPABILITY_SUPPORT: Record<MethodFamily, Partial<Record<Capability,
     insurance_claims: 'good',
     medical_records: 'good',
     contract_analysis: 'good',
-    video_summarization: 'none',
-    video_chapter_extraction: 'none',
-    audio_transcription: 'none',
-    audio_summarization: 'none',
-    content_moderation: 'good',        // can detect via vision
+    // Media — Nova 2 Lite natively supports video + audio input
+    video_summarization: 'good',       // native video input
+    video_chapter_extraction: 'good',  // scene understanding via vision
+    audio_transcription: 'good',       // native audio input
+    audio_summarization: 'good',       // native audio input
+    content_moderation: 'good',        // can detect via vision + audio
     // Advanced AI
-    image_separation: 'good',          // Nova vision can identify embedded images
+    image_separation: 'good',
     embedding_generation: 'none',
     knowledge_base_ingestion: 'none',
     pdf_conversion: 'none',
