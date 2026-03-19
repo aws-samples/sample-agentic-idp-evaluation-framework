@@ -20,9 +20,10 @@ interface ChatPanelProps {
   isStreaming: boolean;
   error: string | null;
   onSendMessage: (message: string) => void;
+  hideQuickReplies?: boolean;
 }
 
-export default function ChatPanel({ messages, isStreaming, error, onSendMessage }: ChatPanelProps) {
+export default function ChatPanel({ messages, isStreaming, error, onSendMessage, hideQuickReplies }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -111,7 +112,7 @@ export default function ChatPanel({ messages, isStreaming, error, onSendMessage 
           {messages.map((msg, idx) => (
             <div key={idx}>
               <MessageBubble message={msg} />
-              {msg.quickReplies && msg.quickReplies.length > 0 && !isStreaming && (
+              {msg.quickReplies && msg.quickReplies.length > 0 && !isStreaming && !hideQuickReplies && (
                 <QuickReplies
                   options={msg.quickReplies}
                   onSelect={onSendMessage}

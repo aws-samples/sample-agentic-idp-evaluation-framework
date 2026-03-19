@@ -135,6 +135,7 @@ export default function ConversationPage({
             isStreaming={isStreaming}
             error={error}
             onSendMessage={sendMessage}
+            hideQuickReplies={!!preview && preview.results.some((r) => r.status === 'complete')}
           />
 
           {/* Document Preview */}
