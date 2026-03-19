@@ -43,6 +43,9 @@ import {
   Globe,
   Shield,
   EyeOff,
+  FileOutput,
+  Ruler,
+  ScanEye,
 } from 'lucide-react';
 import DocumentUpload from '../components/upload/DocumentUpload';
 import OnboardingBanner from '../components/common/OnboardingBanner';
@@ -78,6 +81,9 @@ const CAPABILITY_ICONS: Record<string, React.ReactNode> = {
   image_separation: <Scissors size={18} color={ICON_COLOR} />,
   embedding_generation: <GitCompareArrows size={18} color={ICON_COLOR} />,
   knowledge_base_ingestion: <FolderOpen size={18} color={ICON_COLOR} />,
+  pdf_conversion: <FileOutput size={18} color={ICON_COLOR} />,
+  format_standardization: <Ruler size={18} color={ICON_COLOR} />,
+  ocr_enhancement: <ScanEye size={18} color={ICON_COLOR} />,
 };
 
 const FAMILY_NAMES: Record<string, string> = {
