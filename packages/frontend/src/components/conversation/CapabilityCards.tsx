@@ -24,27 +24,41 @@ interface CapabilityCardsProps {
 }
 
 function renderExtraction(data: unknown, format: string): React.ReactNode {
-  if (data == null) return <Box color="text-body-secondary" fontSize="body-s">No data</Box>;
+  if (data == null) return <Box color="text-body-secondary" fontSize="body-s">No data extracted</Box>;
 
-  const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-
+  // HTML tables: render directly
   if (format === 'html' && typeof data === 'string') {
     return (
       <div
-        style={{ fontSize: '12px', maxHeight: '200px', overflow: 'auto' }}
+        style={{ fontSize: '12px', maxHeight: '200px', overflow: 'auto', lineHeight: 1.4 }}
         dangerouslySetInnerHTML={{ __html: data }}
       />
     );
   }
 
+  // Text: show as readable text (not code block)
+  if (format === 'text' && typeof data === 'string') {
+    return (
+      <div style={{
+        fontSize: '13px', lineHeight: 1.5, maxHeight: '400px', overflow: 'auto',
+        padding: '8px', background: '#fafafa', borderRadius: '4px',
+        whiteSpace: 'pre-wrap',
+      }}>
+        {data}
+      </div>
+    );
+  }
+
+  // JSON/objects: formatted code block
+  const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
   return (
     <pre style={{
       fontSize: '12px', lineHeight: 1.4, margin: 0,
-      maxHeight: '200px', overflow: 'auto',
+      maxHeight: '400px', overflow: 'auto',
       background: '#f8f9fa', padding: '8px', borderRadius: '4px',
       whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     }}>
-      {text.substring(0, 2000)}
+      {text}
     </pre>
   );
 }
@@ -158,8 +172,10 @@ export default function CapabilityCards({
             </div>
           ))}
           {preview.results.filter((r) => r.status === 'error').map((r) => (
-            <div key={r.method} style={{ fontSize: '13px' }}>
-              <StatusIndicator type="error">{r.shortName}: {r.error}</StatusIndicator>
+            <div key={r.method} style={{ fontSize: '13px', maxWidth: '300px' }}>
+              <StatusIndicator type="error">
+                {r.shortName}: {(r.error ?? 'Error').substring(0, 50)}
+              </StatusIndicator>
             </div>
           ))}
         </div>

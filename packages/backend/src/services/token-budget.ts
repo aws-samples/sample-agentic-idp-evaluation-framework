@@ -43,6 +43,7 @@ export function calculateMaxTokens(
   if (isMedia) return Math.max(2048, Math.min(capCount * 500, 4096));
 
   const formatMult = format === 'yaml' ? 1.0 : 1.3;
-  const calculated = Math.round((200 * capCount + pageCount * 150) * formatMult);
-  return Math.max(512, Math.min(calculated, 4096));
+  // Base: 800 tokens per capability + 400 per page (dense multilingual docs need more)
+  const calculated = Math.round((800 * capCount + pageCount * 400) * formatMult);
+  return Math.max(2048, Math.min(calculated, 16384));
 }

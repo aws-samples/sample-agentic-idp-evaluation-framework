@@ -80,6 +80,8 @@ export class SyncPollAdapter implements StreamAdapter {
       throw new Error('BDA completed but no output URI returned');
     }
 
+    console.error(`[BDA] outputUri from status: ${outputUri}`);
+    console.error(`[BDA] invocationArn: ${invocationArn}`);
     emitProgress(res, this.method, 'all', 95, 'Fetching results...');
 
     const rawOutput = await this.fetchOutput(outputUri);
@@ -100,8 +102,10 @@ export class SyncPollAdapter implements StreamAdapter {
     const bucket = url.hostname;
     const key = decodeURIComponent(url.pathname.slice(1));
 
-    // BDA outputs a job_metadata.json with pointers to actual results
-    const metadataKey = key.endsWith('/') ? `${key}job_metadata.json` : `${key}/job_metadata.json`;
+    // BDA outputUri may point directly to job_metadata.json or to a directory
+    const metadataKey = key.endsWith('job_metadata.json')
+      ? key
+      : key.endsWith('/') ? `${key}job_metadata.json` : `${key}/job_metadata.json`;
 
     try {
       const metaResponse = await s3Client.send(
@@ -110,20 +114,50 @@ export class SyncPollAdapter implements StreamAdapter {
       const metaBody = await metaResponse.Body!.transformToString();
       const metadata = JSON.parse(metaBody);
 
-      // Fetch the standard output document result
-      const segments = metadata.output_metadata?.documents;
-      if (segments && segments.length > 0) {
-        const docSegment = segments[0];
-        const resultKey = docSegment.standard_output?.s3_prefix
-          ?? docSegment.s3_prefix;
-        if (resultKey) {
-          const resultResponse = await s3Client.send(
-            new GetObjectCommand({ Bucket: bucket, Key: resultKey }),
-          );
-          return resultResponse.Body!.transformToString();
+      // Try all known BDA metadata formats to find the actual result
+      console.error('[BDA fetchOutput] metadata keys:', Object.keys(metadata), 'output_metadata type:', typeof metadata.output_metadata, 'isArray:', Array.isArray(metadata.output_metadata));
+
+      // Format 1: output_metadata[].segment_metadata[].standard_output_path (current BDA)
+      const assets = Array.isArray(metadata.output_metadata) ? metadata.output_metadata : [];
+      for (const asset of assets) {
+        const segments = Array.isArray(asset.segment_metadata) ? asset.segment_metadata : [];
+        for (const seg of segments) {
+          const outputPath = seg.standard_output_path as string | undefined;
+          if (outputPath?.startsWith('s3://')) {
+            try {
+              const outUrl = new URL(outputPath);
+              const outBucket = outUrl.hostname;
+              const outKey = decodeURIComponent(outUrl.pathname.slice(1));
+              console.log(`[BDA] Fetching result from: s3://${outBucket}/${outKey}`);
+              const resultResponse = await s3Client.send(
+                new GetObjectCommand({ Bucket: outBucket, Key: outKey }),
+              );
+              return resultResponse.Body!.transformToString();
+            } catch (err) {
+              console.warn(`[BDA] Failed to fetch ${outputPath}:`, (err as Error).message);
+            }
+          }
         }
       }
 
+      // Format 2: output_metadata.documents[].standard_output.s3_prefix (legacy)
+      const legacyMeta = metadata.output_metadata as Record<string, unknown> | undefined;
+      const legacyDocs = Array.isArray(legacyMeta) ? [] : ((legacyMeta?.documents ?? []) as Array<Record<string, unknown>>);
+      for (const doc of legacyDocs) {
+        const resultKey = (doc.standard_output as Record<string, string>)?.s3_prefix ?? (doc as Record<string, string>).s3_prefix;
+        if (resultKey) {
+          try {
+            const resultResponse = await s3Client.send(
+              new GetObjectCommand({ Bucket: bucket, Key: resultKey }),
+            );
+            return resultResponse.Body!.transformToString();
+          } catch (err) {
+            console.warn(`[BDA] Failed to fetch legacy path ${resultKey}:`, (err as Error).message);
+          }
+        }
+      }
+
+      console.warn('[BDA] Could not find result path in metadata, returning metadata itself');
       return metaBody;
     } catch {
       // Fallback: try direct output path
@@ -147,7 +181,7 @@ export class SyncPollAdapter implements StreamAdapter {
       for (const cap of capabilities) {
         results[cap] = {
           capability: cap,
-          data: rawOutput,
+          data: rawOutput.substring(0, 2000),
           confidence: 0.5,
           format: 'text',
         };
@@ -155,14 +189,75 @@ export class SyncPollAdapter implements StreamAdapter {
       return results;
     }
 
+    // BDA result.json format:
+    //   pages[].representation.markdown — full page text in markdown
+    //   elements[] — individual elements with type, representation, sub_type
+    //   element types: TABLE, TEXT, KEY_VALUE, TITLE, HEADER, FOOTER, etc.
+    const pages = (parsed.pages ?? []) as Array<{ representation?: { markdown?: string } }>;
+    const elements = (parsed.elements ?? []) as Array<{ type?: string; sub_type?: string; representation?: { markdown?: string; html?: string; text?: string } }>;
+
+    // Extract full document text from pages
+    const allText = pages.map((p) => p.representation?.markdown ?? '').join('\n\n').trim();
+
+    // Extract tables from elements
+    const tableElements = elements.filter((e) => e.type === 'TABLE');
+    const tableData = tableElements.map((t) => t.representation?.markdown ?? t.representation?.html ?? '');
+
+    // Extract key-value pairs from elements
+    const kvElements = elements.filter((e) => e.type === 'KEY_VALUE');
+    const kvData = kvElements.map((kv) => kv.representation?.markdown ?? kv.representation?.text ?? '');
+
     for (const cap of capabilities) {
-      const format = cap === 'table_extraction' ? 'html' : 'json';
-      results[cap] = {
-        capability: cap,
-        data: parsed[cap] ?? parsed,
-        confidence: 0.85,
-        format,
-      };
+      switch (cap) {
+        case 'text_extraction':
+          results[cap] = {
+            capability: cap,
+            data: allText || rawOutput.substring(0, 3000),
+            confidence: allText ? 0.9 : 0.5,
+            format: 'text',
+          };
+          break;
+        case 'table_extraction':
+          results[cap] = {
+            capability: cap,
+            data: tableData.length > 0 ? tableData.join('\n\n') : allText.substring(0, 2000),
+            confidence: tableData.length > 0 ? 0.9 : 0.6,
+            format: tableData.length > 0 ? 'text' : 'text',
+          };
+          break;
+        case 'kv_extraction':
+          results[cap] = {
+            capability: cap,
+            data: kvData.length > 0 ? kvData.join('\n') : 'No explicit key-value pairs detected',
+            confidence: kvData.length > 0 ? 0.9 : 0.4,
+            format: 'text',
+          };
+          break;
+        case 'layout_analysis':
+          results[cap] = {
+            capability: cap,
+            data: elements.map((e) => `[${e.type}${e.sub_type ? ':' + e.sub_type : ''}] ${(e.representation?.markdown ?? '').substring(0, 100)}`).join('\n'),
+            confidence: 0.9,
+            format: 'text',
+          };
+          break;
+        case 'document_summarization':
+          results[cap] = {
+            capability: cap,
+            data: allText.substring(0, 1000),
+            confidence: 0.7,
+            format: 'text',
+          };
+          break;
+        default:
+          results[cap] = {
+            capability: cap,
+            data: allText.substring(0, 1000) || 'BDA extraction complete (see raw output)',
+            confidence: 0.6,
+            format: 'text',
+          };
+          break;
+      }
     }
 
     return results;

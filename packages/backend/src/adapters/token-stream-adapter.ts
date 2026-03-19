@@ -151,16 +151,40 @@ export class TokenStreamAdapter implements StreamAdapter {
   ): Record<string, { capability: string; data: unknown; confidence: number; format: string }> {
     const results: Record<string, { capability: string; data: unknown; confidence: number; format: string }> = {};
 
-    let parsed: Record<string, unknown>;
-    try {
-      // Strip markdown code fences if present
-      const cleaned = rawOutput.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '');
-      parsed = JSON.parse(cleaned);
-    } catch {
+    let parsed: Record<string, unknown> | null = null;
+
+    // Try multiple parsing strategies
+    const fenceMatch = rawOutput.match(/```(?:json|JSON)?\s*\n([\s\S]*?)\n\s*```/);
+    const cleanStrategies = [
+      // 1. Direct parse
+      rawOutput.trim(),
+      // 2. Extract content from code fences
+      fenceMatch?.[1]?.trim() ?? '',
+      // 3. Strip code fences with simple replace (no multiline flag)
+      rawOutput.replace(/^```(?:json|JSON)?\s*\n/, '').replace(/\n\s*```\s*$/, '').trim(),
+      // 4. Find first JSON object in text
+      rawOutput.match(/(\{[\s\S]*\})/)?.[1]?.trim() ?? '',
+    ];
+
+    for (const cleaned of cleanStrategies) {
+      if (!cleaned) continue;
+      try {
+        const candidate = JSON.parse(cleaned);
+        if (candidate && typeof candidate === 'object') {
+          parsed = candidate;
+          break;
+        }
+      } catch {
+        // Try next strategy
+      }
+    }
+
+    if (!parsed) {
+      // All parsing failed — return raw text per capability
       for (const cap of capabilities) {
         results[cap] = {
           capability: cap,
-          data: rawOutput,
+          data: rawOutput.substring(0, 2000),
           confidence: 0.5,
           format: 'text',
         };
@@ -169,20 +193,35 @@ export class TokenStreamAdapter implements StreamAdapter {
     }
 
     for (const cap of capabilities) {
-      const capData = parsed[cap] as Record<string, unknown> | undefined;
+      // Try exact key match, then underscore/space variations
+      const capData = (parsed[cap] ?? parsed[cap.replace(/_/g, ' ')] ?? parsed[cap.replace(/_/g, '-')]) as Record<string, unknown> | string | undefined;
+
       if (capData && typeof capData === 'object' && 'data' in capData) {
+        // Structured format: {data, confidence, format}
         results[cap] = {
           capability: cap,
           data: capData.data,
-          confidence: (capData.confidence as number) ?? 0.8,
-          format: (capData.format as string) ?? 'json',
+          confidence: (capData.confidence as number) ?? 0.85,
+          format: (capData.format as string) ?? (cap === 'table_extraction' ? 'html' : 'json'),
         };
-      } else {
+      } else if (capData != null) {
+        // Direct data (no wrapper)
+        const format = cap === 'table_extraction' ? 'html'
+          : cap === 'text_extraction' || cap === 'document_summarization' ? 'text'
+          : 'json';
         results[cap] = {
           capability: cap,
-          data: capData ?? rawOutput,
-          confidence: 0.7,
-          format: 'json',
+          data: capData,
+          confidence: 0.8,
+          format,
+        };
+      } else {
+        // Capability not found in response
+        results[cap] = {
+          capability: cap,
+          data: null,
+          confidence: 0,
+          format: 'text',
         };
       }
     }
