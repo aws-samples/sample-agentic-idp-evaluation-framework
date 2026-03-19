@@ -8,6 +8,7 @@ export const CAPABILITY_CATEGORIES = [
   'industry_specific',
   'media_processing',
   'advanced_ai',
+  'document_conversion',
 ] as const;
 
 export type CapabilityCategory = (typeof CAPABILITY_CATEGORIES)[number];
@@ -62,6 +63,12 @@ export const CATEGORY_INFO: Record<CapabilityCategory, CategoryInfo> = {
     description: 'Image separation, multimodal embeddings, and knowledge base integration',
     color: '#2563eb',
   },
+  document_conversion: {
+    id: 'document_conversion',
+    name: 'Document Conversion',
+    description: 'Format conversion, PDF generation, and OCR preprocessing',
+    color: '#7c3aed',
+  },
 };
 
 // ─── Capabilities ────────────────────────────────────────────────────────────
@@ -104,6 +111,10 @@ export const CAPABILITIES = [
   'image_separation',
   'embedding_generation',
   'knowledge_base_ingestion',
+  // Document Conversion & Programmatic
+  'pdf_conversion',
+  'format_standardization',
+  'ocr_enhancement',
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -431,6 +442,36 @@ export const CAPABILITY_INFO: Record<Capability, CapabilityInfo> = {
     tags: ['knowledge', 'base', 'rag', 'ingestion', 'bedrock', 'retrieval', 'qa'],
     exampleInput: 'Extracted text + embeddings from processing pipeline',
     exampleOutput: 'Documents indexed in Bedrock Knowledge Base, queryable via RetrieveAndGenerate API',
+  },
+  pdf_conversion: {
+    id: 'pdf_conversion',
+    name: 'PDF Conversion',
+    description: 'Convert Word, Excel, PowerPoint, images, and other formats to standardized PDF for downstream processing. Uses Python (reportlab, pdfkit) or LibreOffice headless for high-fidelity conversion.',
+    category: 'document_conversion',
+    icon: 'file',
+    tags: ['pdf', 'convert', 'word', 'excel', 'pptx', 'python', 'libreoffice'],
+    exampleInput: 'invoice.docx, report.xlsx, presentation.pptx',
+    exampleOutput: 'Standardized PDF files ready for text/table extraction',
+  },
+  format_standardization: {
+    id: 'format_standardization',
+    name: 'Format Standardization',
+    description: 'Normalize document layouts, page sizes, and orientations. Detect and correct rotation, split multi-document PDFs, and standardize to consistent A4/Letter format for reliable extraction.',
+    category: 'document_conversion',
+    icon: 'settings',
+    tags: ['normalize', 'standardize', 'rotate', 'split', 'a4', 'format'],
+    exampleInput: 'Mixed-orientation scanned PDF with varying page sizes',
+    exampleOutput: 'Uniform A4 PDF with consistent orientation and page numbering',
+  },
+  ocr_enhancement: {
+    id: 'ocr_enhancement',
+    name: 'OCR Enhancement',
+    description: 'Pre-process images for better OCR accuracy: deskew, denoise, contrast enhancement, and binarization. Combines Amazon Textract with image preprocessing (OpenCV/Pillow) for improved extraction from low-quality scans.',
+    category: 'document_conversion',
+    icon: 'search',
+    tags: ['ocr', 'enhance', 'deskew', 'denoise', 'scan', 'preprocess', 'opencv'],
+    exampleInput: 'Low-quality scan with noise, skew, and poor contrast',
+    exampleOutput: 'Enhanced image with improved OCR accuracy (90%+ character recognition)',
   },
 };
 

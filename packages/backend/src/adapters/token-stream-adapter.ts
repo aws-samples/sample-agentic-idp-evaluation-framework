@@ -2,6 +2,7 @@ import type { Response } from 'express';
 import type { ProcessingMethod } from '@idp/shared';
 import { METHOD_INFO } from '@idp/shared';
 import sharp from 'sharp';
+import YAML from 'yaml';
 import {
   ConverseStreamCommand,
   type ContentBlock,
@@ -40,10 +41,10 @@ function buildSystemPrompt(capabilities: string[]): string {
   return `You are a document processing AI. Extract the following capabilities from the provided document:
 ${capabilities.map((c) => `- ${c}`).join('\n')}
 
-Return your results as a JSON object with each capability as a key. For each capability, provide:
-- "data": the extracted content
-- "confidence": a number between 0 and 1 indicating your confidence
-- "format": one of "html", "csv", "json", "text"
+Return your results as YAML (not JSON) with each capability as a key. For each capability, provide:
+- data: the extracted content
+- confidence: a number between 0 and 1 indicating your confidence
+- format: one of "html", "csv", "json", "text"
 
 For table_extraction, use HTML table format.
 For kv_extraction, use JSON key-value pairs.
@@ -51,7 +52,7 @@ For image_description, provide text descriptions.
 For bounding_box, provide JSON with coordinates.
 For text_extraction, provide plain text.
 
-Return ONLY valid JSON, no markdown code blocks.`;
+Return ONLY valid YAML. No markdown code blocks, no JSON.`;
 }
 
 export class TokenStreamAdapter implements StreamAdapter {
@@ -99,7 +100,7 @@ export class TokenStreamAdapter implements StreamAdapter {
         maxTokens: calculateMaxTokens(
           input.capabilities.length,
           input.pageCount ?? 1,
-          'json',
+          'yaml',
           input.capabilities.some(isMediaCapability),
         ),
         temperature: 0,
@@ -154,22 +155,29 @@ export class TokenStreamAdapter implements StreamAdapter {
     let parsed: Record<string, unknown> | null = null;
 
     // Try multiple parsing strategies
-    const fenceMatch = rawOutput.match(/```(?:json|JSON)?\s*\n([\s\S]*?)\n\s*```/);
+    const yamlFenceMatch = rawOutput.match(/```(?:yaml|YAML|yml)?\s*\n([\s\S]*?)\n\s*```/);
+    const jsonFenceMatch = rawOutput.match(/```(?:json|JSON)?\s*\n([\s\S]*?)\n\s*```/);
     const cleanStrategies = [
-      // 1. Direct parse
-      rawOutput.trim(),
-      // 2. Extract content from code fences
-      fenceMatch?.[1]?.trim() ?? '',
-      // 3. Strip code fences with simple replace (no multiline flag)
-      rawOutput.replace(/^```(?:json|JSON)?\s*\n/, '').replace(/\n\s*```\s*$/, '').trim(),
-      // 4. Find first JSON object in text
-      rawOutput.match(/(\{[\s\S]*\})/)?.[1]?.trim() ?? '',
+      // 1. Try YAML parse first (handles truncated content gracefully)
+      { content: rawOutput.trim(), parser: 'yaml' },
+      // 2. Extract YAML from code fences
+      { content: yamlFenceMatch?.[1]?.trim() ?? '', parser: 'yaml' },
+      // 3. Strip YAML code fences
+      { content: rawOutput.replace(/^```(?:yaml|YAML|yml)?\s*\n/, '').replace(/\n\s*```\s*$/, '').trim(), parser: 'yaml' },
+      // 4. Try JSON parse (fallback for old responses)
+      { content: rawOutput.trim(), parser: 'json' },
+      // 5. Extract JSON from code fences
+      { content: jsonFenceMatch?.[1]?.trim() ?? '', parser: 'json' },
+      // 6. Strip JSON code fences
+      { content: rawOutput.replace(/^```(?:json|JSON)?\s*\n/, '').replace(/\n\s*```\s*$/, '').trim(), parser: 'json' },
+      // 7. Find first JSON object in text
+      { content: rawOutput.match(/(\{[\s\S]*\})/)?.[1]?.trim() ?? '', parser: 'json' },
     ];
 
-    for (const cleaned of cleanStrategies) {
-      if (!cleaned) continue;
+    for (const { content, parser } of cleanStrategies) {
+      if (!content) continue;
       try {
-        const candidate = JSON.parse(cleaned);
+        const candidate = parser === 'yaml' ? YAML.parse(content) : JSON.parse(content);
         if (candidate && typeof candidate === 'object') {
           parsed = candidate;
           break;
