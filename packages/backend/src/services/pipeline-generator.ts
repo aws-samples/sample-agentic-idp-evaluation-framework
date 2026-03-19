@@ -32,6 +32,7 @@ interface MethodScore {
   speedRank: number;
 }
 
+// Speed ranks: lower = faster. Built dynamically from METHOD_INFO families.
 const SPEED_RANK: Record<string, number> = {
   'claude-haiku': 1,
   'nova-lite': 2,
@@ -42,8 +43,12 @@ const SPEED_RANK: Record<string, number> = {
   'textract-nova-pro': 7,
   'textract-claude-sonnet': 8,
   'bda-standard': 9,
-  'claude-opus': 10,
-  'bda-custom': 11,
+  'bda-claude-haiku': 10,
+  'bda-nova-lite': 11,
+  'bda-claude-sonnet': 12,
+  'claude-opus': 13,
+  'bda-custom': 14,
+  'nova-embeddings': 15,
 };
 
 function selectMethod(
@@ -371,9 +376,11 @@ export function generatePipeline(
   // Latency estimation: methods run in parallel, add classifier overhead
   const methodLatencies = uniqueMethods.map((m) => {
     const family = METHOD_INFO[m].family;
-    if (family === 'bda') return 5000;
-    if (family === 'textract-llm') return 4000;
-    return 3000; // claude, nova
+    if (family === 'bda') return 15000;
+    if (family === 'bda-llm') return 25000; // BDA polling + LLM streaming
+    if (family === 'textract-llm') return 8000;
+    if (family === 'embeddings') return 2000;
+    return 5000; // claude, nova
   });
   const estimatedLatencyMs = Math.max(...methodLatencies) + (enableHybridRouting ? 500 : 0);
 

@@ -3,7 +3,7 @@ import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { bedrockClient, config } from '../config/aws.js';
 import { generatePipeline } from '../services/pipeline-generator.js';
 import type { Capability, ProcessingMethod, PipelineGenerateRequest } from '@idp/shared';
-import { CAPABILITY_SUPPORT, getBestMethodsForCapability, getMethodFamily } from '@idp/shared';
+import { CAPABILITY_SUPPORT, METHODS, METHOD_INFO, getBestMethodsForCapability, getMethodFamily } from '@idp/shared';
 
 interface PreviewMethodResult {
   method: string;
@@ -129,26 +129,30 @@ router.post('/', async (req, res) => {
       })
       .join('\n');
 
+    // Build method list dynamically from METHOD_INFO
+    const methodListStr = METHODS.map((m) => {
+      const info = METHOD_INFO[m];
+      const pricing = info.family === 'bda'
+        ? `$${info.estimatedCostPerPage}/page`
+        : info.family === 'bda-llm'
+          ? `BDA $0.01/pg + $${info.tokenPricing.inputPer1MTokens}/$${info.tokenPricing.outputPer1MTokens} per 1M tokens`
+          : info.family === 'textract-llm'
+            ? `Textract $0.0015/pg + $${info.tokenPricing.inputPer1MTokens}/$${info.tokenPricing.outputPer1MTokens} per 1M tokens`
+            : `$${info.tokenPricing.inputPer1MTokens}/$${info.tokenPricing.outputPer1MTokens} per 1M tokens`;
+      return `- ${m}: ${info.name} (${pricing}) - ${info.strengths[0] ?? info.description}`;
+    }).join('\n');
+
     const prompt = `You are an IDP pipeline architect. Analyze these extraction preview results and recommend the optimal pipeline configuration.
 
 Document type: ${body.documentType ?? 'unknown'}
 Selected capabilities: ${body.capabilities.join(', ')}
 ${body.preferredMethod ? `User preferred method: ${body.preferredMethod}` : ''}
 
-Preview results from 3 methods:
+Preview results:
 ${previewSummary || 'No preview results available.'}
 
-Available methods:
-- claude-sonnet: Claude Sonnet 4.6 ($3/$15 per 1M tokens) - highest accuracy
-- claude-haiku: Claude Haiku 4.5 ($1/$5 per 1M tokens) - fast and cheap
-- claude-opus: Claude Opus 4.6 ($5/$25 per 1M tokens) - most capable
-- nova-lite: Nova 2 Lite ($0.30/$2.50 per 1M tokens) - cheapest LLM
-- nova-pro: Nova 2 Pro ($1.25/$10 per 1M tokens) - balanced
-- bda-standard: BDA Standard ($0.01/page) - automated extraction
-- bda-custom: BDA Custom ($0.04/page) - custom blueprints
-- textract-claude-sonnet: Textract+Sonnet ($0.0015/pg + LLM tokens)
-- textract-claude-haiku: Textract+Haiku ($0.0015/pg + LLM tokens)
-- textract-nova-lite: Textract+Nova Lite ($0.0015/pg + LLM tokens)
+Available methods (${METHODS.length} total):
+${methodListStr}
 
 Return ONLY valid JSON:
 {
