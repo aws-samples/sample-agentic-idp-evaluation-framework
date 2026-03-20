@@ -11,6 +11,7 @@ import Spinner from '@cloudscape-design/components/spinner';
 import type { UploadResponse, Capability, ProcessorResult, ComparisonResult } from '@idp/shared';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import { marked } from 'marked';
+import { authedFetch } from '../services/api.js';
 import PipelineCanvas from '../components/pipeline/PipelineCanvas';
 import PipelineToolbar from '../components/pipeline/PipelineToolbar';
 import PipelineAlternatives from '../components/pipeline/PipelineAlternatives';
@@ -80,7 +81,7 @@ export default function PipelinePage({
     setSmartError(null);
 
     try {
-      const res = await fetch('/api/pipeline/smart', {
+      const res = await authedFetch('/api/pipeline/smart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

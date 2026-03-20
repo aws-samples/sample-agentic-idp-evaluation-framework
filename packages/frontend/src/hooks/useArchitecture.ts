@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import type { ProcessorResult, ComparisonResult, Capability } from '@idp/shared';
+import { authedFetch } from '../services/api.js';
 
 export interface CostProjectionData {
   scale: string;
@@ -45,7 +46,7 @@ export function useArchitecture(): UseArchitectureResult {
 
     (async () => {
       try {
-        const res = await fetch('/api/architecture', {
+        const res = await authedFetch('/api/architecture', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

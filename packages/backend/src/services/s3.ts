@@ -1,5 +1,4 @@
 import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import { s3Client, config } from '../config/aws.js';
 import { mkdir, writeFile, readFile } from 'fs/promises';
@@ -53,15 +52,12 @@ export async function uploadDocument(
 }
 
 export async function getPresignedUrl(s3Uri: string): Promise<string> {
-  if (s3Uri.startsWith('local://')) {
-    const key = s3Uri.replace(/^local:\/\/[^/]+\//, '');
-    // Encode each path segment for proper URL handling of Korean/CJK filenames
-    const encoded = key.split('/').map((seg) => encodeURIComponent(seg)).join('/');
-    return `/api/files/${encoded}`;
-  }
-  const { bucket, key } = parseS3Uri(s3Uri);
-  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-  return getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  // Always use backend proxy for file serving (avoids S3 presigned URL issues)
+  const key = s3Uri.startsWith('local://')
+    ? s3Uri.replace(/^local:\/\/[^/]+\//, '')
+    : new URL(s3Uri).pathname.slice(1);
+  const encoded = key.split('/').map((seg) => encodeURIComponent(seg)).join('/');
+  return `/api/files/${encoded}`;
 }
 
 export async function getDocumentBuffer(s3Uri: string): Promise<Buffer> {

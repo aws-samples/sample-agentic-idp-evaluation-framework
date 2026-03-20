@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { authedFetch } from '../services/api.js';
 import type { Capability, MethodFamily } from '@idp/shared';
 
 export interface CapabilityResult {
@@ -52,7 +53,7 @@ export function usePreview(): UsePreviewResult {
     setError(null);
 
     try {
-      const res = await fetch('/api/preview', {
+      const res = await authedFetch('/api/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId, s3Uri, capabilities, userInstruction }),

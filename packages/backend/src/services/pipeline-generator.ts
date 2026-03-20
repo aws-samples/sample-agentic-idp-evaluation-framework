@@ -278,34 +278,40 @@ export function generatePipeline(
   }
   xPos += xStep;
 
-  // 5. Aggregator Node
-  const aggregatorNodeId = generateNodeId('aggregator');
-  nodes.push({
-    id: aggregatorNodeId,
-    type: 'aggregator',
-    label: 'Aggregator',
-    description: 'Combines results from all methods',
-    config: {
-      nodeType: 'aggregator',
-      strategy: optimizeFor === 'accuracy' ? 'best-confidence' : optimizeFor === 'cost' ? 'best-cost' : optimizeFor === 'speed' ? 'best-speed' : 'best-confidence',
-    } as AggregatorConfig,
-    position: { x: xPos, y: yPos },
-  });
-
-  for (const methodNodeId of methodNodeIds) {
-    edges.push({
-      id: generateEdgeId(),
-      source: methodNodeId,
-      target: aggregatorNodeId,
+  // 5. Aggregator Node (only when multiple methods need merging)
+  let preOutputNodeId: string;
+  if (methodNodeIds.length > 1) {
+    const aggregatorNodeId = generateNodeId('aggregator');
+    nodes.push({
+      id: aggregatorNodeId,
+      type: 'aggregator',
+      label: 'Aggregator',
+      description: 'Combines results from all methods',
+      config: {
+        nodeType: 'aggregator',
+        strategy: optimizeFor === 'accuracy' ? 'best-confidence' : optimizeFor === 'cost' ? 'best-cost' : optimizeFor === 'speed' ? 'best-speed' : 'best-confidence',
+      } as AggregatorConfig,
+      position: { x: xPos, y: yPos },
     });
+
+    for (const methodNodeId of methodNodeIds) {
+      edges.push({
+        id: generateEdgeId(),
+        source: methodNodeId,
+        target: aggregatorNodeId,
+      });
+    }
+    preOutputNodeId = aggregatorNodeId;
+    xPos += xStep;
+  } else {
+    preOutputNodeId = methodNodeIds[0];
   }
-  xPos += xStep;
 
   // 6. Output Node
   const outputNodeId = generateNodeId('output');
   nodes.push({
     id: outputNodeId,
-    type: 'output',
+    type: 'pipeline-output',
     label: 'Output',
     description: 'Final structured output',
     config: {
@@ -319,7 +325,7 @@ export function generatePipeline(
 
   edges.push({
     id: generateEdgeId(),
-    source: aggregatorNodeId,
+    source: preOutputNodeId,
     target: outputNodeId,
   });
 

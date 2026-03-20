@@ -12,7 +12,7 @@ import { midwayAuth, midwayUserHeader } from './middleware/midway.js';
 import { errorHandler } from './middleware/error.js';
 import { processRateLimit, apiRateLimit } from './middleware/rate-limit.js';
 import { config } from './config/aws.js';
-import { getLocalFilePath } from './services/s3.js';
+import { getLocalFilePath, getDocumentBuffer } from './services/s3.js';
 import authRouter from './routes/auth.js';
 import healthRouter from './routes/health.js';
 import uploadRouter from './routes/upload.js';
@@ -37,14 +37,39 @@ app.use('/api/health', healthRouter);
 app.use('/api', midwayAuth);
 app.use('/api', midwayUserHeader);
 
-// Local file serving (dev mode - when S3 is not configured)
-app.get('/api/files/*', (req, res) => {
+// File serving proxy (local files or S3)
+app.get('/api/files/*', async (req, res) => {
   const key = decodeURIComponent(req.path.replace('/api/files/', ''));
+
+  // Try local file first
   const filePath = getLocalFilePath(key);
   if (filePath) {
     res.sendFile(filePath);
-  } else {
-    res.status(404).json({ error: 'File not found' });
+    return;
+  }
+
+  // Proxy from S3
+  try {
+    const s3Uri = `s3://${config.s3Bucket}/${key}`;
+    const buffer = await getDocumentBuffer(s3Uri);
+    const ext = key.split('.').pop()?.toLowerCase() ?? '';
+    const mimeTypes: Record<string, string> = {
+      pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+      mp4: 'video/mp4', mp3: 'audio/mpeg', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    };
+    res.set('Content-Type', mimeTypes[ext] ?? 'application/octet-stream');
+    res.set('Content-Length', String(buffer.length));
+    res.send(buffer);
+  } catch (err: any) {
+    if (err.Code === 'NoSuchKey' || err.name === 'NoSuchKey') {
+      res.status(404).json({ error: 'File not found' });
+    } else {
+      console.error('[File proxy error]', err.message);
+      res.status(500).json({ error: 'Failed to retrieve file' });
+    }
   }
 });
 

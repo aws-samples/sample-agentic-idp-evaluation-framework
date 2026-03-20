@@ -10,7 +10,7 @@ export type PipelineNodeType =
   | 'capability'
   | 'method'
   | 'aggregator'
-  | 'output';
+  | 'pipeline-output';
 
 export interface PipelineNode {
   id: string;

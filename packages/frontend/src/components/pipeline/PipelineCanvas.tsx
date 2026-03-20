@@ -27,7 +27,7 @@ const nodeTypes = {
   capability: CapabilityNode,
   method: MethodNode,
   aggregator: AggregatorNode,
-  output: OutputNode,
+  'pipeline-output': OutputNode,
 };
 
 interface PipelineCanvasProps {

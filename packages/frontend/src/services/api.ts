@@ -1,4 +1,5 @@
 import type { UploadResponse } from '@idp/shared';
+import { redirectToMidway } from './midway.js';
 
 const BASE = '/api';
 
@@ -7,19 +8,19 @@ export interface AuthUser {
   email: string;
 }
 
+/** Fetch wrapper that auto-redirects to Midway on 401 */
+export async function authedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 401 && window.location.hostname !== 'localhost') {
+    redirectToMidway();
+    return new Promise(() => {}); // page is redirecting
+  }
+  return res;
+}
+
 export async function getCurrentUser(): Promise<AuthUser> {
-  const res = await fetch(`${BASE}/auth/me`);
+  const res = await authedFetch(`${BASE}/auth/me`);
   if (!res.ok) {
-    // Auto-redirect to Midway login on 401
-    if (res.status === 401) {
-      try {
-        const body = await res.json() as { loginUrl?: string };
-        if (body.loginUrl) {
-          window.location.href = body.loginUrl;
-          return new Promise(() => {}); // never resolves — page is redirecting
-        }
-      } catch { /* fall through */ }
-    }
     throw new Error('Not authenticated');
   }
   return res.json() as Promise<AuthUser>;
@@ -29,7 +30,7 @@ export async function uploadDocument(file: File): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${BASE}/upload`, {
+  const res = await authedFetch(`${BASE}/upload`, {
     method: 'POST',
     body: formData,
   });

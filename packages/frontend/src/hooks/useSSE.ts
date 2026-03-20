@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { authedFetch } from '../services/api.js';
 
 export type SSEStatus = 'idle' | 'connecting' | 'streaming' | 'done' | 'error';
 
@@ -44,7 +45,7 @@ export function useSSE<T = unknown>(url: string): UseSSEResult<T> {
 
       (async () => {
         try {
-          const res = await fetch(url, {
+          const res = await authedFetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),

@@ -8,6 +8,7 @@ import type {
   ProcessorResult,
   ComparisonResult,
 } from '@idp/shared';
+import { authedFetch } from '../services/api.js';
 
 export type NodeState = 'idle' | 'active' | 'complete' | 'error';
 
@@ -63,7 +64,7 @@ export function usePipeline(): UsePipelineResult {
     setError(null);
 
     try {
-      const res = await fetch('/api/pipeline/generate', {
+      const res = await authedFetch('/api/pipeline/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
@@ -120,7 +121,7 @@ export function usePipeline(): UsePipelineResult {
 
     (async () => {
       try {
-        const res = await fetch('/api/pipeline/execute', {
+        const res = await authedFetch('/api/pipeline/execute', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
