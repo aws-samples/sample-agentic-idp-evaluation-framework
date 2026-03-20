@@ -18,7 +18,7 @@ function useLocal(): boolean {
 
 function parseS3Uri(s3Uri: string): { bucket: string; key: string } {
   const url = new URL(s3Uri);
-  return { bucket: url.hostname, key: normalizeFileName(decodeURIComponent(url.pathname.slice(1))) };
+  return { bucket: url.hostname, key: decodeURIComponent(url.pathname.slice(1)) };
 }
 
 export async function uploadDocument(
@@ -75,9 +75,11 @@ export async function getDocumentBuffer(s3Uri: string): Promise<Buffer> {
     return Buffer.from(bytes);
   } catch (err: any) {
     // Fallback: try NFD (decomposed) key for files uploaded from macOS before NFC fix
-    if (err.Code === 'NoSuchKey' || err.name === 'NoSuchKey') {
+    const errorCode = err.Code || err.name || err.$metadata?.httpStatusCode;
+    if (errorCode === 'NoSuchKey' || errorCode === 404) {
       const nfdKey = key.normalize('NFD');
       if (nfdKey !== key) {
+        console.log('[S3 NFD fallback] NFC key not found, trying NFD:', nfdKey.length, 'bytes vs NFC:', key.length);
         const response = await s3Client.send(
           new GetObjectCommand({ Bucket: bucket, Key: nfdKey }),
         );
