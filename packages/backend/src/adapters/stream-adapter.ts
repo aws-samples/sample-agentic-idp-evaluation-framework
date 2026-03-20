@@ -13,6 +13,7 @@ export interface AdapterInput {
   fileName: string;
   capabilities: string[];
   pageCount: number;
+  userInstruction?: string;
 }
 
 export interface AdapterOutput {

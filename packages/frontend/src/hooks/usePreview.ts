@@ -39,7 +39,7 @@ export interface UsePreviewResult {
   preview: PreviewResponse | null;
   isLoading: boolean;
   error: string | null;
-  runPreview: (documentId: string, s3Uri: string, capabilities: Capability[]) => Promise<void>;
+  runPreview: (documentId: string, s3Uri: string, capabilities: Capability[], userInstruction?: string) => Promise<void>;
 }
 
 export function usePreview(): UsePreviewResult {
@@ -47,7 +47,7 @@ export function usePreview(): UsePreviewResult {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const runPreview = useCallback(async (documentId: string, s3Uri: string, capabilities: Capability[]) => {
+  const runPreview = useCallback(async (documentId: string, s3Uri: string, capabilities: Capability[], userInstruction?: string) => {
     setIsLoading(true);
     setError(null);
 
@@ -55,7 +55,7 @@ export function usePreview(): UsePreviewResult {
       const res = await fetch('/api/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId, s3Uri, capabilities }),
+        body: JSON.stringify({ documentId, s3Uri, capabilities, userInstruction }),
       });
 
       if (!res.ok) {

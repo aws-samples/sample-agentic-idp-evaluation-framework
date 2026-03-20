@@ -17,6 +17,7 @@ interface PreviewRequest {
   s3Uri: string;
   capabilities: Capability[];
   methods?: ProcessingMethod[];
+  userInstruction?: string;
 }
 
 // Return all available methods (filtered by config). Let the LLM/agent decide which to use.
@@ -73,6 +74,7 @@ router.post('/', async (req, res) => {
       fileName,
       capabilities: body.capabilities,
       pageCount,
+      userInstruction: body.userInstruction,
     };
 
     const methods = getAvailableMethods(body.methods);

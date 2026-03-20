@@ -35,8 +35,14 @@ export default function ConversationPage({
   const { preview, isLoading: isPreviewLoading, error: previewError, runPreview } = usePreview();
   const [selectedMethod, setSelectedMethod] = useState<string>('');
 
-  // Initialize selected capabilities from recommendations and auto-run preview
   const autoPreviewDone = useRef(false);
+
+  // Build user instruction from interview conversation to pass to preview adapters
+  const userInstruction = messages
+    .filter((m) => m.role === 'user')
+    .map((m) => m.content)
+    .join('\n')
+    .trim() || undefined;
 
   useEffect(() => {
     if (recommendations && selectedCapabilities.length === 0) {
@@ -58,9 +64,9 @@ export default function ConversationPage({
       !autoPreviewDone.current
     ) {
       autoPreviewDone.current = true;
-      runPreview(document.documentId, document.s3Uri, selectedCapabilities);
+      runPreview(document.documentId, document.s3Uri, selectedCapabilities, userInstruction);
     }
-  }, [document, selectedCapabilities, recommendations, preview, isPreviewLoading, runPreview]);
+  }, [document, selectedCapabilities, recommendations, preview, isPreviewLoading, runPreview, userInstruction]);
 
   const handleToggleCapability = useCallback(
     (cap: Capability, enabled: boolean) => {
@@ -75,8 +81,8 @@ export default function ConversationPage({
 
   const handleRunPreview = useCallback(() => {
     if (!document || selectedCapabilities.length === 0) return;
-    runPreview(document.documentId, document.s3Uri, selectedCapabilities);
-  }, [document, selectedCapabilities, runPreview]);
+    runPreview(document.documentId, document.s3Uri, selectedCapabilities, userInstruction);
+  }, [document, selectedCapabilities, runPreview, userInstruction]);
 
   const handleBuildPipeline = useCallback(() => {
     onStartProcessing(selectedMethod || undefined, preview);
@@ -135,7 +141,7 @@ export default function ConversationPage({
             isStreaming={isStreaming}
             error={error}
             onSendMessage={sendMessage}
-            hideQuickReplies={!!preview && preview.results.some((r) => r.status === 'complete')}
+            hideQuickReplies={!!recommendations || (!!preview && preview.results.some((r) => r.status === 'complete'))}
           />
 
           {/* Document Preview */}

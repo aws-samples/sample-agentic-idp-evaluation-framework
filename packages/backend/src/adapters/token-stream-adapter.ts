@@ -38,15 +38,20 @@ function getImageFormat(fileName: string): ImageFormat {
   return map[ext] ?? 'jpeg';
 }
 
-function buildSystemPrompt(capabilities: string[]): string {
+function buildSystemPrompt(capabilities: string[], userInstruction?: string): string {
   const formatHints = capabilities.map((c) => {
     const info = CAPABILITY_INFO[c as keyof typeof CAPABILITY_INFO];
     const fmt = info?.defaultFormat ?? 'json';
     return `- ${c}: output as ${fmt}`;
   }).join('\n');
 
+  const instructionBlock = userInstruction
+    ? `\n\nUser's specific requirements (from interview):\n${userInstruction}\n\nTailor your extraction to match these requirements (language, style, detail level, etc.).`
+    : '';
+
   return `You are a document processing AI. Extract the following capabilities from the provided document:
 ${formatHints}
+${instructionBlock}
 
 Return your results as YAML (not JSON) with each capability as a key. For each capability, provide:
 - data: the extracted content (use the format specified above)
@@ -95,7 +100,7 @@ export class TokenStreamAdapter implements StreamAdapter {
 
     const command = new ConverseStreamCommand({
       modelId: this.modelId,
-      system: [{ text: buildSystemPrompt(input.capabilities) }],
+      system: [{ text: buildSystemPrompt(input.capabilities, input.userInstruction) }],
       messages,
       inferenceConfig: {
         maxTokens: calculateMaxTokens(
