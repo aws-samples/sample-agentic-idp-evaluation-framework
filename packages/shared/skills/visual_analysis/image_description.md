@@ -7,6 +7,8 @@ categoryName: "Visual Analysis"
 icon: "image"
 defaultFormat: "json"
 tags: ["image", "chart", "graph", "diagram", "photo", "visual"]
+exampleInput: "Annual report with pie charts"
+exampleOutput: "Detailed description of each chart with data points"
 support:
   bda: "good"
   bda-llm: "good"

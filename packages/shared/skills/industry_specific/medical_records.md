@@ -7,6 +7,8 @@ categoryName: "Industry-Specific"
 icon: "activity"
 defaultFormat: "json"
 tags: ["medical", "health", "patient", "diagnosis", "icd", "medication", "hipaa"]
+exampleInput: "Patient discharge summary"
+exampleOutput: "{"patient": "...", "diagnoses": [...], "medications": [...]}"
 support:
   bda: "good"
   bda-llm: "excellent"

@@ -116,20 +116,21 @@ skills.sort((a, b) => {
 const capIds = skills.map(s => `'${s.id}'`).join(',\n  ');
 const capInfoEntries = skills.map(s => {
   const tags = s.tags.map(t => `'${t}'`).join(', ');
+  const esc = (v: string) => (v ?? '').replace(/'/g, "\\'");
   const supportEntries = Object.entries(s.support)
     .map(([f, l]) => `    '${f}': '${l}' as const`)
     .join(',\n');
 
   return `  '${s.id}': {
     id: '${s.id}',
-    name: '${s.name}',
-    description: '${s.description.replace(/'/g, "\\'")}',
+    name: '${esc(s.name)}',
+    description: '${esc(s.description)}',
     category: '${s.category}',
     icon: '${s.icon}',
     defaultFormat: '${s.defaultFormat}',
     tags: [${tags}],
-    exampleInput: '',
-    exampleOutput: '',
+    exampleInput: '${esc(s.exampleInput)}',
+    exampleOutput: '${esc(s.exampleOutput)}',
     support: {
 ${supportEntries}
     },

@@ -7,6 +7,8 @@ categoryName: "Document Conversion"
 icon: "ruler"
 defaultFormat: "json"
 tags: ["normalize", "standardize", "rotate", "split", "a4", "pymupdf", "pikepdf"]
+exampleInput: "Mixed-orientation scanned PDF with varying page sizes"
+exampleOutput: "Uniform A4 PDF with consistent orientation and page numbering"
 support:
 
 ---

@@ -7,6 +7,8 @@ categoryName: "Visual Analysis"
 icon: "crop"
 defaultFormat: "json"
 tags: ["bbox", "coordinates", "spatial", "detection", "region"]
+exampleInput: "Yearbook page with photos"
+exampleOutput: "[{"label": "face", "x": 120, "y": 45, "w": 80, "h": 100}]"
 support:
   bda: "excellent"
   bda-llm: "excellent"

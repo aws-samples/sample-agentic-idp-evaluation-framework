@@ -7,6 +7,8 @@ categoryName: "Advanced AI"
 icon: "library"
 defaultFormat: "json"
 tags: ["knowledge", "base", "rag", "ingestion", "bedrock", "retrieval", "qa"]
+exampleInput: "Extracted text + embeddings from processing pipeline"
+exampleOutput: "Documents indexed in Bedrock Knowledge Base, queryable via RetrieveAndGenerate API"
 support:
   embeddings: "good"
 ---

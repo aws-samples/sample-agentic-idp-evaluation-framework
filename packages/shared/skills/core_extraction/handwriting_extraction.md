@@ -7,6 +7,8 @@ categoryName: "Core Extraction"
 icon: "edit"
 defaultFormat: "text"
 tags: ["handwriting", "cursive", "annotations", "notes"]
+exampleInput: "Handwritten medical form"
+exampleOutput: "Digitized text from handwritten fields"
 support:
   bda: "good"
   bda-llm: "excellent"

@@ -7,6 +7,8 @@ categoryName: "Document Intelligence"
 icon: "globe"
 defaultFormat: "json"
 tags: ["language", "detect", "translate", "multilingual", "i18n"]
+exampleInput: "Document in unknown language"
+exampleOutput: "{"language": "ko", "confidence": 0.98, "name": "Korean"}"
 support:
   bda: "good"
   bda-llm: "excellent"

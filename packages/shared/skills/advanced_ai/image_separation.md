@@ -7,6 +7,8 @@ categoryName: "Advanced AI"
 icon: "image-off"
 defaultFormat: "json"
 tags: ["image", "extract", "separate", "figure", "chart", "embedded", "ocr"]
+exampleInput: "PDF with embedded product photos and charts"
+exampleOutput: "Individual images extracted with captions and page locations"
 support:
   bda: "good"
   bda-llm: "good"

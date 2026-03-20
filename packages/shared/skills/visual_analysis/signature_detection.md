@@ -7,6 +7,8 @@ categoryName: "Visual Analysis"
 icon: "pen-tool"
 defaultFormat: "json"
 tags: ["signature", "initials", "stamp", "signed", "notarized"]
+exampleInput: "Signed contract"
+exampleOutput: "{"hasSignature": true, "locations": [...], "count": 2}"
 support:
   bda: "limited"
   bda-llm: "good"

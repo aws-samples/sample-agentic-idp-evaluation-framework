@@ -7,6 +7,8 @@ categoryName: "Compliance & Security"
 icon: "shield"
 defaultFormat: "json"
 tags: ["pii", "ssn", "credit-card", "bank-account", "privacy", "gdpr"]
+exampleInput: "Customer application form"
+exampleOutput: "[{"type": "SSN", "value": "***-**-1234", "location": {...}}]"
 support:
   bda: "limited"
   bda-llm: "excellent"

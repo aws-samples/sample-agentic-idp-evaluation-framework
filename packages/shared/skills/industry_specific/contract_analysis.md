@@ -7,6 +7,8 @@ categoryName: "Industry-Specific"
 icon: "file-text"
 defaultFormat: "json"
 tags: ["contract", "clause", "terms", "obligations", "legal", "nda", "agreement"]
+exampleInput: "SaaS subscription agreement"
+exampleOutput: "{"parties": [...], "clauses": [...], "termDate": "...", "obligations": [...]}"
 support:
   bda: "limited"
   bda-llm: "excellent"

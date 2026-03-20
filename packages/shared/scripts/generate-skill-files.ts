@@ -43,6 +43,8 @@ categoryName: "${categoryName}"
 icon: "${info.icon}"
 defaultFormat: "${defaultFormat}"
 tags: [${info.tags.map(t => `"${t}"`).join(', ')}]
+exampleInput: "${info.exampleInput}"
+exampleOutput: "${info.exampleOutput}"
 support:
 ${Object.entries(support).map(([f, l]) => `  ${f}: "${l}"`).join('\n')}
 ---

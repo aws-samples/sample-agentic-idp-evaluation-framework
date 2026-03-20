@@ -7,6 +7,8 @@ categoryName: "Core Extraction"
 icon: "file-text"
 defaultFormat: "text"
 tags: ["text", "ocr", "printed", "digital"]
+exampleInput: "Scanned contract PDF"
+exampleOutput: "Full text with paragraph structure"
 support:
   bda: "excellent"
   bda-llm: "excellent"

@@ -7,6 +7,8 @@ categoryName: "Visual Analysis"
 icon: "maximize"
 defaultFormat: "json"
 tags: ["barcode", "qr", "data-matrix", "scan", "code"]
+exampleInput: "Shipping label with barcode"
+exampleOutput: "{"type": "QR", "data": "https://...", "location": {...}}"
 support:
   bda: "limited"
   bda-llm: "limited"

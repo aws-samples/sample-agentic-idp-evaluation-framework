@@ -7,6 +7,8 @@ categoryName: "Core Extraction"
 icon: "list"
 defaultFormat: "json"
 tags: ["form", "fields", "key-value", "structured", "labels"]
+exampleInput: "Tax form W-2"
+exampleOutput: "{"employer_name": "...", "wages": "$...", "ssn": "***-**-****"}"
 support:
   bda: "good"
   bda-llm: "excellent"

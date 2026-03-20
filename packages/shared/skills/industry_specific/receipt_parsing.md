@@ -7,6 +7,8 @@ categoryName: "Industry-Specific"
 icon: "shopping-cart"
 defaultFormat: "json"
 tags: ["receipt", "items", "prices", "store", "expense", "reimbursement"]
+exampleInput: "Restaurant receipt photo"
+exampleOutput: "{"store": "...", "items": [...], "subtotal": "$45.00", "tip": "$9.00"}"
 support:
   bda: "excellent"
   bda-llm: "excellent"

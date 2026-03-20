@@ -7,6 +7,8 @@ categoryName: "Media Processing"
 icon: "shield-alert"
 defaultFormat: "json"
 tags: ["moderation", "safety", "nsfw", "violence", "explicit", "compliance"]
+exampleInput: "User-uploaded image or video"
+exampleOutput: "Moderation flags with confidence scores per category"
 support:
   bda: "excellent"
   bda-llm: "excellent"

@@ -7,6 +7,8 @@ categoryName: "Core Extraction"
 icon: "table"
 defaultFormat: "html"
 tags: ["table", "nested", "merged", "html", "csv", "structured"]
+exampleInput: "Financial statement with nested tables"
+exampleOutput: "HTML/CSV with preserved structure"
 support:
   bda: "excellent"
   bda-llm: "excellent"

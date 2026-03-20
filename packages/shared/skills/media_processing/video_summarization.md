@@ -7,6 +7,8 @@ categoryName: "Media Processing"
 icon: "video"
 defaultFormat: "json"
 tags: ["video", "summary", "scene", "speaker", "mp4", "mov"]
+exampleInput: "Product demo video (MP4, up to 240 min)"
+exampleOutput: "Full summary + per-chapter summaries with timestamps"
 support:
   bda: "excellent"
   bda-llm: "excellent"

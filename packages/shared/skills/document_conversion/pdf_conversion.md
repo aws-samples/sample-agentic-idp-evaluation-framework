@@ -7,6 +7,8 @@ categoryName: "Document Conversion"
 icon: "file-output"
 defaultFormat: "json"
 tags: ["pdf", "convert", "word", "excel", "pptx", "lambda", "libreoffice"]
+exampleInput: "invoice.docx, report.xlsx, presentation.pptx"
+exampleOutput: "Standardized PDF files ready for BDA or LLM extraction"
 support:
 
 ---

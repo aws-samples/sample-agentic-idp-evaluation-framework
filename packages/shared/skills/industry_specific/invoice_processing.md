@@ -7,6 +7,8 @@ categoryName: "Industry-Specific"
 icon: "file-text"
 defaultFormat: "json"
 tags: ["invoice", "line-items", "totals", "vendor", "ap", "accounts-payable"]
+exampleInput: "Vendor invoice PDF"
+exampleOutput: "{"vendor": "...", "lineItems": [...], "total": "$1,234.56", "tax": "$98.76"}"
 support:
   bda: "excellent"
   bda-llm: "excellent"

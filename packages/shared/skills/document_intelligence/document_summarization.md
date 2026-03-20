@@ -7,6 +7,8 @@ categoryName: "Document Intelligence"
 icon: "align-left"
 defaultFormat: "text"
 tags: ["summary", "key-points", "abstract", "executive-summary"]
+exampleInput: "20-page legal agreement"
+exampleOutput: "Executive summary with key terms, obligations, and deadlines"
 support:
   bda: "excellent"
   bda-llm: "excellent"

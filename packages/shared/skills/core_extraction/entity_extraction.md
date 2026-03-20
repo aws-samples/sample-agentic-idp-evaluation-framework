@@ -7,6 +7,8 @@ categoryName: "Core Extraction"
 icon: "user"
 defaultFormat: "json"
 tags: ["ner", "names", "dates", "amounts", "addresses", "phone", "email"]
+exampleInput: "Business letter or contract"
+exampleOutput: "{"persons": [...], "dates": [...], "amounts": [...], "addresses": [...]}"
 support:
   bda: "good"
   bda-llm: "excellent"

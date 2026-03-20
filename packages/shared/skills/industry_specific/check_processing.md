@@ -7,6 +7,8 @@ categoryName: "Industry-Specific"
 icon: "credit-card"
 defaultFormat: "json"
 tags: ["check", "cheque", "amount", "payee", "micr", "banking"]
+exampleInput: "Personal check image"
+exampleOutput: "{"courtesyAmount": "$500.00", "legalAmount": "Five hundred...", "payee": "..."}"
 support:
   bda: "good"
   bda-llm: "excellent"

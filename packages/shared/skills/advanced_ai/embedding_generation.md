@@ -7,6 +7,8 @@ categoryName: "Advanced AI"
 icon: "database"
 defaultFormat: "json"
 tags: ["embedding", "vector", "semantic", "search", "rag", "multimodal", "similarity"]
+exampleInput: "Document pages, images, or text passages"
+exampleOutput: "Vector embeddings (256-3072 dimensions) for indexing in vector stores"
 support:
   embeddings: "excellent"
 ---

@@ -7,6 +7,8 @@ categoryName: "Compliance & Security"
 icon: "eye-off"
 defaultFormat: "json"
 tags: ["redact", "sanitize", "mask", "anonymize", "privacy"]
+exampleInput: "Document with SSNs and addresses"
+exampleOutput: "Same document with PII replaced by [REDACTED]"
 support:
   bda-llm: "good"
   claude: "excellent"

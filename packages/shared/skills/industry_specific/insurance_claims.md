@@ -7,6 +7,8 @@ categoryName: "Industry-Specific"
 icon: "shield"
 defaultFormat: "json"
 tags: ["insurance", "claim", "policy", "coverage", "damage", "assessment"]
+exampleInput: "Auto insurance claim form"
+exampleOutput: "{"claimId": "...", "policyNumber": "...", "damages": [...], "amount": "$..."}"
 support:
   bda: "good"
   bda-llm: "excellent"

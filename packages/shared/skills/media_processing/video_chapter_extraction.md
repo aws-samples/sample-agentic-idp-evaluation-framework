@@ -7,6 +7,8 @@ categoryName: "Media Processing"
 icon: "film"
 defaultFormat: "json"
 tags: ["video", "chapter", "scene", "timestamp", "iab", "segmentation"]
+exampleInput: "Training webinar recording"
+exampleOutput: "Chapters with start/end times, summaries, and IAB categories"
 support:
   bda: "excellent"
   bda-llm: "excellent"

@@ -7,6 +7,8 @@ categoryName: "Media Processing"
 icon: "headphones"
 defaultFormat: "json"
 tags: ["audio", "summary", "topic", "meeting", "podcast"]
+exampleInput: "Team meeting recording"
+exampleOutput: "Topic summaries with timestamps and action items"
 support:
   bda: "excellent"
   bda-llm: "excellent"

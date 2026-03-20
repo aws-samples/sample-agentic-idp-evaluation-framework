@@ -7,6 +7,8 @@ categoryName: "Visual Analysis"
 icon: "layout"
 defaultFormat: "json"
 tags: ["layout", "columns", "sections", "headers", "footers", "reading-order"]
+exampleInput: "Multi-column newspaper article"
+exampleOutput: "{"sections": [...], "readingOrder": [...], "columns": 2}"
 support:
   bda: "excellent"
   bda-llm: "excellent"

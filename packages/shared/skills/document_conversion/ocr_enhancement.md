@@ -7,6 +7,8 @@ categoryName: "Document Conversion"
 icon: "scan-eye"
 defaultFormat: "json"
 tags: ["ocr", "enhance", "deskew", "denoise", "scan", "opencv", "textract", "preprocess"]
+exampleInput: "Low-quality scan with noise, skew, and poor contrast"
+exampleOutput: "Enhanced image with improved OCR accuracy (90%+ character recognition)"
 support:
   textract-llm: "limited"
 ---

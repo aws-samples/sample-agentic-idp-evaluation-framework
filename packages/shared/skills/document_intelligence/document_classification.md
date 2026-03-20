@@ -7,6 +7,8 @@ categoryName: "Document Intelligence"
 icon: "folder"
 defaultFormat: "json"
 tags: ["classify", "categorize", "type", "identification"]
+exampleInput: "Unknown document"
+exampleOutput: "{"type": "invoice", "confidence": 0.95, "subtype": "utility_bill"}"
 support:
   bda: "good"
   bda-llm: "excellent"
