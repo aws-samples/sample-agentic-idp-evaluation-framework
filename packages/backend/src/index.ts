@@ -62,6 +62,8 @@ app.get('/api/files/*', async (req, res) => {
     };
     res.set('Content-Type', mimeTypes[ext] ?? 'application/octet-stream');
     res.set('Content-Length', String(buffer.length));
+    res.set('Content-Disposition', 'inline');
+    res.set('Cache-Control', 'private, max-age=3600');
     res.send(buffer);
   } catch (err: any) {
     if (err.Code === 'NoSuchKey' || err.name === 'NoSuchKey') {
