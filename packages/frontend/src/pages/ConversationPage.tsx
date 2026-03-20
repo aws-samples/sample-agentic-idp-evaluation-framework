@@ -230,8 +230,8 @@ export default function ConversationPage({
           </Alert>
         )}
 
-        {/* Preview Results Comparison — only show if at least one method succeeded */}
-        {preview && preview.results.some((r) => r.status === 'complete') && (
+        {/* Preview Results Comparison — only show after ALL methods complete */}
+        {preview && !isPreviewLoading && preview.results.some((r) => r.status === 'complete') && (
           <>
             <PreviewComparison
               preview={preview}

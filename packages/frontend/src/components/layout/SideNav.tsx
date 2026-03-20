@@ -1,5 +1,6 @@
 import SideNavigation from '@cloudscape-design/components/side-navigation';
 import Badge from '@cloudscape-design/components/badge';
+// Badge still used for Done/Current indicators
 
 interface Step {
   href: string;
@@ -34,16 +35,7 @@ export default function SideNav({ activeStep, steps }: SideNavProps) {
     <SideNavigation
       header={{ text: 'Workflow', href: '/' }}
       activeHref={steps[activeStep]?.href ?? '/'}
-      items={[
-        ...items,
-        { type: 'divider' },
-        {
-          type: 'link',
-          text: 'Processing (Advanced)',
-          href: '/processing',
-          info: <Badge color="grey">Optional</Badge>,
-        },
-      ]}
+      items={items}
     />
   );
 }
