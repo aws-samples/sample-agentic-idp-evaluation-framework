@@ -8,7 +8,8 @@ import TopNav from './components/layout/TopNav';
 import SideNav from './components/layout/SideNav';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import HomePage from './pages/HomePage';
-import { getCurrentUser, type AuthUser } from './services/api';
+import type { AuthUser } from './services/api';
+import { initMidwayAuth, getStoredToken, getUserFromToken, hasValidToken } from './services/midway';
 import type { PreviewResponse } from './hooks/usePreview';
 
 // Lazy-loaded pages for bundle splitting (#20)
@@ -46,9 +47,12 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('idp-dark-mode') === 'true');
 
   useEffect(() => {
-    getCurrentUser()
-      .then(setUser)
-      .catch(() => setUser(null));
+    // Midway OIDC implicit flow authentication
+    const midwayUser = initMidwayAuth();
+    if (midwayUser) {
+      setUser(midwayUser);
+    }
+    // If initMidwayAuth returns null, it's redirecting to Midway — page will reload
   }, []);
 
   // Dark mode toggle (#16)

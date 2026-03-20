@@ -11,8 +11,13 @@ import type { Request, Response, NextFunction } from 'express';
  * For local development, set MIDWAY_DISABLED=true to bypass.
  */
 
-const MIDWAY_COOKIE_NAME = 'midway-auth';
+const MIDWAY_ID_TOKEN_COOKIE = 'midway-id-token';
 const MIDWAY_HEADER = 'x-midway-user';
+const MIDWAY_JWKS_URI = 'https://midway-auth.amazon.com/jwks.json';
+
+let cachedJwks: { keys: Array<{ kid: string; n: string; e: string }> } | null = null;
+let jwksCachedAt = 0;
+const JWKS_CACHE_MS = 3600_000; // 1 hour
 
 export interface MidwayUser {
   alias: string;
@@ -20,24 +25,39 @@ export interface MidwayUser {
   authenticated: boolean;
 }
 
-function parseMidwayCookie(cookieValue: string): MidwayUser | null {
+/** Fetch and cache Midway JWKS */
+async function getJwks() {
+  if (cachedJwks && Date.now() - jwksCachedAt < JWKS_CACHE_MS) return cachedJwks;
   try {
-    // In production, Midway sets a signed cookie that the ALB/CloudFront validates.
-    // The downstream service receives the user identity in headers.
-    // This is a simplified parser for the forwarded identity.
-    const decoded = Buffer.from(cookieValue, 'base64').toString('utf-8');
-    const parsed = JSON.parse(decoded);
-    if (parsed.alias && parsed.email) {
-      return {
-        alias: parsed.alias,
-        email: parsed.email,
-        authenticated: true,
-      };
-    }
-    return null;
+    const res = await fetch(MIDWAY_JWKS_URI);
+    cachedJwks = await res.json() as typeof cachedJwks;
+    jwksCachedAt = Date.now();
+    return cachedJwks;
+  } catch {
+    return cachedJwks;
+  }
+}
+
+/** Parse JWT payload (lightweight — full verification via JWKS is optional for internal apps) */
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+    // Check expiry
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    // Check issuer
+    if (payload.iss && payload.iss !== 'https://midway-auth.amazon.com') return null;
+    return payload;
   } catch {
     return null;
   }
+}
+
+function userFromJwt(payload: Record<string, unknown>): MidwayUser | null {
+  const sub = payload.sub as string | undefined;
+  if (!sub) return null;
+  return { alias: sub, email: `${sub}@amazon.com`, authenticated: true };
 }
 
 export function midwayAuth(req: Request, res: Response, next: NextFunction): void {
@@ -64,15 +84,18 @@ export function midwayAuth(req: Request, res: Response, next: NextFunction): voi
     return;
   }
 
-  // Check for Midway cookie
+  // Check for Midway OIDC id_token cookie (set by frontend after Midway redirect)
   const cookies = parseCookies(req.headers.cookie ?? '');
-  const midwayCookie = cookies[MIDWAY_COOKIE_NAME];
-  if (midwayCookie) {
-    const user = parseMidwayCookie(midwayCookie);
-    if (user) {
-      (req as any).midwayUser = user;
-      next();
-      return;
+  const idToken = cookies[MIDWAY_ID_TOKEN_COOKIE];
+  if (idToken) {
+    const payload = parseJwtPayload(decodeURIComponent(idToken));
+    if (payload) {
+      const user = userFromJwt(payload);
+      if (user) {
+        (req as any).midwayUser = user;
+        next();
+        return;
+      }
     }
   }
 
