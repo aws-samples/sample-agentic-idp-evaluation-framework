@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import type { ConversationRequest } from '@idp/shared';
+import type { ConversationRequest, ConversationEvent } from '@idp/shared';
 import { config } from '../config/aws.js';
-import { initSSE, startKeepalive, endSSE } from '../services/streaming.js';
+import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 
 const router = Router();
 
@@ -12,37 +12,55 @@ router.post('/', async (req, res) => {
   const keepalive = startKeepalive(res);
 
   try {
-    // Proxy to agent server (local HTTP or AgentCore)
-    const agentUrl = config.agentUrl;
-    const agentRes = await fetch(`${agentUrl}/conversation`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: body.message,
-        history: body.history,
-        documentId: body.documentId,
-        s3Uri: body.s3Uri,
-      }),
+    const isInit = body.message === '__init__';
+    const userText = isInit
+      ? 'I just uploaded this document. Please analyze it and tell me what you see, then ask me what I want to do with it. Provide clickable options.'
+      : body.message;
+
+    // Try agent server proxy first, fallback to direct import
+    if (config.agentUrl && config.agentUrl !== 'direct') {
+      try {
+        const agentRes = await fetch(`${config.agentUrl}/conversation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: body.message,
+            history: body.history,
+            documentId: body.documentId,
+            s3Uri: body.s3Uri,
+          }),
+        });
+
+        if (agentRes.ok && agentRes.body) {
+          const reader = agentRes.body.getReader();
+          const decoder = new TextDecoder();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(decoder.decode(value, { stream: true }));
+          }
+          return; // SSE complete via proxy
+        }
+        console.warn('[Conversation] Agent server returned', agentRes.status, '— falling back to direct');
+      } catch (proxyErr) {
+        console.warn('[Conversation] Agent server unavailable — falling back to direct');
+      }
+    }
+
+    // Direct: run Strands agent in-process
+    const { runSocraticAgentStrands } = await import('../agents/socratic-agent-strands.js');
+    const history = body.history.map((h) => ({ role: h.role, content: h.content }));
+    await runSocraticAgentStrands(res, userText, history, {
+      documentId: body.documentId,
+      s3Uri: body.s3Uri,
     });
 
-    if (!agentRes.ok || !agentRes.body) {
-      throw new Error(`Agent server error: ${agentRes.status}`);
-    }
-
-    // Stream SSE from agent server to client
-    const reader = agentRes.body.getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      res.write(chunk);
-    }
+    const doneEvent: ConversationEvent = { type: 'done' };
+    emitSSE(res, doneEvent);
   } catch (err) {
-    console.error('[Conversation Proxy Error]', err);
-    res.write(`data: ${JSON.stringify({ type: 'text', data: 'I encountered an error. Please try again.' })}\n\n`);
-    res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+    console.error('[Conversation Error]', err);
+    emitSSE(res, { type: 'text', data: 'I encountered an error processing your request. Please try again.' });
+    emitSSE(res, { type: 'done' });
   } finally {
     endSSE(res, keepalive);
   }
