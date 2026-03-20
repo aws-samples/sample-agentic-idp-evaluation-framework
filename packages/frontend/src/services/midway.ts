@@ -70,19 +70,18 @@ export function hasValidToken(): boolean {
   return true;
 }
 
-/** Handle the OIDC callback — extract id_token from URL hash */
+/** Handle the OIDC callback — extract id_token from URL query or hash */
 export function handleOidcCallback(): boolean {
-  const hash = window.location.hash;
-  if (!hash || !hash.includes('id_token=')) return false;
-
-  const params = new URLSearchParams(hash.substring(1));
-  const idToken = params.get('id_token');
+  // Midway returns id_token as query param or hash fragment depending on config
+  const queryParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const idToken = queryParams.get('id_token') || hashParams.get('id_token');
   if (!idToken) return false;
 
   storeToken(idToken);
 
-  // Clean up URL (remove hash fragment)
-  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  // Clean up URL (remove token from URL)
+  window.history.replaceState(null, '', window.location.pathname);
 
   return true;
 }
@@ -104,8 +103,18 @@ export function redirectToMidway(): void {
   window.location.href = authUrl;
 }
 
+/** Check if running in local dev mode */
+function isLocalDev(): boolean {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
 /** Initialize Midway auth — call on app startup */
 export function initMidwayAuth(): { alias: string; email: string } | null {
+  // Local dev: skip Midway, use mock user
+  if (isLocalDev()) {
+    return { alias: 'local-dev', email: 'local-dev@amazon.com' };
+  }
+
   // Step 1: Check for OIDC callback (returning from Midway)
   if (handleOidcCallback()) {
     const token = getStoredToken();
