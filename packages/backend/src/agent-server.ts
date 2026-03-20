@@ -2,7 +2,7 @@
  * Standalone Agent Server
  * Runs the Strands Socratic Agent as an independent service.
  * Local: http://localhost:3002
- * Production: AgentCore runtime container
+ * Production: AgentCore runtime container (port 8080, POST /invocations)
  */
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -18,10 +18,11 @@ import type { ConversationEvent } from '@idp/shared';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
-// Also accept raw text payloads (AgentCore may send raw bytes)
 app.use(express.text({ limit: '10mb', type: 'text/*' }));
+// Accept raw binary payloads too (AgentCore sends raw bytes)
+app.use(express.raw({ limit: '10mb', type: 'application/octet-stream' }));
 
-// Health check
+// Health check (AgentCore also calls GET /health)
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'idp-agent', timestamp: new Date().toISOString() });
 });
@@ -35,7 +36,14 @@ interface AgentRequest {
 
 // Shared conversation handler
 async function conversationHandler(req: Request, res: Response): Promise<void> {
-  const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as AgentRequest;
+  let body: AgentRequest;
+  if (Buffer.isBuffer(req.body)) {
+    body = JSON.parse(req.body.toString('utf-8'));
+  } else if (typeof req.body === 'string') {
+    body = JSON.parse(req.body);
+  } else {
+    body = req.body as AgentRequest;
+  }
 
   initSSE(res);
   const keepalive = startKeepalive(res);
@@ -65,10 +73,15 @@ async function conversationHandler(req: Request, res: Response): Promise<void> {
   }
 }
 
-// AgentCore invocation — raw payload from InvokeAgentRuntimeCommand
-// AgentCore POSTs to the container root with the payload body
+// AgentCore HTTP protocol: POST /invocations (port 8080)
+app.post('/invocations', (req, res) => {
+  console.log('[Agent Server] AgentCore /invocations received');
+  return conversationHandler(req, res);
+});
+
+// Also handle root POST (fallback)
 app.post('/', (req, res) => {
-  console.log('[Agent Server] AgentCore invocation received');
+  console.log('[Agent Server] Root POST received');
   return conversationHandler(req, res);
 });
 
@@ -77,9 +90,14 @@ app.post('/conversation', (req, res) => {
   return conversationHandler(req, res);
 });
 
-const port = parseInt(process.env.AGENT_PORT ?? '3002', 10);
+// AgentCore uses port 8080 by default; local dev uses AGENT_PORT or 3002
+const isAgentCore = process.env.SERVER_MODE === 'agent';
+const port = parseInt(process.env.AGENT_PORT ?? (isAgentCore ? '8080' : '3002'), 10);
 app.listen(port, () => {
   console.log(`IDP Agent Server running on port ${port}`);
   console.log(`Health: http://localhost:${port}/health`);
   console.log(`Mode: ${process.env.SERVER_MODE ?? 'standalone'}`);
+  if (isAgentCore) {
+    console.log(`AgentCore invocation endpoint: POST http://localhost:${port}/invocations`);
+  }
 });
