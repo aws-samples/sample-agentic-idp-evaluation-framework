@@ -77,8 +77,9 @@ export function midwayAuth(req: Request, res: Response, next: NextFunction): voi
   }
 
   // Not authenticated - redirect to Midway login
+  const siteUrl = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
   const redirectUrl = `https://midway-auth.amazon.com/SSO/redirect?targetUrl=${encodeURIComponent(
-    req.protocol + '://' + req.get('host') + req.originalUrl,
+    siteUrl + req.originalUrl,
   )}`;
 
   res.status(401).json({

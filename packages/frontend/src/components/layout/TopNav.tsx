@@ -14,7 +14,7 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
         href: '/',
         title: 'IDP Framework',
         logo: {
-          src: '/favicon.svg',
+          src: '/logo-dark.svg',
           alt: 'IDP Framework',
         },
       }}
@@ -31,16 +31,6 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
           href: 'https://github.com/aws-samples/one-idp',
           external: true,
           externalIconAriaLabel: '(opens in new tab)',
-        },
-        {
-          type: 'menu-dropdown',
-          iconName: 'settings',
-          ariaLabel: 'Settings',
-          title: 'Settings',
-          items: [
-            { id: 'settings', text: 'Settings' },
-            { id: 'about', text: 'About IDP Framework' },
-          ],
         },
         ...(user
           ? [

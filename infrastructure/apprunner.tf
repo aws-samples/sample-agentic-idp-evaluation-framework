@@ -29,6 +29,7 @@ resource "aws_apprunner_service" "backend" {
           PORT               = "3001"
           CLAUDE_MODEL_ID    = "us.anthropic.claude-sonnet-4-6"
           NOVA_MODEL_ID      = "us.amazon.nova-2-lite-v1:0"
+          SITE_URL           = var.domain_name != "" ? "https://${var.domain_name}" : ""
           MIDWAY_DISABLED    = "false"
           AGENTCORE_RUNTIME_ARN = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn
         }

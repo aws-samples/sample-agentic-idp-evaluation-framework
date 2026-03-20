@@ -9,7 +9,19 @@ export interface AuthUser {
 
 export async function getCurrentUser(): Promise<AuthUser> {
   const res = await fetch(`${BASE}/auth/me`);
-  if (!res.ok) throw new Error('Not authenticated');
+  if (!res.ok) {
+    // Auto-redirect to Midway login on 401
+    if (res.status === 401) {
+      try {
+        const body = await res.json() as { loginUrl?: string };
+        if (body.loginUrl) {
+          window.location.href = body.loginUrl;
+          return new Promise(() => {}); // never resolves — page is redirecting
+        }
+      } catch { /* fall through */ }
+    }
+    throw new Error('Not authenticated');
+  }
   return res.json() as Promise<AuthUser>;
 }
 
