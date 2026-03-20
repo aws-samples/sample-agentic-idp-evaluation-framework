@@ -11,6 +11,7 @@ import { ClaudeSonnetProcessor, ClaudeHaikuProcessor } from '../processors/claud
 import { NovaLiteProcessor } from '../processors/nova-direct.js';
 import { TextractClaudeHaikuProcessor } from '../processors/textract-llm.js';
 import { config } from '../config/aws.js';
+import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 
 interface PreviewRequest {
   documentId: string;
@@ -94,46 +95,13 @@ router.post('/', async (req, res) => {
       return !!PROCESSOR_FACTORY[m];
     });
 
-    // Run all processors in parallel with null response (no SSE)
-    const settled = await Promise.allSettled(
-      validMethods.map(async (method) => {
-        const processor = PROCESSOR_FACTORY[method]!();
-        const result = await processor.process(null, input);
-        return { method, result };
-      }),
-    );
+    // SSE streaming: emit each method result as it completes
+    initSSE(res);
+    const keepalive = startKeepalive(res);
 
-    const results = settled.map((s, i) => {
-      if (s.status === 'fulfilled') {
-        const { method, result } = s.value;
-        const info = METHOD_INFO[method];
-        return {
-          method,
-          shortName: info.shortName,
-          family: info.family,
-          status: result.status,
-          results: result.results,
-          rawOutput: result.rawOutput,
-          latencyMs: result.metrics.latencyMs,
-          estimatedCost: result.metrics.cost,
-          confidence: result.metrics.confidence,
-          ...(result.error ? { error: result.error } : {}),
-        };
-      }
-      const method = validMethods[i];
-      const info = METHOD_INFO[method];
-      return {
-        method,
-        shortName: info.shortName,
-        family: info.family,
-        status: 'error' as const,
-        results: {},
-        latencyMs: 0,
-        error: (s.reason as Error)?.message ?? 'Unknown error',
-      };
-    });
-
-    res.json({
+    // Emit method list upfront
+    emitSSE(res, {
+      type: 'preview_start',
       documentId: body.documentId,
       capabilities: body.capabilities,
       methods: validMethods.map((m) => ({
@@ -142,11 +110,55 @@ router.post('/', async (req, res) => {
         family: METHOD_INFO[m].family,
         tokenPricing: METHOD_INFO[m].tokenPricing,
       })),
-      results,
     });
+
+    // Run all processors in parallel, emit results as they complete
+    await Promise.allSettled(
+      validMethods.map(async (method) => {
+        try {
+          const processor = PROCESSOR_FACTORY[method]!();
+          const result = await processor.process(null, input);
+          const info = METHOD_INFO[method];
+          emitSSE(res, {
+            type: 'method_result',
+            method,
+            shortName: info.shortName,
+            family: info.family,
+            status: result.status,
+            results: result.results,
+            rawOutput: result.rawOutput,
+            latencyMs: result.metrics.latencyMs,
+            estimatedCost: result.metrics.cost,
+            confidence: result.metrics.confidence,
+            ...(result.error ? { error: result.error } : {}),
+          });
+        } catch (err) {
+          const info = METHOD_INFO[method];
+          emitSSE(res, {
+            type: 'method_result',
+            method,
+            shortName: info.shortName,
+            family: info.family,
+            status: 'error',
+            results: {},
+            latencyMs: 0,
+            error: (err as Error)?.message ?? 'Unknown error',
+          });
+        }
+      }),
+    );
+
+    emitSSE(res, { type: 'preview_done' });
+    endSSE(res, keepalive);
   } catch (err) {
     console.error('[Preview Error]', err);
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Preview failed' });
+    // If SSE already started, emit error event; otherwise send JSON error
+    if (res.headersSent) {
+      emitSSE(res, { type: 'preview_error', error: err instanceof Error ? err.message : 'Preview failed' });
+      res.end();
+    } else {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Preview failed' });
+    }
   }
 });
 
