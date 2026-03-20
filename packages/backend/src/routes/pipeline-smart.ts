@@ -24,6 +24,7 @@ interface SmartPipelineRequest {
   documentType: string;
   previewResults: PreviewMethodResult[];
   preferredMethod?: string;
+  optimizeFor?: 'accuracy' | 'cost' | 'speed' | 'balanced';
 }
 
 // Build capability support reference for the LLM prompt
@@ -83,10 +84,13 @@ router.post('/', async (req, res) => {
     // Build capability support reference
     const supportRef = buildCapabilitySupportRef(body.capabilities);
 
+    const userStrategy = body.optimizeFor ?? 'balanced';
     const prompt = `You are an IDP pipeline architect. Analyze the data below and recommend the optimal pipeline configuration.
 
 Document type: ${body.documentType ?? 'unknown'}
 Selected capabilities: ${body.capabilities.join(', ')}
+OPTIMIZATION GOAL: User selected "${userStrategy}" strategy. Your "optimizeFor" field MUST be "${userStrategy}".
+${userStrategy === 'accuracy' ? 'Prioritize the highest-confidence methods regardless of cost.' : ''}${userStrategy === 'cost' ? 'Prioritize the cheapest methods that still produce acceptable quality.' : ''}${userStrategy === 'speed' ? 'Prioritize the fastest methods (lowest latency).' : ''}${userStrategy === 'balanced' ? 'Balance cost, speed, and accuracy.' : ''}
 ${body.preferredMethod ? `IMPORTANT — User explicitly selected: ${body.preferredMethod}. You MUST use this method (or its family) as the primary method. Only deviate if the selected method fundamentally cannot handle a specific capability.` : ''}
 
 Preview results:

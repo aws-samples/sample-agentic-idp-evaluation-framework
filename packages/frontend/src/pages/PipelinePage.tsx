@@ -74,7 +74,7 @@ export default function PipelinePage({
   const [smartError, setSmartError] = useState<string | null>(null);
 
   // Smart generation: use LLM to analyze preview results and generate pipeline
-  const generateSmartPipeline = useCallback(async () => {
+  const generateSmartPipeline = useCallback(async (strategy?: 'accuracy' | 'cost' | 'speed' | 'balanced') => {
     if (!document || capabilities.length === 0) return;
 
     setIsSmartGenerating(true);
@@ -89,6 +89,7 @@ export default function PipelinePage({
           documentType: document.documentType ?? 'pdf',
           previewResults: previewData?.results ?? [],
           preferredMethod,
+          optimizeFor: strategy ?? 'balanced',
         }),
       });
 
@@ -148,14 +149,19 @@ export default function PipelinePage({
   const handleGenerate = useCallback(
     (optimizeFor: 'accuracy' | 'cost' | 'speed' | 'balanced', enableHybrid: boolean) => {
       if (!document || !document.documentType) return;
-      generatePipeline({
-        documentType: document.documentType,
-        capabilities,
-        optimizeFor,
-        enableHybridRouting: enableHybrid,
-      }).catch(() => {});
+      if (previewData) {
+        // Use smart pipeline (LLM-based) when preview data available
+        generateSmartPipeline(optimizeFor);
+      } else {
+        generatePipeline({
+          documentType: document.documentType,
+          capabilities,
+          optimizeFor,
+          enableHybridRouting: enableHybrid,
+        }).catch(() => {});
+      }
     },
-    [document, capabilities, generatePipeline],
+    [document, capabilities, previewData, generateSmartPipeline, generatePipeline],
   );
 
   const handleExecute = useCallback(() => {
