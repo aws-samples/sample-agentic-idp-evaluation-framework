@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
 
 describe('calculateMaxTokens', () => {
-  it('returns minimum 512 for small documents', () => {
-    expect(calculateMaxTokens(1, 1, 'yaml', false)).toBe(512);
+  it('returns minimum 2048 for small documents', () => {
+    expect(calculateMaxTokens(1, 1, 'yaml', false)).toBe(2048);
   });
 
   it('scales with capability count', () => {
@@ -18,8 +18,8 @@ describe('calculateMaxTokens', () => {
     expect(tokens5).toBeGreaterThan(tokens1);
   });
 
-  it('caps at 4096', () => {
-    expect(calculateMaxTokens(50, 50, 'json', false)).toBe(4096);
+  it('caps at 16384', () => {
+    expect(calculateMaxTokens(50, 50, 'json', false)).toBe(16384);
   });
 
   it('json format uses 1.3x multiplier', () => {
@@ -36,17 +36,17 @@ describe('calculateMaxTokens', () => {
     expect(calculateMaxTokens(5, 1, 'yaml', true)).toBe(2500);
   });
 
-  // Specific examples from the plan
-  it('3 caps, 1 page, yaml -> 750', () => {
-    expect(calculateMaxTokens(3, 1, 'yaml', false)).toBe(750);
+  // Specific examples: 800/cap + 400/page, min 2048, max 16384
+  it('3 caps, 1 page, yaml -> 2800', () => {
+    expect(calculateMaxTokens(3, 1, 'yaml', false)).toBe(2800);
   });
 
-  it('5 caps, 2 pages, yaml -> 1300', () => {
-    expect(calculateMaxTokens(5, 2, 'yaml', false)).toBe(1300);
+  it('5 caps, 2 pages, yaml -> 4800', () => {
+    expect(calculateMaxTokens(5, 2, 'yaml', false)).toBe(4800);
   });
 
-  it('15 caps, 10 pages, json -> 4096 (capped)', () => {
-    expect(calculateMaxTokens(15, 10, 'json', false)).toBe(4096);
+  it('15 caps, 10 pages, json -> 16384 (capped)', () => {
+    expect(calculateMaxTokens(15, 10, 'json', false)).toBe(16384);
   });
 });
 
