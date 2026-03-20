@@ -39,8 +39,9 @@ export abstract class ProcessorBase {
         results: capResults,
         metrics: {
           latencyMs: output.latencyMs,
-          cost: calculateCost(this.method, input.pageCount),
+          cost: calculateCost(this.method, input.pageCount, output.tokenUsage),
           confidence: avgConfidence,
+          tokenUsage: output.tokenUsage,
         },
         rawOutput: output.rawOutput,
       };

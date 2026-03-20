@@ -19,6 +19,7 @@ export interface MethodResult {
   latencyMs: number;
   estimatedCost?: number;
   confidence?: number;
+  tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
   error?: string;
 }
 

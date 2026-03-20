@@ -305,6 +305,7 @@ export interface ProcessorResult {
     latencyMs: number;
     cost: number;
     confidence?: number;
+    tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
   };
   rawOutput?: string;
   error?: string;

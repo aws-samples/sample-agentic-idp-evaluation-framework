@@ -130,6 +130,7 @@ router.post('/', async (req, res) => {
             latencyMs: result.metrics.latencyMs,
             estimatedCost: result.metrics.cost,
             confidence: result.metrics.confidence,
+            tokenUsage: result.metrics.tokenUsage,
             ...(result.error ? { error: result.error } : {}),
           });
         } catch (err) {
