@@ -20,4 +20,6 @@ export const config = {
   novaModelId: process.env.NOVA_MODEL_ID ?? 'us.amazon.nova-2-pro-preview-20251202-v1:0',
   port: parseInt(process.env.PORT ?? '3001', 10),
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+  agentUrl: process.env.AGENT_URL ?? 'http://localhost:3002',
+  agentRuntimeId: process.env.AGENT_RUNTIME_ID ?? '',
 };
