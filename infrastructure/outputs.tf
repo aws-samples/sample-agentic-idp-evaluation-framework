@@ -13,14 +13,29 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.backend.repository_url
 }
 
-output "backend_role_arn" {
-  description = "IAM role ARN for backend service"
-  value       = aws_iam_role.backend.arn
+output "agentcore_execution_role_arn" {
+  description = "AgentCore execution role ARN"
+  value       = aws_iam_role.agentcore_execution.arn
 }
 
 output "agentcore_runtime_arn" {
   description = "AgentCore agent runtime ARN"
-  value       = aws_bedrockagentcore_agent_runtime.idp_agent.arn
+  value       = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn
+}
+
+output "agentcore_runtime_id" {
+  description = "AgentCore agent runtime ID"
+  value       = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_id
+}
+
+output "agentcore_endpoint" {
+  description = "AgentCore runtime invocation endpoint"
+  value       = "https://bedrock-agentcore.${var.aws_region}.amazonaws.com/runtimes/${urlencode(aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn)}/invocations"
+}
+
+output "apprunner_service_url" {
+  description = "App Runner service URL (backend API)"
+  value       = "https://${aws_apprunner_service.backend.service_url}"
 }
 
 output "cloudfront_domain" {

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"terraform validate 2>&1\",\"description\":\"Terraform validate with AWS 6.x\"}",
+  "error": "Exit code 1\n\u001b[31m╷\u001b[0m\u001b[0m\n\u001b[31m│\u001b[0m \u001b[0m\u001b[1m\u001b[31mError: \u001b[0m\u001b[0m\u001b[1mUnsupported attribute\u001b[0m\n\u001b[31m│\u001b[0m \u001b[0m\n\u001b[31m│\u001b[0m \u001b[0m\u001b[0m  on cloudfront.tf line 41, in resource \"aws_cloudfront_distribution\" \"main\":\n\u001b[31m│\u001b[0m \u001b[0m  41:     domain_name = aws_bedrockagentcore_agent_runtime.idp_agent\u001b[4m.agent_runtime_endpoint\u001b[0m\u001b[0m\n\u001b[31m│\u001b[0m \u001b[0m\n\u001b[31m│\u001b[0m \u001b[0mThis object has no argument, nested block, or exported attribute named\n\u001b[31m│\u001b[0m \u001b[0m\"agent_runtime_endpoint\".\n\u001b[31m╵\u001b[0m\u001b[0m\n\u001b[31m╷\u001b[0m\u001b[0m...",
+  "timestamp": "2026-03-20T05:06:03.554Z",
+  "retry_count": 1
+}

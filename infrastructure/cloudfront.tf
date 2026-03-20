@@ -36,7 +36,8 @@ resource "aws_cloudfront_distribution" "main" {
     origin_id                = "S3-static"
   }
 
-  # App Runner Origin for API
+  # App Runner Origin for API (Express REST server)
+  # App Runner → AgentCore (IAM auth) for agent invocations
   origin {
     domain_name = aws_apprunner_service.backend.service_url
     origin_id   = "AppRunner-API"

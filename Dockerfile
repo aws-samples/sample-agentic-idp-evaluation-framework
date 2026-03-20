@@ -9,9 +9,11 @@ COPY packages/backend/package.json packages/backend/
 RUN npm ci --workspace=packages/shared --workspace=packages/backend
 
 COPY packages/shared/ packages/shared/
-COPY packages/backend/ packages/backend/
 
+# Build shared (generates skills.ts from .md files, then compiles)
 RUN npm run build -w packages/shared
+
+COPY packages/backend/ packages/backend/
 RUN npm run build -w packages/backend
 
 # Stage 2: Production

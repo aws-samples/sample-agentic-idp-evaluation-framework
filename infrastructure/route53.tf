@@ -7,10 +7,9 @@
 # 4. ACM certificate validates via DNS (Route53 record)
 # 5. CloudFront uses the certificate for HTTPS
 
-# Lookup existing hosted zone (pre-created for .people.aws.dev)
-data "aws_route53_zone" "main" {
-  count = var.domain_name != "" ? 1 : 0
-  name  = join(".", slice(split(".", var.domain_name), 1, length(split(".", var.domain_name))))
+# Use the pre-existing hosted zone for .people.aws.dev
+locals {
+  zone_id = var.route53_zone_id
 }
 
 # ACM Certificate (must be in us-east-1 for CloudFront)
@@ -45,7 +44,7 @@ resource "aws_route53_record" "cert_validation" {
   records         = [each.value.record]
   ttl             = 60
   type            = each.value.type
-  zone_id         = data.aws_route53_zone.main[0].zone_id
+  zone_id         = local.zone_id
 }
 
 # ACM certificate validation
@@ -65,7 +64,7 @@ resource "aws_acm_certificate_validation" "main" {
 resource "aws_route53_record" "main" {
   count = var.domain_name != "" ? 1 : 0
 
-  zone_id = data.aws_route53_zone.main[0].zone_id
+  zone_id = local.zone_id
   name    = var.domain_name
   type    = "A"
 
@@ -80,7 +79,7 @@ resource "aws_route53_record" "main" {
 resource "aws_route53_record" "main_ipv6" {
   count = var.domain_name != "" ? 1 : 0
 
-  zone_id = data.aws_route53_zone.main[0].zone_id
+  zone_id = local.zone_id
   name    = var.domain_name
   type    = "AAAA"
 

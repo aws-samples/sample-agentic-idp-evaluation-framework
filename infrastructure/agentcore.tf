@@ -1,13 +1,14 @@
 # ============================================================================
-# AgentCore Runtime - Deploy Strands agent as managed container
-# Set var.deploy_mode = "agentcore" to use this instead of App Runner
+# AgentCore Runtime - Deploy backend as managed container
+# Based on: github.com/awslabs/amazon-bedrock-agentcore-samples/terraform/basic-runtime
 # ============================================================================
 
-# AgentCore Agent Runtime
-resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
+resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
   agent_runtime_name = replace("${var.project_name}_${var.environment}", "-", "_")
-  description        = "ONE IDP Strands-based document processing agent"
+  description        = "IDP Evaluation Framework - document processing agent"
   role_arn           = aws_iam_role.agentcore_execution.arn
 
   agent_runtime_artifact {
@@ -21,20 +22,20 @@ resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
   }
 
   environment_variables = {
-    AWS_REGION       = var.aws_region
-    S3_BUCKET        = aws_s3_bucket.uploads.id
-    S3_OUTPUT_PREFIX = "idp-outputs/"
-    BDA_PROFILE_ARN  = var.bda_profile_arn
-    BDA_PROJECT_ARN  = var.bda_project_arn
-    NODE_ENV         = "production"
-    PORT             = "3001"
-    CLAUDE_MODEL_ID  = "us.anthropic.claude-sonnet-4-6"
-    NOVA_MODEL_ID    = "us.amazon.nova-2-lite-v1:0"
+    AWS_REGION         = var.aws_region
+    AWS_DEFAULT_REGION = var.aws_region
+    S3_BUCKET          = aws_s3_bucket.uploads.id
+    S3_OUTPUT_PREFIX    = "idp-outputs/"
+    BDA_PROFILE_ARN    = var.bda_profile_arn
+    BDA_PROJECT_ARN    = var.bda_project_arn
+    NODE_ENV           = "production"
+    PORT               = "3001"
+    CLAUDE_MODEL_ID    = "us.anthropic.claude-sonnet-4-6"
+    NOVA_MODEL_ID      = "us.amazon.nova-2-lite-v1:0"
   }
 
   depends_on = [
-    aws_iam_role_policy.agentcore_bedrock,
-    aws_iam_role_policy.agentcore_s3,
+    aws_iam_role_policy.agentcore_execution,
     aws_iam_role_policy_attachment.agentcore_managed,
   ]
 }
@@ -44,12 +45,12 @@ resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
 # ============================================================================
 
 resource "aws_iam_role" "agentcore_execution" {
-  name  = "${var.project_name}-agentcore-execution-${var.environment}"
+  name = "${var.project_name}-agentcore-execution-${var.environment}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid    = "AgentCoreAssumeRole"
+      Sid    = "AssumeRolePolicy"
       Effect = "Allow"
       Principal = {
         Service = "bedrock-agentcore.amazonaws.com"
@@ -60,7 +61,7 @@ resource "aws_iam_role" "agentcore_execution" {
           "aws:SourceAccount" = data.aws_caller_identity.current.id
         }
         ArnLike = {
-          "aws:SourceArn" = "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.id}:*"
+          "aws:SourceArn" = "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.id}:*"
         }
       }
     }]
@@ -69,15 +70,14 @@ resource "aws_iam_role" "agentcore_execution" {
 
 # Managed policy for AgentCore
 resource "aws_iam_role_policy_attachment" "agentcore_managed" {
-  count      = var.deploy_mode == "agentcore" ? 1 : 0
   role       = aws_iam_role.agentcore_execution.name
   policy_arn = "arn:aws:iam::aws:policy/BedrockAgentCoreFullAccess"
 }
 
-# ECR + CloudWatch + X-Ray
-resource "aws_iam_role_policy" "agentcore_infra" {
-  name  = "AgentCoreInfraPolicy"
-  role  = aws_iam_role.agentcore_execution.id
+# Inline execution policy
+resource "aws_iam_role_policy" "agentcore_execution" {
+  name = "AgentCoreExecutionPolicy"
+  role = aws_iam_role.agentcore_execution.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -89,8 +89,13 @@ resource "aws_iam_role_policy" "agentcore_infra" {
           "ecr:BatchGetImage",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchCheckLayerAvailability",
-          "ecr:GetAuthorizationToken",
         ]
+        Resource = aws_ecr_repository.backend.arn
+      },
+      {
+        Sid      = "ECRTokenAccess"
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
         Resource = "*"
       },
       {
@@ -103,7 +108,7 @@ resource "aws_iam_role_policy" "agentcore_infra" {
           "logs:DescribeLogStreams",
           "logs:DescribeLogGroups",
         ]
-        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.id}:log-group:/aws/bedrock-agentcore/runtimes/*"
+        Resource = "arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.id}:log-group:/aws/bedrock-agentcore/runtimes/*"
       },
       {
         Sid    = "XRayTracing"
@@ -127,18 +132,6 @@ resource "aws_iam_role_policy" "agentcore_infra" {
           }
         }
       },
-    ]
-  })
-}
-
-# Bedrock model invocation
-resource "aws_iam_role_policy" "agentcore_bedrock" {
-  name  = "AgentCoreBedrockPolicy"
-  role  = aws_iam_role.agentcore_execution.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
       {
         Sid    = "BedrockModelInvocation"
         Effect = "Allow"
@@ -170,18 +163,6 @@ resource "aws_iam_role_policy" "agentcore_bedrock" {
         ]
         Resource = "*"
       },
-    ]
-  })
-}
-
-# S3 access
-resource "aws_iam_role_policy" "agentcore_s3" {
-  name  = "AgentCoreS3Policy"
-  role  = aws_iam_role.agentcore_execution.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
       {
         Sid    = "S3DocumentAccess"
         Effect = "Allow"
@@ -196,18 +177,6 @@ resource "aws_iam_role_policy" "agentcore_s3" {
           "${aws_s3_bucket.uploads.arn}/*",
         ]
       },
-    ]
-  })
-}
-
-# Workload identity tokens
-resource "aws_iam_role_policy" "agentcore_tokens" {
-  name  = "AgentCoreTokenPolicy"
-  role  = aws_iam_role.agentcore_execution.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
       {
         Sid    = "WorkloadAccessTokens"
         Effect = "Allow"
@@ -217,13 +186,10 @@ resource "aws_iam_role_policy" "agentcore_tokens" {
           "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
         ]
         Resource = [
-          "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.id}:workload-identity-directory/default",
-          "arn:aws:bedrock-agentcore:${var.aws_region}:${data.aws_caller_identity.current.id}:workload-identity-directory/default/workload-identity/*",
+          "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.id}:workload-identity-directory/default",
+          "arn:aws:bedrock-agentcore:${data.aws_region.current.id}:${data.aws_caller_identity.current.id}:workload-identity-directory/default/workload-identity/*",
         ]
       },
     ]
   })
 }
-
-# Data source for account ID
-data "aws_caller_identity" "current" {}
