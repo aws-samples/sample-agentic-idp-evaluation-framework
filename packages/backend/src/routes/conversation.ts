@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { ConversationRequest, ConversationEvent } from '@idp/shared';
-import { config } from '../config/aws.js';
+import { InvokeAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore';
+import { config, agentCoreClient } from '../config/aws.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 
 const router = Router();
@@ -17,7 +18,59 @@ router.post('/', async (req, res) => {
       ? 'I just uploaded this document. Please analyze it and tell me what you see, then ask me what I want to do with it. Provide clickable options.'
       : body.message;
 
-    // Try agent server proxy first, fallback to direct import
+    // Strategy 1: AgentCore SDK invocation (production)
+    if (config.agentRuntimeArn) {
+      try {
+        console.log('[Conversation] Invoking AgentCore runtime:', config.agentRuntimeArn);
+        const payload = JSON.stringify({
+          message: body.message,
+          history: body.history,
+          documentId: body.documentId,
+          s3Uri: body.s3Uri,
+        });
+
+        const command = new InvokeAgentRuntimeCommand({
+          agentRuntimeArn: config.agentRuntimeArn,
+          contentType: 'application/json',
+          accept: 'text/event-stream',
+          payload: new TextEncoder().encode(payload),
+        });
+
+        const agentRes = await agentCoreClient.send(command);
+
+        if (agentRes.response) {
+          // Stream the AgentCore response (SSE events) back to client
+          const stream = agentRes.response;
+          if (typeof (stream as any).transformToWebStream === 'function') {
+            const webStream = (stream as any).transformToWebStream() as ReadableStream;
+            const reader = webStream.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              res.write(decoder.decode(value, { stream: true }));
+            }
+          } else if (typeof (stream as any).pipe === 'function') {
+            // Node.js Readable stream
+            await new Promise<void>((resolve, reject) => {
+              (stream as any).on('data', (chunk: Buffer) => res.write(chunk));
+              (stream as any).on('end', resolve);
+              (stream as any).on('error', reject);
+            });
+          } else {
+            // Fallback: transformToByteArray
+            const bytes = await (stream as any).transformToByteArray();
+            res.write(Buffer.from(bytes));
+          }
+          return; // SSE complete via AgentCore
+        }
+        console.warn('[Conversation] AgentCore returned no response stream — falling back to direct');
+      } catch (agentCoreErr: any) {
+        console.warn('[Conversation] AgentCore invocation failed:', agentCoreErr.message, '— falling back to direct');
+      }
+    }
+
+    // Strategy 2: HTTP proxy to agent server (local dev with separate agent process)
     if (config.agentUrl && config.agentUrl !== 'direct') {
       try {
         const agentRes = await fetch(`${config.agentUrl}/conversation`, {
@@ -47,7 +100,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Direct: run Strands agent in-process
+    // Strategy 3: Direct in-process agent (fallback)
     const { runSocraticAgentStrands } = await import('../agents/socratic-agent-strands.js');
     const history = body.history.map((h) => ({ role: h.role, content: h.content }));
     await runSocraticAgentStrands(res, userText, history, {

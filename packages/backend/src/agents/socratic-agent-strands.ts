@@ -18,35 +18,41 @@ export interface SocraticAgentOptions {
   s3Uri?: string;
 }
 
-// Strands tool: analyze uploaded document
-const analyzeDocumentTool = tool({
-  name: 'analyze_document',
-  description: 'Analyze an uploaded document to understand its structure, content types, and characteristics. Use this when you first receive a document to understand what it contains.',
-  inputSchema: z.object({
-    documentId: z.string().describe('The document ID'),
-    s3Uri: z.string().describe('The S3 URI of the document'),
-  }),
-  callback: async (input) => {
-    const analysis = await analyzeDocument(input.documentId, input.s3Uri);
-    return JSON.stringify(analysis);
-  },
-});
+/**
+ * Create tools with closure-bound document context.
+ * This avoids relying on the LLM to pass Korean/CJK s3Uri strings correctly.
+ */
+function createTools(options: SocraticAgentOptions) {
+  const boundDocumentId = options.documentId ?? '';
+  const boundS3Uri = options.s3Uri ?? '';
 
-// Strands tool: recommend capabilities based on analysis + user needs
-const recommendCapabilitiesTool = tool({
-  name: 'recommend_capabilities',
-  description: 'Based on document analysis and user requirements gathered from conversation, recommend the optimal set of IDP capabilities. Call this after gathering enough information (3-5 exchanges).',
-  inputSchema: z.object({
-    documentId: z.string().describe('The document ID'),
-    s3Uri: z.string().describe('The S3 URI of the document'),
-    userRequirements: z.array(z.string()).describe('Key requirements gathered from the conversation'),
-  }),
-  callback: async (input) => {
-    const analysis = await analyzeDocument(input.documentId, input.s3Uri);
-    const recs = recommendCapabilities(analysis, input.userRequirements);
-    return JSON.stringify({ capabilities: recs });
-  },
-});
+  const analyzeDocumentTool = tool({
+    name: 'analyze_document',
+    description: 'Analyze the uploaded document to understand its structure, content types, and characteristics. Use this when you first receive a document to understand what it contains. No parameters needed — the document context is already bound.',
+    inputSchema: z.object({}),
+    callback: async () => {
+      console.log('[Tool:analyze_document] Using bound context:', boundDocumentId, boundS3Uri);
+      const analysis = await analyzeDocument(boundDocumentId, boundS3Uri);
+      return JSON.stringify(analysis);
+    },
+  });
+
+  const recommendCapabilitiesTool = tool({
+    name: 'recommend_capabilities',
+    description: 'Based on document analysis and user requirements gathered from conversation, recommend the optimal set of IDP capabilities. Call this after gathering enough information (3-5 exchanges).',
+    inputSchema: z.object({
+      userRequirements: z.array(z.string()).describe('Key requirements gathered from the conversation'),
+    }),
+    callback: async (input) => {
+      console.log('[Tool:recommend_capabilities] Using bound context:', boundDocumentId, boundS3Uri);
+      const analysis = await analyzeDocument(boundDocumentId, boundS3Uri);
+      const recs = recommendCapabilities(analysis, input.userRequirements);
+      return JSON.stringify({ capabilities: recs });
+    },
+  });
+
+  return [analyzeDocumentTool, recommendCapabilitiesTool];
+}
 
 function buildSystemPrompt(
   options: SocraticAgentOptions,
@@ -54,9 +60,8 @@ function buildSystemPrompt(
 ): string {
   const docContext = options.documentId && options.s3Uri
     ? `\n\nDOCUMENT CONTEXT: A document has ALREADY been uploaded and is available for processing.
-- documentId: "${options.documentId}"
-- s3Uri: "${options.s3Uri}"
-You MUST use these exact values when calling analyze_document or recommend_capabilities.
+The document context is automatically bound to the tools — you do NOT need to pass documentId or s3Uri as parameters.
+Simply call analyze_document() with no arguments, or recommend_capabilities(userRequirements=[...]).
 NEVER ask the user to upload a document or provide IDs — the document is already available.`
     : '';
 
@@ -150,9 +155,12 @@ export async function runSocraticAgentStrands(
   // Convert history to MessageData[] for the Agent constructor
   const priorMessages = historyToMessageData(conversationHistory);
 
+  // Create tools with bound document context (avoids LLM garbling Korean s3Uri)
+  const tools = createTools(options);
+
   const agent = new Agent({
     model,
-    tools: [analyzeDocumentTool, recommendCapabilitiesTool],
+    tools,
     systemPrompt: buildSystemPrompt(options, conversationHistory.length),
     // Pass conversation history as initial messages (MessageData[])
     messages: priorMessages,
@@ -166,7 +174,7 @@ export async function runSocraticAgentStrands(
   // Build the current user message
   let messageContent = userMessage;
   if (conversationHistory.length === 0 && options.documentId && options.s3Uri) {
-    messageContent = `A document has been uploaded (documentId="${options.documentId}", s3Uri="${options.s3Uri}"). ${userMessage}\n\nAnalyze the document using the analyze_document tool.`;
+    messageContent = `A document has been uploaded. ${userMessage}\n\nAnalyze the document using the analyze_document tool.`;
   }
 
   // Stream the agent response via SSE
