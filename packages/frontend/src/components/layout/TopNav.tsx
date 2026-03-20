@@ -1,5 +1,6 @@
 import TopNavigation from '@cloudscape-design/components/top-navigation';
 import type { AuthUser } from '../../services/api';
+import { clearToken } from '../../services/midway';
 
 interface TopNavProps {
   user: AuthUser | null;
@@ -43,6 +44,12 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
                   { id: 'profile', text: `Signed in as ${user.alias}` },
                   { id: 'signout', text: 'Sign out' },
                 ],
+                onItemClick: ({ detail }: { detail: { id: string } }) => {
+                  if (detail.id === 'signout') {
+                    clearToken();
+                    window.location.reload();
+                  }
+                },
               },
             ]
           : []),
