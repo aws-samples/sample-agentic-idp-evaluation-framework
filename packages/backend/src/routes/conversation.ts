@@ -6,6 +6,9 @@ import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.
 
 const router = Router();
 
+// AgentCore invocation timeout (10s to get first response, then fall back)
+const AGENTCORE_TIMEOUT_MS = 10_000;
+
 router.post('/', async (req, res) => {
   const body = req.body as ConversationRequest;
 
@@ -29,6 +32,9 @@ router.post('/', async (req, res) => {
           s3Uri: body.s3Uri,
         });
 
+        const abortController = new AbortController();
+        const timeout = setTimeout(() => abortController.abort(), AGENTCORE_TIMEOUT_MS);
+
         const command = new InvokeAgentRuntimeCommand({
           agentRuntimeArn: config.agentRuntimeArn,
           contentType: 'application/json',
@@ -36,35 +42,45 @@ router.post('/', async (req, res) => {
           payload: new TextEncoder().encode(payload),
         });
 
-        const agentRes = await agentCoreClient.send(command);
+        try {
+          const agentRes = await agentCoreClient.send(command, {
+            abortSignal: abortController.signal,
+          });
+          clearTimeout(timeout);
 
-        if (agentRes.response) {
-          // Stream the AgentCore response (SSE events) back to client
-          const stream = agentRes.response;
-          if (typeof (stream as any).transformToWebStream === 'function') {
-            const webStream = (stream as any).transformToWebStream() as ReadableStream;
-            const reader = webStream.getReader();
-            const decoder = new TextDecoder();
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              res.write(decoder.decode(value, { stream: true }));
+          if (agentRes.response) {
+            console.log('[Conversation] AgentCore response received, streaming back');
+            const stream = agentRes.response;
+            if (typeof (stream as any).transformToWebStream === 'function') {
+              const webStream = (stream as any).transformToWebStream() as ReadableStream;
+              const reader = webStream.getReader();
+              const decoder = new TextDecoder();
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                res.write(decoder.decode(value, { stream: true }));
+              }
+            } else if (typeof (stream as any).pipe === 'function') {
+              await new Promise<void>((resolve, reject) => {
+                (stream as any).on('data', (chunk: Buffer) => res.write(chunk));
+                (stream as any).on('end', resolve);
+                (stream as any).on('error', reject);
+              });
+            } else {
+              const bytes = await (stream as any).transformToByteArray();
+              res.write(Buffer.from(bytes));
             }
-          } else if (typeof (stream as any).pipe === 'function') {
-            // Node.js Readable stream
-            await new Promise<void>((resolve, reject) => {
-              (stream as any).on('data', (chunk: Buffer) => res.write(chunk));
-              (stream as any).on('end', resolve);
-              (stream as any).on('error', reject);
-            });
-          } else {
-            // Fallback: transformToByteArray
-            const bytes = await (stream as any).transformToByteArray();
-            res.write(Buffer.from(bytes));
+            return; // SSE complete via AgentCore
           }
-          return; // SSE complete via AgentCore
+          console.warn('[Conversation] AgentCore returned no response stream — falling back to direct');
+        } catch (sendErr: any) {
+          clearTimeout(timeout);
+          if (sendErr.name === 'AbortError') {
+            console.warn('[Conversation] AgentCore timed out after', AGENTCORE_TIMEOUT_MS, 'ms — falling back to direct');
+          } else {
+            throw sendErr;
+          }
         }
-        console.warn('[Conversation] AgentCore returned no response stream — falling back to direct');
       } catch (agentCoreErr: any) {
         console.warn('[Conversation] AgentCore invocation failed:', agentCoreErr.message, '— falling back to direct');
       }
@@ -101,6 +117,7 @@ router.post('/', async (req, res) => {
     }
 
     // Strategy 3: Direct in-process agent (fallback)
+    console.log('[Conversation] Using direct in-process agent');
     const { runSocraticAgentStrands } = await import('../agents/socratic-agent-strands.js');
     const history = body.history.map((h) => ({ role: h.role, content: h.content }));
     await runSocraticAgentStrands(res, userText, history, {

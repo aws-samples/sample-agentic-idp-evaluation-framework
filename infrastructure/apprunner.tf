@@ -196,7 +196,10 @@ resource "aws_iam_role_policy" "apprunner_agentcore" {
         "bedrock-agentcore:InvokeAgentRuntime",
         "bedrock-agentcore:InvokeAgentRuntimeStreaming",
       ]
-      Resource = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn
+      Resource = [
+        aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn,
+        "${aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn}/*",
+      ]
     }]
   })
 }
