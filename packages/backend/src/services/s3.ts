@@ -6,6 +6,11 @@ import { mkdir, writeFile, readFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
 
+// macOS uses NFD (decomposed) for Korean/CJK filenames; S3 keys must be NFC (composed)
+function normalizeFileName(name: string): string {
+  return name.normalize('NFC');
+}
+
 const LOCAL_STORAGE_DIR = join(process.cwd(), '.local-uploads');
 
 function useLocal(): boolean {
@@ -14,7 +19,7 @@ function useLocal(): boolean {
 
 function parseS3Uri(s3Uri: string): { bucket: string; key: string } {
   const url = new URL(s3Uri);
-  return { bucket: url.hostname, key: decodeURIComponent(url.pathname.slice(1)) };
+  return { bucket: url.hostname, key: normalizeFileName(decodeURIComponent(url.pathname.slice(1))) };
 }
 
 export async function uploadDocument(
@@ -24,7 +29,7 @@ export async function uploadDocument(
 ): Promise<{ documentId: string; s3Uri: string }> {
   const documentId = uuidv4();
   const userPrefix = userAlias ? `${userAlias}/` : '';
-  const key = `uploads/${userPrefix}${documentId}/${fileName}`;
+  const key = `uploads/${userPrefix}${documentId}/${normalizeFileName(fileName)}`;
 
   if (useLocal()) {
     const localPath = join(LOCAL_STORAGE_DIR, key);
@@ -66,11 +71,26 @@ export async function getDocumentBuffer(s3Uri: string): Promise<Buffer> {
     return readFile(localPath);
   }
   const { bucket, key } = parseS3Uri(s3Uri);
-  const response = await s3Client.send(
-    new GetObjectCommand({ Bucket: bucket, Key: key }),
-  );
-  const bytes = await response.Body!.transformToByteArray();
-  return Buffer.from(bytes);
+  try {
+    const response = await s3Client.send(
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+    );
+    const bytes = await response.Body!.transformToByteArray();
+    return Buffer.from(bytes);
+  } catch (err: any) {
+    // Fallback: try NFD (decomposed) key for files uploaded from macOS before NFC fix
+    if (err.Code === 'NoSuchKey' || err.name === 'NoSuchKey') {
+      const nfdKey = key.normalize('NFD');
+      if (nfdKey !== key) {
+        const response = await s3Client.send(
+          new GetObjectCommand({ Bucket: bucket, Key: nfdKey }),
+        );
+        const bytes = await response.Body!.transformToByteArray();
+        return Buffer.from(bytes);
+      }
+    }
+    throw err;
+  }
 }
 
 // Serve local files (for dev mode)

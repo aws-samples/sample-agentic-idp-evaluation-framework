@@ -88,9 +88,9 @@ Turn 5+: When you have enough info, use recommend_capabilities tool and present 
 
 AFTER RECOMMENDING:
 Once you have called recommend_capabilities and presented the results:
-- Tell the user the capabilities have been selected and they can use the **"Run Preview"** button above to test extraction.
+- Tell the user the capabilities have been selected and they can click the **"Run Preview"** button in the capabilities section below to test extraction.
 - Do NOT offer options like "start processing" or "run extraction" — the UI handles this.
-- If the user asks to process/extract/run, remind them to click the "Run Preview" button in the capabilities section.
+- If the user asks to process/extract/run, remind them to scroll down and click the "Run Preview" button in the capabilities section below.
 - If the user wants to change capabilities, help them adjust selections.
 - Do NOT call recommend_capabilities again — it has already been called.
 
