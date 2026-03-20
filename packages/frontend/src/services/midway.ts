@@ -87,11 +87,20 @@ export function handleOidcCallback(): boolean {
   return true;
 }
 
+/** Generate a random nonce for OIDC */
+function generateNonce(): string {
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 /** Redirect to Midway for authentication */
 export function redirectToMidway(): void {
   const currentUrl = window.location.origin + window.location.pathname;
   const clientId = `${window.location.origin}:443`;
-  const authUrl = `${MIDWAY_AUTH_ENDPOINT}?response_type=id_token&client_id=${encodeURIComponent(clientId)}&scope=openid&redirect_uri=${encodeURIComponent(currentUrl)}`;
+  const nonce = generateNonce();
+  sessionStorage.setItem('midway-nonce', nonce);
+  const authUrl = `${MIDWAY_AUTH_ENDPOINT}?response_type=id_token&client_id=${encodeURIComponent(clientId)}&scope=openid&nonce=${nonce}&redirect_uri=${encodeURIComponent(currentUrl)}`;
   window.location.href = authUrl;
 }
 
