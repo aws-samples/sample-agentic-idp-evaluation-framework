@@ -30,9 +30,14 @@ RUN npm ci --workspace=packages/shared --workspace=packages/backend --omit=dev
 
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV SERVER_MODE=main
 EXPOSE 3001
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3001/api/health || exit 1
+# Entrypoint script selects main backend or agent server
+COPY --from=builder /app/packages/backend/src/entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh
 
-CMD ["node", "packages/backend/dist/index.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:${PORT}/health || wget -qO- http://localhost:${PORT}/api/health || exit 1
+
+ENTRYPOINT ["./entrypoint.sh"]

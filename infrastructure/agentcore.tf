@@ -22,6 +22,7 @@ resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
   }
 
   environment_variables = {
+    SERVER_MODE        = "agent"
     AWS_REGION         = var.aws_region
     AWS_DEFAULT_REGION = var.aws_region
     S3_BUCKET          = aws_s3_bucket.uploads.id
@@ -29,7 +30,7 @@ resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
     BDA_PROFILE_ARN    = var.bda_profile_arn
     BDA_PROJECT_ARN    = var.bda_project_arn
     NODE_ENV           = "production"
-    PORT               = "3001"
+    AGENT_PORT         = "3001"
     CLAUDE_MODEL_ID    = "us.anthropic.claude-sonnet-4-6"
     NOVA_MODEL_ID      = "us.amazon.nova-2-lite-v1:0"
   }
