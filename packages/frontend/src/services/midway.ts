@@ -90,7 +90,8 @@ export function handleOidcCallback(): boolean {
 /** Redirect to Midway for authentication */
 export function redirectToMidway(): void {
   const currentUrl = window.location.origin + window.location.pathname;
-  const authUrl = `${MIDWAY_AUTH_ENDPOINT}?response_type=id_token&scope=openid&redirect_uri=${encodeURIComponent(currentUrl)}`;
+  const clientId = `${window.location.origin}:443`;
+  const authUrl = `${MIDWAY_AUTH_ENDPOINT}?response_type=id_token&client_id=${encodeURIComponent(clientId)}&scope=openid&redirect_uri=${encodeURIComponent(currentUrl)}`;
   window.location.href = authUrl;
 }
 
