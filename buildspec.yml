@@ -3,10 +3,10 @@ phases:
   pre_build:
     commands:
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
+      - docker buildx create --use --name multiarch --driver docker-container --bootstrap
   build:
     commands:
-      - docker build -t $ECR_REPO_URI:latest .
+      - docker buildx build --platform linux/amd64,linux/arm64 -t $ECR_REPO_URI:latest --push .
   post_build:
     commands:
-      - docker push $ECR_REPO_URI:latest
-      - echo "Image pushed to $ECR_REPO_URI:latest"
+      - echo "Multi-arch image pushed to $ECR_REPO_URI:latest (amd64+arm64)"
