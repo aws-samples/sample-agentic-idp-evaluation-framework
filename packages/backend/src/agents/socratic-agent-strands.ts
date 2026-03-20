@@ -7,6 +7,7 @@ import { Agent, BedrockModel, NullConversationManager, tool } from '@strands-age
 import { z } from 'zod';
 import type { Response } from 'express';
 import type { ConversationEvent, CapabilityRecommendation } from '@idp/shared';
+import { CAPABILITIES } from '@idp/shared';
 import { config } from '../config/aws.js';
 import { emitSSE } from '../services/streaming.js';
 import { analyzeDocument } from './tools/analyze-document.js';
@@ -107,12 +108,7 @@ OPTIONS RULES:
 - <options> must be the VERY LAST thing in your response
 
 CAPABILITY IDS (for recommend_capabilities):
-text_extraction, handwriting_extraction, table_extraction, kv_extraction, entity_extraction,
-image_description, bounding_box, signature_detection, barcode_qr, layout_analysis,
-document_classification, document_splitting, document_summarization, language_detection,
-pii_detection, pii_redaction, invoice_processing, receipt_parsing, check_processing,
-insurance_claims, medical_records, contract_analysis,
-video_summarization, video_chapter_extraction, audio_transcription, audio_summarization, content_moderation
+${CAPABILITIES.join(', ')}
 
 When you have recommendations, ALSO include them in <recommendation> tags:
 <recommendation>

@@ -4,10 +4,22 @@ import {
 } from '@aws-sdk/client-bedrock-runtime';
 import type { Response } from 'express';
 import type { ConversationEvent, CapabilityRecommendation } from '@idp/shared';
+import { CAPABILITY_INFO, CAPABILITY_CATEGORIES, CATEGORY_INFO, getCapabilitiesByCategory } from '@idp/shared';
 import { bedrockClient, config } from '../config/aws.js';
 import { emitSSE } from '../services/streaming.js';
 import { analyzeDocument } from './tools/analyze-document.js';
 import { recommendCapabilities } from './tools/recommend-capabilities.js';
+
+// Build capability list dynamically from CAPABILITY_INFO (SSOT: skill .md files)
+function buildCapabilityList(): string {
+  return CAPABILITY_CATEGORIES.map((catId) => {
+    const catInfo = CATEGORY_INFO[catId];
+    const caps = getCapabilitiesByCategory(catId);
+    if (caps.length === 0) return '';
+    const items = caps.map((c) => `- ${c.id}: ${c.description}`).join('\n');
+    return `**${catInfo.name}:**\n${items}`;
+  }).filter(Boolean).join('\n\n');
+}
 
 const SYSTEM_PROMPT = `You are a Socratic document processing advisor for an IDP (Intelligent Document Processing) platform. Guide users through understanding their document processing needs.
 
@@ -27,37 +39,7 @@ When ready to recommend, include a JSON block in <recommendation> tags:
 
 Available capabilities organized by category:
 
-**Core Extraction:**
-- text_extraction: Extract printed text with layout preservation
-- handwriting_extraction: Recognize handwritten text, notes, annotations
-- table_extraction: Extract tables including nested/merged cells to HTML or CSV
-- kv_extraction: Extract key-value pairs from forms and field-based documents
-- entity_extraction: Extract names, dates, amounts, addresses, phone numbers, emails
-
-**Visual Analysis:**
-- image_description: Describe and interpret images, charts, graphs, diagrams
-- bounding_box: Detect element locations with precise spatial coordinates
-- signature_detection: Detect presence and location of signatures/initials/stamps
-- barcode_qr: Detect and decode barcodes, QR codes, data matrix codes
-- layout_analysis: Detect reading order, columns, sections, headers, footers
-
-**Document Intelligence:**
-- document_classification: Classify document type (invoice, contract, form, etc.)
-- document_splitting: Split multi-document PDFs into logical documents
-- document_summarization: Generate executive summaries and key points
-- language_detection: Auto-detect document language
-
-**Compliance & Security:**
-- pii_detection: Detect SSN, credit cards, bank accounts, etc.
-- pii_redaction: Automatically redact PII from extracted text
-
-**Industry-Specific:**
-- invoice_processing: Extract line items, totals, taxes, vendor/buyer info
-- receipt_parsing: Parse receipts for items, prices, totals, store info
-- check_processing: Extract amounts, payee, date, MICR line from checks
-- insurance_claims: Extract claim details, policy info, damage assessment
-- medical_records: Extract patient info, diagnoses, medications, treatment plans
-- contract_analysis: Extract clauses, terms, obligations, deadlines, parties
+${buildCapabilityList()}
 
 Be conversational and concise. Ask one or two questions at a time.`;
 

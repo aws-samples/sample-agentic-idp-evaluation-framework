@@ -12,6 +12,7 @@ import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapte
 import { emitProgress } from './stream-adapter.js';
 import { bedrockClient } from '../config/aws.js';
 import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
+import { CAPABILITY_INFO } from '@idp/shared';
 
 const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp)$/i;
@@ -38,19 +39,19 @@ function getImageFormat(fileName: string): ImageFormat {
 }
 
 function buildSystemPrompt(capabilities: string[]): string {
+  const formatHints = capabilities.map((c) => {
+    const info = CAPABILITY_INFO[c as keyof typeof CAPABILITY_INFO];
+    const fmt = info?.defaultFormat ?? 'json';
+    return `- ${c}: output as ${fmt}`;
+  }).join('\n');
+
   return `You are a document processing AI. Extract the following capabilities from the provided document:
-${capabilities.map((c) => `- ${c}`).join('\n')}
+${formatHints}
 
 Return your results as YAML (not JSON) with each capability as a key. For each capability, provide:
-- data: the extracted content
+- data: the extracted content (use the format specified above)
 - confidence: a number between 0 and 1 indicating your confidence
 - format: one of "html", "csv", "json", "text"
-
-For table_extraction, use HTML table format.
-For kv_extraction, use JSON key-value pairs.
-For image_description, provide text descriptions.
-For bounding_box, provide JSON with coordinates.
-For text_extraction, provide plain text.
 
 Return ONLY valid YAML. No markdown code blocks, no JSON.`;
 }
@@ -205,19 +206,17 @@ export class TokenStreamAdapter implements StreamAdapter {
       const capData = (parsed[cap] ?? parsed[cap.replace(/_/g, ' ')] ?? parsed[cap.replace(/_/g, '-')]) as Record<string, unknown> | string | undefined;
 
       if (capData && typeof capData === 'object' && 'data' in capData) {
-        // For content_moderation, null/empty data means "safe" — treat as valid
         const isSafeNull = capData.data == null && cap === 'content_moderation';
+        const defaultFmt = CAPABILITY_INFO[cap as keyof typeof CAPABILITY_INFO]?.defaultFormat ?? 'json';
         results[cap] = {
           capability: cap,
           data: isSafeNull ? { safe: true, flags: [] } : capData.data,
           confidence: (capData.confidence as number) ?? (isSafeNull ? 0.95 : 0.85),
-          format: (capData.format as string) ?? (cap === 'table_extraction' ? 'html' : 'json'),
+          format: (capData.format as string) ?? defaultFmt,
         };
       } else if (capData != null) {
         // Direct data (no wrapper)
-        const format = cap === 'table_extraction' ? 'html'
-          : cap === 'text_extraction' || cap === 'document_summarization' ? 'text'
-          : 'json';
+        const format = CAPABILITY_INFO[cap as keyof typeof CAPABILITY_INFO]?.defaultFormat ?? 'json';
         results[cap] = {
           capability: cap,
           data: capData,
