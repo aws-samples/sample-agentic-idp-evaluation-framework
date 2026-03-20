@@ -69,7 +69,15 @@ resource "aws_cloudfront_distribution" "main" {
 
     forwarded_values {
       query_string = true
-      headers      = ["*"]
+      # Forward specific headers (NOT Host — App Runner rejects foreign Host headers)
+      headers = [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "Referer",
+        "X-IDP-User",
+      ]
 
       cookies {
         forward = "all"
