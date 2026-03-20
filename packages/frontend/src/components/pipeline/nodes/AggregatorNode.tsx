@@ -3,6 +3,7 @@ import { Handle, Position } from '@xyflow/react';
 import type { AggregatorConfig } from '@idp/shared';
 import Box from '@cloudscape-design/components/box';
 import Badge from '@cloudscape-design/components/badge';
+import { getPipelineIcon } from '../../common/icons';
 
 interface AggregatorNodeData {
   config: AggregatorConfig;
@@ -46,7 +47,7 @@ export default memo(function AggregatorNode({ data }: { data: AggregatorNodeData
       <Handle type="target" position={Position.Left} style={{ background: '#0972d3' }} />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-        <span style={{ fontSize: '20px' }}>⚡</span>
+        {getPipelineIcon('aggregator', 20, '#0972d3')}
         <Box variant="strong" fontSize="body-m">Aggregator</Box>
       </div>
 

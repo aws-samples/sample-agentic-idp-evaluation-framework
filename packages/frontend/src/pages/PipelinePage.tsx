@@ -252,32 +252,33 @@ export default function PipelinePage({
             }
           >
             <SpaceBetween size="m">
-              <ColumnLayout columns={3} variant="text-grid">
+              <ColumnLayout columns={2} variant="text-grid">
                 <div>
                   <Box variant="awsui-key-label">Optimization Strategy</Box>
-                  <Box variant="awsui-value-large">
-                    {smartRec.optimizeFor.charAt(0).toUpperCase() + smartRec.optimizeFor.slice(1)}
-                  </Box>
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">Hybrid Routing</Box>
-                  <Box variant="awsui-value-large">
-                    {smartRec.enableHybridRouting ? 'Enabled' : 'Disabled'}
+                  <Box>
+                    <StatusIndicator type="info">
+                      {smartRec.optimizeFor.charAt(0).toUpperCase() + smartRec.optimizeFor.slice(1)}
+                    </StatusIndicator>
+                    {smartRec.enableHybridRouting && (
+                      <span style={{ marginLeft: '12px', fontSize: '13px', color: '#5f6b7a' }}>Hybrid routing enabled</span>
+                    )}
                   </Box>
                 </div>
                 <div>
                   <Box variant="awsui-key-label">Estimated Savings</Box>
-                  <Box variant="awsui-value-large">{smartRec.estimatedSavings}</Box>
+                  <Box fontSize="body-s" color="text-body-secondary">{smartRec.estimatedSavings}</Box>
                 </div>
               </ColumnLayout>
 
-              <div
-                className="chat-markdown"
-                dangerouslySetInnerHTML={{
-                  __html: marked.parse(smartRec.rationale) as string,
-                }}
-                style={{ fontSize: '14px', lineHeight: '1.6', color: '#16191f' }}
-              />
+              <Box fontSize="body-s" color="text-body-secondary">
+                <div
+                  className="chat-markdown"
+                  dangerouslySetInnerHTML={{
+                    __html: marked.parse(smartRec.rationale) as string,
+                  }}
+                  style={{ lineHeight: '1.5' }}
+                />
+              </Box>
 
               {smartRec.tokenUsage && (
                 <Box color="text-body-secondary" fontSize="body-s">

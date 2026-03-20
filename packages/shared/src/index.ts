@@ -95,6 +95,10 @@ export type {
   ExtractedEntity,
 } from './types/unified-page.js';
 
+// Generated skill definitions (from skills/**/*.md)
+export type { SkillId, SkillInfo } from './generated/skills.js';
+export { SKILL_IDS, SKILL_INFO, GENERATED_CAPABILITIES, GENERATED_CAPABILITY_INFO } from './generated/skills.js';
+
 // Document schemas (#5)
 export {
   DOCUMENT_SCHEMAS,

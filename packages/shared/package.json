@@ -12,7 +12,8 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build:skills": "npx tsx scripts/build-skills.ts",
+    "build": "npx tsx scripts/build-skills.ts && tsc",
     "dev": "tsc --watch"
   },
   "dependencies": {

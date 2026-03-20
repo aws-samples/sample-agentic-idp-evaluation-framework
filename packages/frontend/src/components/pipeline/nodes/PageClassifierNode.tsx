@@ -3,6 +3,7 @@ import { Handle, Position } from '@xyflow/react';
 import type { PageClassifierConfig } from '@idp/shared';
 import Box from '@cloudscape-design/components/box';
 import Badge from '@cloudscape-design/components/badge';
+import { getPipelineIcon } from '../../common/icons';
 
 interface PageClassifierData {
   config: PageClassifierConfig;
@@ -44,7 +45,7 @@ export default memo(function PageClassifierNode({ data }: { data: PageClassifier
       <Handle type="target" position={Position.Left} style={{ background: '#0972d3' }} />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-        <span style={{ fontSize: '20px' }}>🔀</span>
+        {getPipelineIcon('page-classifier', 20, '#0972d3')}
         <Box variant="strong" fontSize="body-m">Page Classifier</Box>
       </div>
 

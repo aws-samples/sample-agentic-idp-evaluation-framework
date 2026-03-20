@@ -27,64 +27,14 @@ import {
   MessageSquare,
   GitCompareArrows,
   Award,
-  FileText,
-  PenLine,
-  Table2,
-  List,
-  Users,
-  Image,
-  ScanSearch,
-  PenTool,
-  Barcode,
-  LayoutGrid,
-  FolderOpen,
-  Scissors,
-  AlignLeft,
-  Globe,
-  Shield,
-  EyeOff,
-  FileOutput,
-  Ruler,
-  ScanEye,
 } from 'lucide-react';
 import DocumentUpload from '../components/upload/DocumentUpload';
 import OnboardingBanner from '../components/common/OnboardingBanner';
+import { getCapabilityIcon } from '../components/common/icons';
 
 interface HomePageProps {
   onUploadComplete: (doc: UploadResponse) => void;
 }
-
-const ICON_COLOR = '#545b64';
-
-const CAPABILITY_ICONS: Record<string, React.ReactNode> = {
-  text_extraction: <FileText size={18} color={ICON_COLOR} />,
-  handwriting_extraction: <PenLine size={18} color={ICON_COLOR} />,
-  table_extraction: <Table2 size={18} color={ICON_COLOR} />,
-  kv_extraction: <List size={18} color={ICON_COLOR} />,
-  entity_extraction: <Users size={18} color={ICON_COLOR} />,
-  image_description: <Image size={18} color={ICON_COLOR} />,
-  bounding_box: <ScanSearch size={18} color={ICON_COLOR} />,
-  signature_detection: <PenTool size={18} color={ICON_COLOR} />,
-  barcode_qr: <Barcode size={18} color={ICON_COLOR} />,
-  layout_analysis: <LayoutGrid size={18} color={ICON_COLOR} />,
-  document_classification: <FolderOpen size={18} color={ICON_COLOR} />,
-  document_splitting: <Scissors size={18} color={ICON_COLOR} />,
-  document_summarization: <AlignLeft size={18} color={ICON_COLOR} />,
-  language_detection: <Globe size={18} color={ICON_COLOR} />,
-  pii_detection: <Shield size={18} color={ICON_COLOR} />,
-  pii_redaction: <EyeOff size={18} color={ICON_COLOR} />,
-  video_summarization: <FileText size={18} color={ICON_COLOR} />,
-  video_chapter_extraction: <Scissors size={18} color={ICON_COLOR} />,
-  audio_transcription: <FileText size={18} color={ICON_COLOR} />,
-  audio_summarization: <AlignLeft size={18} color={ICON_COLOR} />,
-  content_moderation: <Shield size={18} color={ICON_COLOR} />,
-  image_separation: <Scissors size={18} color={ICON_COLOR} />,
-  embedding_generation: <GitCompareArrows size={18} color={ICON_COLOR} />,
-  knowledge_base_ingestion: <FolderOpen size={18} color={ICON_COLOR} />,
-  pdf_conversion: <FileOutput size={18} color={ICON_COLOR} />,
-  format_standardization: <Ruler size={18} color={ICON_COLOR} />,
-  ocr_enhancement: <ScanEye size={18} color={ICON_COLOR} />,
-};
 
 const FAMILY_NAMES: Record<string, string> = {
   bda: 'Bedrock Data Automation',
@@ -259,7 +209,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0972d3'; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e9ebed'; }}
                               >
-                                {CAPABILITY_ICONS[cap.id]}
+                                {getCapabilityIcon(cap.id, 18)}
                                 <span>{cap.name}</span>
                               </div>
                             </Popover>

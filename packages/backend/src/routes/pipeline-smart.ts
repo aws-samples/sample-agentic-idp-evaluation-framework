@@ -87,7 +87,7 @@ router.post('/', async (req, res) => {
 
 Document type: ${body.documentType ?? 'unknown'}
 Selected capabilities: ${body.capabilities.join(', ')}
-${body.preferredMethod ? `User preferred method: ${body.preferredMethod}` : ''}
+${body.preferredMethod ? `IMPORTANT — User explicitly selected: ${body.preferredMethod}. You MUST use this method (or its family) as the primary method. Only deviate if the selected method fundamentally cannot handle a specific capability.` : ''}
 
 Preview results:
 ${previewSummary}

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { ProcessRequest, ProcessingMethod, ProcessorResult } from '@idp/shared';
+import { BDA_LIMITS, TEXTRACT_LIMITS } from '@idp/shared';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { getDocumentBuffer } from '../services/s3.js';
 import { buildComparison } from '../services/comparison.js';
@@ -56,22 +57,27 @@ router.post('/', async (req, res) => {
       pageCount,
     };
 
-    // Filter methods: skip BDA methods if ARNs not configured
+    // Filter methods: skip incompatible formats and unconfigured backends
+    const ext = (fileName.match(/\.(\w+)$/)?.[1] ?? '').toLowerCase();
+    const normalizedExt = ext === 'jpg' ? 'jpeg' : ext === 'tif' ? 'tiff' : ext;
+    const isBdaCompatible = (BDA_LIMITS.async.supportedFormats as readonly string[]).includes(normalizedExt);
+    const isTextractCompatible = (TEXTRACT_LIMITS.analyzeDocument.supportedFormats as readonly string[]).includes(normalizedExt);
+
     const methods = body.methods.filter((m) => {
       if (m === 'bda-custom' && !config.bdaProjectArn) {
-        emitSSE(res, {
-          type: 'method_error',
-          method: m,
-          error: 'BDA Custom Blueprint not configured (BDA_PROJECT_ARN is empty)',
-        });
+        emitSSE(res, { type: 'method_error', method: m, error: 'BDA Custom Blueprint not configured (BDA_PROJECT_ARN is empty)' });
         return false;
       }
-      if ((m === 'bda-standard' || m === 'bda-claude-sonnet' || m === 'bda-claude-haiku' || m === 'bda-nova-lite') && !config.bdaProfileArn) {
-        emitSSE(res, {
-          type: 'method_error',
-          method: m,
-          error: 'BDA not configured (BDA_PROFILE_ARN is empty)',
-        });
+      if (m.startsWith('bda-') && !config.bdaProfileArn && m !== 'bda-custom') {
+        emitSSE(res, { type: 'method_error', method: m, error: 'BDA not configured (BDA_PROFILE_ARN is empty)' });
+        return false;
+      }
+      if (m.startsWith('bda-') && !isBdaCompatible) {
+        emitSSE(res, { type: 'method_error', method: m, error: `BDA does not support .${ext} files` });
+        return false;
+      }
+      if (m.startsWith('textract-') && !isTextractCompatible) {
+        emitSSE(res, { type: 'method_error', method: m, error: `Textract does not support .${ext} files` });
         return false;
       }
       return true;

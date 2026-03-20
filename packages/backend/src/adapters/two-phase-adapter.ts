@@ -37,6 +37,13 @@ export class TwoPhaseAdapter implements StreamAdapter {
     // Phase 1: Textract extraction
     emitProgress(res, this.method, 'all', 0, 'Running Textract OCR...');
 
+    // Textract AnalyzeDocument (sync) only supports single-page documents.
+    // Multi-page PDFs must use StartDocumentAnalysis (async, S3 required).
+    const isPDF = /\.pdf$/i.test(fileName);
+    if (isPDF && (input.pageCount ?? 1) > 1) {
+      throw new Error(`Textract sync API supports single-page PDFs only (this document has ${input.pageCount} pages). Use BDA or direct LLM methods for multi-page documents.`);
+    }
+
     const textractCommand = new AnalyzeDocumentCommand({
       Document: {
         Bytes: input.documentBuffer,
@@ -150,10 +157,11 @@ Return ONLY valid JSON, no markdown code blocks.`;
     for (const cap of capabilities) {
       const capData = parsed[cap] as Record<string, unknown> | undefined;
       if (capData && typeof capData === 'object' && 'data' in capData) {
+        const isSafeNull = capData.data == null && cap === 'content_moderation';
         results[cap] = {
           capability: cap,
-          data: capData.data,
-          confidence: (capData.confidence as number) ?? 0.8,
+          data: isSafeNull ? { safe: true, flags: [] } : capData.data,
+          confidence: (capData.confidence as number) ?? (isSafeNull ? 0.95 : 0.8),
           format: (capData.format as string) ?? 'json',
         };
       } else {

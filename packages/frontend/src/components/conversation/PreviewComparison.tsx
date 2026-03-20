@@ -134,8 +134,8 @@ export default function PreviewComparison({
                 )}
               </div>
               <div style={{ marginTop: '8px' }}>
-                <Button variant="link" onClick={() => setShowRaw(showRaw === r.method ? null : r.method)}>
-                  {showRaw === r.method ? 'Hide' : 'Show'} raw
+                <Button variant="normal" onClick={() => setShowRaw(showRaw === r.method ? null : r.method)} iconName={showRaw === r.method ? 'angle-up' : 'angle-down'}>
+                  {showRaw === r.method ? 'Hide raw' : 'Show raw'}
                 </Button>
                 {showRaw === r.method && (
                   <pre style={{

@@ -13,6 +13,7 @@ import { buildComparison } from '../services/comparison.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { getDocumentBuffer } from '../services/s3.js';
 import { calculateCost } from '../services/pricing.js';
+import { BDA_LIMITS, TEXTRACT_LIMITS } from '@idp/shared';
 import { config } from '../config/aws.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
@@ -159,23 +160,28 @@ router.post('/execute', async (req, res) => {
       pageCount,
     };
 
-    // Filter out BDA methods with missing ARNs
+    // Filter out methods with missing config or incompatible document formats
+    const ext = (fileName.match(/\.(\w+)$/)?.[1] ?? '').toLowerCase();
+    const normalizedExt = ext === 'jpg' ? 'jpeg' : ext === 'tif' ? 'tiff' : ext;
+    const isBdaCompatible = (BDA_LIMITS.async.supportedFormats as readonly string[]).includes(normalizedExt);
+    const isTextractCompatible = (TEXTRACT_LIMITS.analyzeDocument.supportedFormats as readonly string[]).includes(normalizedExt);
+
     const validMethodNodes = methodNodes.filter((node) => {
       const method: ProcessingMethod = (node.config as any).method;
-      if (method === 'bda-standard' && !config.bdaProfileArn) {
-        emitSSE(res, {
-          type: 'node_error',
-          nodeId: node.id,
-          error: 'BDA Standard not configured (BDA_PROFILE_ARN is empty)',
-        } as PipelineExecutionEvent);
+      if (method === 'bda-custom' && !config.bdaProjectArn) {
+        emitSSE(res, { type: 'node_error', nodeId: node.id, error: 'BDA Custom not configured (BDA_PROJECT_ARN is empty)' } as PipelineExecutionEvent);
         return false;
       }
-      if (method === 'bda-custom' && !config.bdaProjectArn) {
-        emitSSE(res, {
-          type: 'node_error',
-          nodeId: node.id,
-          error: 'BDA Custom not configured (BDA_PROJECT_ARN is empty)',
-        } as PipelineExecutionEvent);
+      if (method.startsWith('bda-') && !config.bdaProfileArn && method !== 'bda-custom') {
+        emitSSE(res, { type: 'node_error', nodeId: node.id, error: 'BDA not configured (BDA_PROFILE_ARN is empty)' } as PipelineExecutionEvent);
+        return false;
+      }
+      if (method.startsWith('bda-') && !isBdaCompatible) {
+        emitSSE(res, { type: 'node_error', nodeId: node.id, error: `BDA does not support .${ext} files` } as PipelineExecutionEvent);
+        return false;
+      }
+      if (method.startsWith('textract-') && !isTextractCompatible) {
+        emitSSE(res, { type: 'node_error', nodeId: node.id, error: `Textract does not support .${ext} files` } as PipelineExecutionEvent);
         return false;
       }
       return true;

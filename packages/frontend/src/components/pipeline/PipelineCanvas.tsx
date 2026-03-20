@@ -10,7 +10,6 @@ import {
   ConnectionLineType,
   applyNodeChanges,
   applyEdgeChanges,
-  Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { PipelineDefinition } from '@idp/shared';
@@ -137,18 +136,6 @@ export default function PipelineCanvas({
       >
         <Background color="#e9ebed" gap={20} />
         <Controls style={{ bottom: 10, left: 10 }} />
-        <Panel position="top-right">
-          <div style={{
-            background: 'white',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            border: '1px solid #e9ebed',
-            fontSize: '12px',
-            color: '#5f6b7a',
-          }}>
-            Drag nodes to rearrange. Scroll to zoom.
-          </div>
-        </Panel>
       </ReactFlow>
     </div>
   );

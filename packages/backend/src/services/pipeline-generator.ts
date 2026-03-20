@@ -230,67 +230,25 @@ export function generatePipeline(
     previousNodeIds = [classifierNodeId];
   }
 
-  // 3. Capability Nodes + Method Selection
-  const capabilityNodeIds: string[] = [];
+  // 3. Method Selection — group capabilities by their best method
   const methodToCapabilities = new Map<ProcessingMethod, Capability[]>();
 
-  // Select methods for each capability and track assignment
-  const capabilityToMethod = new Map<Capability, ProcessingMethod>();
   for (const capability of capabilities) {
     const method = selectMethod(capability, optimizeFor, preferredMethods);
-    capabilityToMethod.set(capability, method);
     if (!methodToCapabilities.has(method)) {
       methodToCapabilities.set(method, []);
     }
     methodToCapabilities.get(method)!.push(capability);
   }
 
-  // Create capability nodes with method assignment info
-  const capYStart = yPos - (capabilities.length * 100) / 2;
-  capabilities.forEach((capability, idx) => {
-    const capNodeId = generateNodeId('capability');
-    capabilityNodeIds.push(capNodeId);
-
-    const assignedMethod = capabilityToMethod.get(capability)!;
-    const methodInfo = METHOD_INFO[assignedMethod];
-
-    nodes.push({
-      id: capNodeId,
-      type: 'capability',
-      label: capability.replace(/_/g, ' '),
-      description: `${capability.replace(/_/g, ' ')} → ${methodInfo.shortName} ($${methodInfo.estimatedCostPerPage.toFixed(4)}/page)`,
-      config: {
-        nodeType: 'capability',
-        capability,
-        priority: 'required',
-        assignedMethod: assignedMethod,
-        assignedMethodName: methodInfo.shortName,
-        assignedMethodFamily: methodInfo.family,
-      } as CapabilityNodeConfig & { assignedMethod: string; assignedMethodName: string; assignedMethodFamily: string },
-      position: { x: xPos, y: capYStart + idx * 100 },
-    });
-
-    // Connect from previous nodes
-    for (const prevId of previousNodeIds) {
-      edges.push({
-        id: generateEdgeId(),
-        source: prevId,
-        target: capNodeId,
-      });
-    }
-  });
-  xPos += xStep;
-
-  // 4. Method Nodes (deduplicated)
+  // 4. Method Nodes (each method handles its assigned capabilities as sub-items)
   const methodNodeIds: string[] = [];
-  const methodNodeMap = new Map<ProcessingMethod, string>();
-  const methodYStart = yPos - (methodToCapabilities.size * 120) / 2;
+  const methodYStart = yPos - (methodToCapabilities.size * 140) / 2;
   let methodIdx = 0;
 
   for (const [method, caps] of methodToCapabilities.entries()) {
     const methodNodeId = generateNodeId('method');
     methodNodeIds.push(methodNodeId);
-    methodNodeMap.set(method, methodNodeId);
 
     const info = METHOD_INFO[method];
     nodes.push({
@@ -302,18 +260,17 @@ export function generatePipeline(
         nodeType: 'method',
         method,
         family: info.family,
-      } as MethodNodeConfig,
-      position: { x: xPos, y: methodYStart + methodIdx * 120 },
+        capabilities: caps,
+      } as MethodNodeConfig & { capabilities: string[] },
+      position: { x: xPos, y: methodYStart + methodIdx * 140 },
     });
 
-    // Connect capabilities to their assigned method
-    for (const cap of caps) {
-      const capNodeId = capabilityNodeIds[capabilities.indexOf(cap)];
+    // Connect from previous nodes (input or classifier)
+    for (const prevId of previousNodeIds) {
       edges.push({
         id: generateEdgeId(),
-        source: capNodeId,
+        source: prevId,
         target: methodNodeId,
-        label: cap.replace(/_/g, ' '),
       });
     }
 

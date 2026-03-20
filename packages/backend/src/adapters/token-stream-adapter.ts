@@ -205,11 +205,12 @@ export class TokenStreamAdapter implements StreamAdapter {
       const capData = (parsed[cap] ?? parsed[cap.replace(/_/g, ' ')] ?? parsed[cap.replace(/_/g, '-')]) as Record<string, unknown> | string | undefined;
 
       if (capData && typeof capData === 'object' && 'data' in capData) {
-        // Structured format: {data, confidence, format}
+        // For content_moderation, null/empty data means "safe" — treat as valid
+        const isSafeNull = capData.data == null && cap === 'content_moderation';
         results[cap] = {
           capability: cap,
-          data: capData.data,
-          confidence: (capData.confidence as number) ?? 0.85,
+          data: isSafeNull ? { safe: true, flags: [] } : capData.data,
+          confidence: (capData.confidence as number) ?? (isSafeNull ? 0.95 : 0.85),
           format: (capData.format as string) ?? (cap === 'table_extraction' ? 'html' : 'json'),
         };
       } else if (capData != null) {
@@ -224,11 +225,12 @@ export class TokenStreamAdapter implements StreamAdapter {
           format,
         };
       } else {
-        // Capability not found in response
+        // Capability not found in LLM response — likely truncated output.
+        // Provide a fallback from the raw text so downstream consumers still get usable data.
         results[cap] = {
           capability: cap,
-          data: null,
-          confidence: 0,
+          data: rawOutput.length > 0 ? `[Extracted from partial response]\n${rawOutput.substring(0, 1500)}` : null,
+          confidence: rawOutput.length > 0 ? 0.3 : 0,
           format: 'text',
         };
       }

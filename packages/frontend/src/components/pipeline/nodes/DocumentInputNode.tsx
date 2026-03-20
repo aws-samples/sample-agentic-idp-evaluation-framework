@@ -3,6 +3,7 @@ import { Handle, Position } from '@xyflow/react';
 import type { DocumentInputConfig } from '@idp/shared';
 import Box from '@cloudscape-design/components/box';
 import Badge from '@cloudscape-design/components/badge';
+import { getPipelineIcon } from '../../common/icons';
 
 interface DocumentInputData {
   config: DocumentInputConfig;
@@ -44,7 +45,7 @@ export default memo(function DocumentInputNode({ data }: { data: DocumentInputDa
       `}</style>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-        <span style={{ fontSize: '20px' }}>📄</span>
+        {getPipelineIcon('document-input', 20, '#0972d3')}
         <Box variant="strong" fontSize="body-m">Document Input</Box>
       </div>
 

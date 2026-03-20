@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Capability, ProcessingMethod } from '@idp/shared';
-import { getBestMethodsForCapability, METHOD_INFO } from '@idp/shared';
+import { getBestMethodsForCapability, METHOD_INFO, BDA_LIMITS, TEXTRACT_LIMITS } from '@idp/shared';
 import { getDocumentBuffer } from '../services/s3.js';
 import { convertOfficeDocument, isOfficeFormat } from '../services/file-converter.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
@@ -77,10 +77,18 @@ router.post('/', async (req, res) => {
 
     const methods = getAvailableMethods(body.methods);
 
-    // Filter out methods without configured backends
+    // Filter out methods without configured backends or incompatible document formats.
+    // Uses the canonical format lists from @idp/shared (BDA_LIMITS, TEXTRACT_LIMITS).
+    const ext = (fileName.match(/\.(\w+)$/)?.[1] ?? '').toLowerCase();
+    const normalizedExt = ext === 'jpg' ? 'jpeg' : ext === 'tif' ? 'tiff' : ext;
+    const isBdaCompatible = (BDA_LIMITS.async.supportedFormats as readonly string[]).includes(normalizedExt);
+    const isTextractCompatible = (TEXTRACT_LIMITS.analyzeDocument.supportedFormats as readonly string[]).includes(normalizedExt);
+
     const validMethods = methods.filter((m) => {
-      if ((m === 'bda-standard' || m === 'bda-claude-sonnet' || m === 'bda-claude-haiku' || m === 'bda-nova-lite') && !config.bdaProfileArn) return false;
+      if (m.startsWith('bda-') && m !== 'bda-custom' && !config.bdaProfileArn) return false;
+      if (m.startsWith('bda-') && !isBdaCompatible) return false;
       if (m === 'bda-custom' && !config.bdaProjectArn) return false;
+      if (m.startsWith('textract-') && !isTextractCompatible) return false;
       return !!PROCESSOR_FACTORY[m];
     });
 

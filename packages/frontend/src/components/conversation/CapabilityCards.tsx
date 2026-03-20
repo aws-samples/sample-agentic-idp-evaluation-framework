@@ -7,7 +7,6 @@ import Toggle from '@cloudscape-design/components/toggle';
 import ProgressBar from '@cloudscape-design/components/progress-bar';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import Badge from '@cloudscape-design/components/badge';
-import Spinner from '@cloudscape-design/components/spinner';
 import Tabs from '@cloudscape-design/components/tabs';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import type { CapabilityRecommendation, Capability, CapabilityCategory } from '@idp/shared';
@@ -137,17 +136,14 @@ export default function CapabilityCards({
         counter={`(${selected.length} selected)`}
         actions={
           selected.length > 0 && onRunPreview ? (
-            <SpaceBetween direction="horizontal" size="xs">
-              {isPreviewLoading && <Spinner />}
-              <Button
-                variant={preview ? 'normal' : 'primary'}
-                onClick={onRunPreview}
-                loading={isPreviewLoading}
-                iconName="play"
-              >
-                {preview ? 'Re-run Preview' : `Run Preview (${selected.length})`}
-              </Button>
-            </SpaceBetween>
+            <Button
+              variant={preview ? 'normal' : 'primary'}
+              onClick={onRunPreview}
+              loading={isPreviewLoading}
+              iconName="play"
+            >
+              {preview ? 'Re-run Preview' : `Run Preview (${selected.length})`}
+            </Button>
           ) : undefined
         }
       >
@@ -161,11 +157,11 @@ export default function CapabilityCards({
           padding: '10px 16px', background: '#f0f8ff', borderRadius: '8px', border: '1px solid #d1e4f6',
         }}>
           {preview.results.filter((r) => r.status === 'complete').map((r) => (
-            <div key={r.method} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+            <div key={r.method} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontFamily: "'Open Sans', 'Helvetica Neue', Roboto, Arial, sans-serif" }}>
               <StatusIndicator type="success">{r.shortName}</StatusIndicator>
-              <span style={{ color: '#5f6b7a' }}>{r.latencyMs}ms</span>
+              <span style={{ color: '#5f6b7a', fontVariantNumeric: 'tabular-nums' }}>{r.latencyMs}ms</span>
               {r.estimatedCost != null && (
-                <span style={{ color: '#037f0c', fontWeight: 600 }}>
+                <span style={{ color: '#037f0c', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                   ~${r.estimatedCost.toFixed(4)}
                 </span>
               )}

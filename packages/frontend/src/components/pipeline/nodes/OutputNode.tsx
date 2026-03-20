@@ -2,8 +2,8 @@ import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { OutputConfig } from '@idp/shared';
 import Box from '@cloudscape-design/components/box';
-import Button from '@cloudscape-design/components/button';
 import Badge from '@cloudscape-design/components/badge';
+import { getPipelineIcon } from '../../common/icons';
 
 interface OutputNodeData {
   config: OutputConfig;
@@ -45,7 +45,7 @@ export default memo(function OutputNode({ data }: { data: OutputNodeData }) {
       <Handle type="target" position={Position.Left} style={{ background: '#0972d3' }} />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-        <span style={{ fontSize: '20px' }}>📊</span>
+        {getPipelineIcon('output', 20, '#0972d3')}
         <Box variant="strong" fontSize="body-m">Output</Box>
       </div>
 
@@ -58,22 +58,7 @@ export default memo(function OutputNode({ data }: { data: OutputNodeData }) {
 
       {state === 'complete' && (
         <div style={{ marginTop: '8px' }}>
-          <Button
-            variant="primary"
-            iconName="download"
-            onClick={() => {
-              // Download handler would go here
-              console.log('Download results');
-            }}
-          >
-            Download
-          </Button>
-        </div>
-      )}
-
-      {state === 'complete' && (
-        <div style={{ marginTop: '8px' }}>
-          <span style={{ color: '#037f0c', fontSize: '18px' }}>✓</span>
+          <Box variant="small" color="text-status-success">&#10003; Complete</Box>
         </div>
       )}
     </div>

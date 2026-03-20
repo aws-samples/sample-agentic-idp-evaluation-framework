@@ -172,8 +172,10 @@ Return ONLY valid JSON, no markdown code blocks.`;
     const bucket = url.hostname;
     const key = decodeURIComponent(url.pathname.slice(1));
 
-    // BDA outputs a job_metadata.json with pointers to actual results
-    const metadataKey = key.endsWith('/') ? `${key}job_metadata.json` : `${key}/job_metadata.json`;
+    // BDA outputUri may point directly to job_metadata.json or to a directory
+    const metadataKey = key.endsWith('job_metadata.json')
+      ? key
+      : key.endsWith('/') ? `${key}job_metadata.json` : `${key}/job_metadata.json`;
 
     try {
       const metaResponse = await s3Client.send(
@@ -182,20 +184,46 @@ Return ONLY valid JSON, no markdown code blocks.`;
       const metaBody = await metaResponse.Body!.transformToString();
       const metadata = JSON.parse(metaBody);
 
-      // Fetch the standard output document result
-      const segments = metadata.output_metadata?.documents;
-      if (segments && segments.length > 0) {
-        const docSegment = segments[0];
-        const resultKey = docSegment.standard_output?.s3_prefix
-          ?? docSegment.s3_prefix;
-        if (resultKey) {
-          const resultResponse = await s3Client.send(
-            new GetObjectCommand({ Bucket: bucket, Key: resultKey }),
-          );
-          return resultResponse.Body!.transformToString();
+      // Format 1: output_metadata[].segment_metadata[].standard_output_path (current BDA)
+      const assets = Array.isArray(metadata.output_metadata) ? metadata.output_metadata : [];
+      for (const asset of assets) {
+        const segments = Array.isArray(asset.segment_metadata) ? asset.segment_metadata : [];
+        for (const seg of segments) {
+          const outputPath = seg.standard_output_path as string | undefined;
+          if (outputPath?.startsWith('s3://')) {
+            try {
+              const outUrl = new URL(outputPath);
+              const outBucket = outUrl.hostname;
+              const outKey = decodeURIComponent(outUrl.pathname.slice(1));
+              const resultResponse = await s3Client.send(
+                new GetObjectCommand({ Bucket: outBucket, Key: outKey }),
+              );
+              return resultResponse.Body!.transformToString();
+            } catch (err) {
+              console.warn(`[BDA-LLM] Failed to fetch ${outputPath}:`, (err as Error).message);
+            }
+          }
         }
       }
 
+      // Format 2: output_metadata.documents[].standard_output.s3_prefix (legacy)
+      const legacyMeta = metadata.output_metadata as Record<string, unknown> | undefined;
+      const legacyDocs = Array.isArray(legacyMeta) ? [] : ((legacyMeta?.documents ?? []) as Array<Record<string, unknown>>);
+      for (const doc of legacyDocs) {
+        const resultKey = (doc.standard_output as Record<string, string>)?.s3_prefix ?? (doc as Record<string, string>).s3_prefix;
+        if (resultKey) {
+          try {
+            const resultResponse = await s3Client.send(
+              new GetObjectCommand({ Bucket: bucket, Key: resultKey }),
+            );
+            return resultResponse.Body!.transformToString();
+          } catch (err) {
+            console.warn(`[BDA-LLM] Failed to fetch legacy path ${resultKey}:`, (err as Error).message);
+          }
+        }
+      }
+
+      console.warn('[BDA-LLM] Could not find result path in metadata, returning metadata itself');
       return metaBody;
     } catch {
       // Fallback: try direct output path
@@ -231,10 +259,12 @@ Return ONLY valid JSON, no markdown code blocks.`;
     for (const cap of capabilities) {
       const capData = parsed[cap] as Record<string, unknown> | undefined;
       if (capData && typeof capData === 'object' && 'data' in capData) {
+        // For content_moderation, null/empty data means "safe" — treat as valid
+        const isSafeNull = capData.data == null && cap === 'content_moderation';
         results[cap] = {
           capability: cap,
-          data: capData.data,
-          confidence: (capData.confidence as number) ?? 0.8,
+          data: isSafeNull ? { safe: true, flags: [] } : capData.data,
+          confidence: (capData.confidence as number) ?? (isSafeNull ? 0.95 : 0.8),
           format: (capData.format as string) ?? 'json',
         };
       } else {
