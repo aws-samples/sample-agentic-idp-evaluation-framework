@@ -100,26 +100,36 @@ resource "aws_iam_role" "apprunner_instance" {
   })
 }
 
-# S3 access
+# S3 access + KMS for encrypted objects
 resource "aws_iam_role_policy" "apprunner_s3" {
   name = "S3Access"
   role = aws_iam_role.apprunner_instance.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject",
-        "s3:ListBucket",
-      ]
-      Resource = [
-        aws_s3_bucket.uploads.arn,
-        "${aws_s3_bucket.uploads.arn}/*",
-      ]
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket",
+        ]
+        Resource = [
+          aws_s3_bucket.uploads.arn,
+          "${aws_s3_bucket.uploads.arn}/*",
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+        ]
+        Resource = "*"
+      },
+    ]
   })
 }
 
