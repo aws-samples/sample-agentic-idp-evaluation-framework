@@ -29,6 +29,9 @@ const app = express();
 app.use(corsMiddleware);
 app.use(express.json({ limit: '50mb' }));
 
+// Health check before auth (App Runner / ALB health checks need unauthenticated access)
+app.use('/api/health', healthRouter);
+
 // Midway authentication (internal AWS employees only)
 // Set MIDWAY_DISABLED=true in .env for local development
 app.use('/api', midwayAuth);
@@ -53,7 +56,6 @@ app.use('/api', apiRateLimit);
 
 // API Routes
 app.use('/api/auth', authRouter);
-app.use('/api/health', healthRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/conversation', conversationRouter);
 app.use('/api/process', processRouter);
