@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd packages/shared && npx tsx scripts/build-skills.ts 2>&1\",\"timeout\":15000,\"description\":\"Build TypeScript from skill .md files\"}",
+  "error": "Exit code 1\n(eval):cd:1: no such file or directory: packages/shared",
+  "timestamp": "2026-03-20T04:11:31.298Z",
+  "retry_count": 1
+}

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"npx tsc --noEmit -p packages/backend/tsconfig.json 2>&1\",\"timeout\":30000,\"description\":\"Type-check backend only\"}",
+  "error": "Exit code 1\nerror TS5058: The specified path does not exist: 'packages/backend/tsconfig.json'.",
+  "timestamp": "2026-03-18T21:42:04.304Z",
+  "retry_count": 1
+}

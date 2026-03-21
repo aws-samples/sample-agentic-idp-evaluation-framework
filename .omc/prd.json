@@ -1,0 +1,71 @@
+{
+  "title": "Session 9 - Production Deployment Verification",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "AgentCore SDK invocation from App Runner",
+      "priority": 1,
+      "passes": false,
+      "acceptanceCriteria": [
+        "conversation.ts uses InvokeAgentRuntimeCommand when AGENTCORE_RUNTIME_ARN is set",
+        "AgentCore runtime receives traffic (visible in CloudWatch logs)",
+        "Fallback to direct mode works when AgentCore fails"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Korean file recognition in agent conversation",
+      "priority": 1,
+      "passes": false,
+      "acceptanceCriteria": [
+        "Agent tools use closure-bound documentId/s3Uri (no LLM pass-through)",
+        "Korean PDF upload triggers analyze_document with correct s3Uri",
+        "analyze_document tool takes zero parameters (closure-bound)"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Multi-arch Docker build and deploy",
+      "priority": 1,
+      "passes": false,
+      "acceptanceCriteria": [
+        "CodeBuild produces multi-arch manifest (amd64+arm64)",
+        "App Runner deploys successfully with new image",
+        "AgentCore runtime updated with SERVER_MODE=agent env var"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "NFD fallback + File proxy + Preview SSE",
+      "priority": 2,
+      "passes": true,
+      "acceptanceCriteria": [
+        "getDocumentBuffer tries NFC, falls back to NFD on NoSuchKey",
+        "/api/files/* returns correct Content-Type for PDF/images",
+        "Preview SSE streams method results with 60s CF timeout"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Token cost + Method Comparison + Pipeline strategy + Architecture",
+      "priority": 2,
+      "passes": true,
+      "acceptanceCriteria": [
+        "Token-based cost in ProcessorResult.metrics",
+        "Method comparison shown after all methods complete",
+        "Pipeline strategy reflected in smart pipeline",
+        "Architecture page uses pipeline execution results"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Conversation fallback + Processing sidebar removed",
+      "priority": 2,
+      "passes": true,
+      "acceptanceCriteria": [
+        "Three-tier routing: AgentCore > HTTP proxy > direct",
+        "No Processing nav item in sidebar"
+      ]
+    }
+  ]
+}
