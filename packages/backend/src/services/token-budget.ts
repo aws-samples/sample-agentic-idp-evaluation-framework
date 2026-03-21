@@ -27,11 +27,11 @@ export function isMediaCapability(cap: string): boolean {
  * @param isMedia - Whether this is a media processing task
  * @returns maxTokens value clamped between MIN and MAX
  *
- * Examples:
- *   3 caps, 1 page, yaml  -> 750
- *   5 caps, 2 pages, yaml -> 1300
- *   15 caps, 10 pages, json -> 4096 (capped)
- *   media, 2 caps -> 2048 (media floor)
+ * Budget rationale:
+ * - Table extraction for multi-page docs needs ~1000 tokens/page (HTML rows)
+ * - Korean/CJK text uses ~1.5-2x more tokens than English
+ * - Each capability adds ~1000 tokens (YAML wrapper + data)
+ * - Min 4096 to handle any single-page document comfortably
  */
 export function calculateMaxTokens(
   capCount: number,
@@ -40,10 +40,10 @@ export function calculateMaxTokens(
   isMedia: boolean = false,
 ): number {
   // Media capabilities need more tokens (video transcription, audio, etc.)
-  if (isMedia) return Math.max(2048, Math.min(capCount * 500, 4096));
+  if (isMedia) return Math.max(4096, Math.min(capCount * 1000, 8192));
 
   const formatMult = format === 'yaml' ? 1.0 : 1.3;
-  // Base: 800 tokens per capability + 400 per page (dense multilingual docs need more)
-  const calculated = Math.round((800 * capCount + pageCount * 400) * formatMult);
-  return Math.max(2048, Math.min(calculated, 16384));
+  // Base: 1000 tokens per capability + 800 per page (CJK/tables need more headroom)
+  const calculated = Math.round((1000 * capCount + pageCount * 800) * formatMult);
+  return Math.max(4096, Math.min(calculated, 16384));
 }
