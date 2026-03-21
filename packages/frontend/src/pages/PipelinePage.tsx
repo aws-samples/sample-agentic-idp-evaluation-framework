@@ -214,13 +214,6 @@ export default function PipelinePage({
         <Header
           variant="h1"
           description={`Optimized processing pipeline for ${document.fileName}`}
-          actions={
-            pipeline ? (
-              <Button variant="primary" onClick={onViewArchitecture}>
-                Generate Code
-              </Button>
-            ) : undefined
-          }
         >
           Pipeline Builder
         </Header>

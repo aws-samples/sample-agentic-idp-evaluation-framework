@@ -1,6 +1,5 @@
 import SideNavigation from '@cloudscape-design/components/side-navigation';
 import Badge from '@cloudscape-design/components/badge';
-// Badge still used for Done/Current indicators
 
 interface Step {
   href: string;
@@ -13,14 +12,11 @@ interface SideNavProps {
 }
 
 export default function SideNav({ activeStep, steps }: SideNavProps) {
-  const stepDescriptions: Record<string, string> = {
-    'Upload': 'Upload your document',
-    'Analyze & Preview': 'AI analysis + method comparison',
-    'Pipeline': 'Build processing pipeline',
-    'Architecture & Code': 'Get production-ready code',
-  };
+  // Separate workflow steps from admin
+  const workflowSteps = steps.filter((s) => s.href !== '/admin');
+  const hasAdmin = steps.some((s) => s.href === '/admin');
 
-  const items = steps.map((step, idx) => ({
+  const workflowItems = workflowSteps.map((step, idx) => ({
     type: 'link' as const,
     text: `${idx + 1}. ${step.text}`,
     href: step.href,
@@ -30,6 +26,17 @@ export default function SideNav({ activeStep, steps }: SideNavProps) {
         ? <Badge color="blue">Current</Badge>
         : undefined,
   }));
+
+  const items: any[] = [...workflowItems];
+
+  if (hasAdmin) {
+    items.push({ type: 'divider' as const });
+    items.push({
+      type: 'link' as const,
+      text: 'Admin',
+      href: '/admin',
+    });
+  }
 
   return (
     <SideNavigation

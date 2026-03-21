@@ -70,20 +70,22 @@ export default function PipelineToolbar({
 
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
           <Button
-            variant="primary"
             onClick={handleGenerate}
             loading={isGenerating}
             disabled={isGenerating || isExecuting}
+            iconName="refresh"
           >
-            Auto-Generate Pipeline
+            Re-Generate Pipeline
           </Button>
 
           {pipeline && (
             <>
               <Button
+                variant="primary"
                 onClick={onExecute}
                 loading={isExecuting}
                 disabled={isGenerating || isExecuting}
+                iconName="caret-right-filled"
               >
                 Execute Pipeline
               </Button>

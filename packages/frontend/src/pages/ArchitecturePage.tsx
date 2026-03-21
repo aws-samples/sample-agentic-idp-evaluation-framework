@@ -23,6 +23,7 @@ import type { ProcessingMethod } from '@idp/shared';
 import { CAPABILITY_INFO, METHOD_INFO, getBestMethodsForCapability } from '@idp/shared';
 import { marked } from 'marked';
 import { useArchitecture } from '../hooks/useArchitecture';
+import MermaidDiagram from '../components/common/MermaidDiagram';
 
 interface ArchitecturePageProps {
   document: UploadResponse | null;
@@ -408,29 +409,50 @@ export default function ArchitecturePage({
             }
           >
             <SpaceBetween size="m">
-              {aiText && (
-                <div
-                  className="chat-markdown"
-                  dangerouslySetInnerHTML={{
-                    __html: marked.parse(
-                      aiText
-                        .replace(/<diagram>[\s\S]*?<\/diagram>/g, '')
-                        .replace(/<costs>[\s\S]*?<\/costs>/g, '')
-                        .trim()
-                    ) as string,
-                  }}
-                  style={{ fontSize: '14px', lineHeight: '1.6' }}
-                />
-              )}
+              {aiText && (() => {
+                const cleaned = aiText
+                  .replace(/<diagram>[\s\S]*?<\/diagram>/g, '')
+                  .replace(/<costs>[\s\S]*?<\/costs>/g, '')
+                  .trim();
+                // Extract ```mermaid blocks for separate rendering
+                const parts: Array<{ type: 'text' | 'mermaid'; content: string }> = [];
+                let remaining = cleaned;
+                const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+                let match;
+                let lastIndex = 0;
+                while ((match = mermaidRegex.exec(remaining)) !== null) {
+                  if (match.index > lastIndex) {
+                    parts.push({ type: 'text', content: remaining.slice(lastIndex, match.index) });
+                  }
+                  parts.push({ type: 'mermaid', content: match[1].trim() });
+                  lastIndex = match.index + match[0].length;
+                }
+                if (lastIndex < remaining.length) {
+                  parts.push({ type: 'text', content: remaining.slice(lastIndex) });
+                }
+                if (parts.length === 0) parts.push({ type: 'text', content: cleaned });
+
+                return (
+                  <SpaceBetween size="m">
+                    {parts.map((part, i) =>
+                      part.type === 'mermaid' ? (
+                        <MermaidDiagram key={i} chart={part.content} />
+                      ) : (
+                        <div
+                          key={i}
+                          className="chat-markdown"
+                          dangerouslySetInnerHTML={{ __html: marked.parse(part.content) as string }}
+                          style={{ fontSize: '14px', lineHeight: '1.6' }}
+                        />
+                      )
+                    )}
+                  </SpaceBetween>
+                );
+              })()}
               {diagram && (
                 <div>
                   <Box variant="h3" padding={{ bottom: 'xs' }}>Architecture Diagram</Box>
-                  <pre style={{
-                    background: '#f8f9fa', padding: '16px', borderRadius: '8px',
-                    fontSize: '13px', overflow: 'auto', maxHeight: '400px',
-                  }}>
-                    <code>{diagram}</code>
-                  </pre>
+                  <MermaidDiagram chart={diagram} />
                 </div>
               )}
               {costProjections.length > 0 && (
