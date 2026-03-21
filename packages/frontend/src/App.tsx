@@ -33,17 +33,28 @@ const STEPS = [
   { href: '/architecture', text: 'Architecture & Code' },
 ];
 
+// Persist state in sessionStorage so it survives navigation and page refreshes
+function loadSession<T>(key: string, fallback: T): T {
+  try {
+    const saved = sessionStorage.getItem(`idp-${key}`);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch { return fallback; }
+}
+function saveSession(key: string, value: unknown) {
+  try { sessionStorage.setItem(`idp-${key}`, JSON.stringify(value)); } catch { /* quota */ }
+}
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [document, setDocument] = useState<UploadResponse | null>(null);
-  const [selectedCapabilities, setSelectedCapabilities] = useState<Capability[]>([]);
-  const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
-  const [preferredMethod, setPreferredMethod] = useState<string | undefined>(undefined);
-  const [processingResults, setProcessingResults] = useState<ProcessorResult[]>([]);
-  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [document, setDocument] = useState<UploadResponse | null>(() => loadSession('document', null));
+  const [selectedCapabilities, setSelectedCapabilities] = useState<Capability[]>(() => loadSession('capabilities', []));
+  const [previewData, setPreviewData] = useState<PreviewResponse | null>(() => loadSession('previewData', null));
+  const [preferredMethod, setPreferredMethod] = useState<string | undefined>(() => loadSession('preferredMethod', undefined));
+  const [processingResults, setProcessingResults] = useState<ProcessorResult[]>(() => loadSession('processingResults', []));
+  const [comparison, setComparison] = useState<ComparisonResult | null>(() => loadSession('comparison', null));
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('idp-dark-mode') === 'true');
 
   useEffect(() => {
@@ -54,6 +65,14 @@ export default function App() {
     }
     // If initMidwayAuth returns null, it's redirecting to Midway — page will reload
   }, []);
+
+  // Persist state to sessionStorage on change
+  useEffect(() => { saveSession('document', document); }, [document]);
+  useEffect(() => { saveSession('capabilities', selectedCapabilities); }, [selectedCapabilities]);
+  useEffect(() => { saveSession('previewData', previewData); }, [previewData]);
+  useEffect(() => { saveSession('preferredMethod', preferredMethod); }, [preferredMethod]);
+  useEffect(() => { saveSession('processingResults', processingResults); }, [processingResults]);
+  useEffect(() => { saveSession('comparison', comparison); }, [comparison]);
 
   // Dark mode toggle (#16)
   useEffect(() => {

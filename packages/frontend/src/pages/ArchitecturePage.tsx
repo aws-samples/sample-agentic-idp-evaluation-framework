@@ -464,9 +464,10 @@ export default function ArchitecturePage({
         )}
 
         {processingResults.length === 0 && (
-          <Alert type="info" header="No pipeline execution data">
-            Run the pipeline first for AI-powered architecture recommendations.
-            Static code snippets are available below based on your selected capabilities.
+          <Alert type="info" header="No pipeline execution data" action={
+            <Button href="/pipeline">Go to Pipeline</Button>
+          }>
+            Run the pipeline first to get AI-powered architecture recommendations based on actual processing results.
           </Alert>
         )}
 
