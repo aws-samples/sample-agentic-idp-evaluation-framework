@@ -3,6 +3,7 @@ import type { ConversationRequest, ConversationEvent } from '@idp/shared';
 import { InvokeAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore';
 import { config, agentCoreClient } from '../config/aws.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
+import { trackActivity } from '../services/activity-tracker.js';
 
 const router = Router();
 
@@ -11,6 +12,13 @@ const AGENTCORE_TIMEOUT_MS = 10_000;
 
 router.post('/', async (req, res) => {
   const body = req.body as ConversationRequest;
+
+  const userAlias = (req as any).midwayUser?.alias ?? 'anonymous';
+  trackActivity(userAlias, body.message === '__init__' ? 'conversation_start' : 'conversation_message', {
+    documentId: body.documentId,
+    s3Uri: body.s3Uri,
+    details: { message: body.message.substring(0, 200), historyLength: body.history.length },
+  });
 
   initSSE(res);
   const keepalive = startKeepalive(res);

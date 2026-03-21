@@ -12,6 +12,7 @@ import { NovaLiteProcessor } from '../processors/nova-direct.js';
 import { TextractClaudeHaikuProcessor } from '../processors/textract-llm.js';
 import { config } from '../config/aws.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
+import { trackActivity } from '../services/activity-tracker.js';
 
 interface PreviewRequest {
   documentId: string;
@@ -93,6 +94,13 @@ router.post('/', async (req, res) => {
       if (m === 'bda-custom' && !config.bdaProjectArn) return false;
       if (m.startsWith('textract-') && !isTextractCompatible) return false;
       return !!PROCESSOR_FACTORY[m];
+    });
+
+    const userAlias = (req as any).midwayUser?.alias ?? 'anonymous';
+    trackActivity(userAlias, 'preview_start', {
+      documentId: body.documentId,
+      s3Uri: body.s3Uri,
+      details: { capabilities: body.capabilities, methods: validMethods },
     });
 
     // SSE streaming: emit each method result as it completes

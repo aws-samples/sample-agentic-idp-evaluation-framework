@@ -17,6 +17,7 @@ const ConversationPage = lazy(() => import('./pages/ConversationPage'));
 const PipelinePage = lazy(() => import('./pages/PipelinePage'));
 const ProcessingPage = lazy(() => import('./pages/ProcessingPage'));
 const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 
 function PageSpinner() {
   return (
@@ -32,6 +33,8 @@ const STEPS = [
   { href: '/pipeline', text: 'Pipeline' },
   { href: '/architecture', text: 'Architecture & Code' },
 ];
+
+const ADMIN_USERS = ['sanghwa'];
 
 // Persist state in sessionStorage so it survives navigation and page refreshes
 function loadSession<T>(key: string, fallback: T): T {
@@ -83,7 +86,9 @@ export default function App() {
     });
   }, [darkMode]);
 
-  const currentStepIndex = STEPS.findIndex((s) => s.href === location.pathname);
+  const isAdmin = user ? ADMIN_USERS.includes(user.alias) : false;
+  const steps = isAdmin ? [...STEPS, { href: '/admin', text: 'Admin' }] : STEPS;
+  const currentStepIndex = steps.findIndex((s) => s.href === location.pathname);
   const activeStep = currentStepIndex >= 0 ? currentStepIndex : 0;
 
   const handleUploadComplete = useCallback(
@@ -135,7 +140,7 @@ export default function App() {
       <TopNav user={user} darkMode={darkMode} onToggleDarkMode={handleToggleDarkMode} />
       <AppLayout
         navigation={
-          <SideNav activeStep={activeStep} steps={STEPS} />
+          <SideNav activeStep={activeStep} steps={steps} />
         }
         content={
           <ErrorBoundary>
@@ -191,6 +196,9 @@ export default function App() {
                     />
                   }
                 />
+                {isAdmin && (
+                  <Route path="/admin" element={<AdminPage />} />
+                )}
               </Routes>
             </Suspense>
           </ErrorBoundary>

@@ -4,6 +4,7 @@ import { getDocumentType } from '@idp/shared';
 import { upload } from '../middleware/upload.js';
 import { uploadDocument, getPresignedUrl } from '../services/s3.js';
 import type { MidwayUser } from '../middleware/midway.js';
+import { trackActivity } from '../services/activity-tracker.js';
 
 const router = Router();
 
@@ -58,6 +59,14 @@ router.post('/', upload.single('file'), async (req, res) => {
     };
 
     res.json(response);
+
+    // Track upload activity (non-blocking)
+    trackActivity(userAlias ?? 'anonymous', 'upload', {
+      documentId,
+      fileName,
+      s3Uri,
+      details: { fileSize: req.file.size, pageCount, documentType },
+    });
   } catch (err) {
     console.error('[Upload Error]', err);
     res.status(500).json({ error: 'Failed to upload document' });

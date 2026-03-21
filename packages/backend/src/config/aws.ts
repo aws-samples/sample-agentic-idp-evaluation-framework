@@ -3,6 +3,8 @@ import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { BedrockDataAutomationRuntimeClient } from '@aws-sdk/client-bedrock-data-automation-runtime';
 import { TextractClient } from '@aws-sdk/client-textract';
 import { BedrockAgentCoreClient } from '@aws-sdk/client-bedrock-agentcore';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 
 const region = process.env.AWS_REGION ?? 'us-west-2';
 
@@ -11,6 +13,8 @@ export const bedrockClient = new BedrockRuntimeClient({ region });
 export const bdaClient = new BedrockDataAutomationRuntimeClient({ region });
 export const textractClient = new TextractClient({ region });
 export const agentCoreClient = new BedrockAgentCoreClient({ region });
+const ddbClient = new DynamoDBClient({ region });
+export const docClient = DynamoDBDocumentClient.from(ddbClient);
 
 export const config = {
   region,
@@ -24,4 +28,6 @@ export const config = {
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
   agentUrl: process.env.AGENT_URL ?? '',
   agentRuntimeArn: process.env.AGENTCORE_RUNTIME_ARN ?? '',
+  activityTable: process.env.ACTIVITY_TABLE ?? 'one-idp-activity-dev',
+  adminUsers: (process.env.ADMIN_USERS ?? 'sanghwa').split(','),
 };

@@ -22,6 +22,7 @@ import architectureRouter from './routes/architecture.js';
 import pipelineRouter from './routes/pipeline.js';
 import pipelineSmartRouter from './routes/pipeline-smart.js';
 import previewRouter from './routes/preview.js';
+import adminRouter from './routes/admin.js';
 
 const app = express();
 
@@ -90,6 +91,7 @@ app.use('/api/architecture', architectureRouter);
 app.use('/api/pipeline', pipelineRouter);
 app.use('/api/pipeline/smart', pipelineSmartRouter);
 app.use('/api/preview', previewRouter);
+app.use('/api/admin', adminRouter);
 
 // Static frontend serving (production mode)
 const frontendDist = resolve(__dirname, '../../frontend/dist');
