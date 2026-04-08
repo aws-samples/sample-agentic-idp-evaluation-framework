@@ -11,7 +11,7 @@ import { CAPABILITIES } from '@idp/shared';
 import { config } from '../config/aws.js';
 import { emitSSE } from '../services/streaming.js';
 import { analyzeDocument } from './tools/analyze-document.js';
-import { recommendCapabilities } from './tools/recommend-capabilities.js';
+import { validateRecommendations } from './tools/recommend-capabilities.js';
 
 export interface SocraticAgentOptions {
   documentId?: string;
@@ -39,14 +39,18 @@ function createTools(options: SocraticAgentOptions) {
 
   const recommendCapabilitiesTool = tool({
     name: 'recommend_capabilities',
-    description: 'Based on document analysis and user requirements gathered from conversation, recommend the optimal set of IDP capabilities. Call this after gathering enough information (3-5 exchanges).',
+    description: 'Submit YOUR recommended capabilities with relevance scores based on the conversation. You determine the scores — the tool validates and returns them for UI display. Call this after gathering enough information (3-5 exchanges).',
     inputSchema: z.object({
-      userRequirements: z.array(z.string()).describe('Key requirements gathered from the conversation'),
+      recommendations: z.array(z.object({
+        capability: z.string().describe('Capability ID from the provided list'),
+        relevance: z.number().describe('Relevance score 0.0-1.0 based on conversation context'),
+        rationale: z.string().describe('Brief explanation of why this capability is relevant'),
+      })).describe('Your recommended capabilities — only include truly relevant ones'),
     }),
     callback: async (input) => {
       console.log('[Tool:recommend_capabilities] Using bound context:', boundDocumentId, boundS3Uri);
       const analysis = await analyzeDocument(boundDocumentId, boundS3Uri);
-      const recs = recommendCapabilities(analysis, input.userRequirements);
+      const recs = validateRecommendations(input.recommendations, analysis);
       return JSON.stringify({ capabilities: recs, documentLanguages: analysis.languages });
     },
   });
@@ -61,7 +65,7 @@ function buildSystemPrompt(
   const docContext = options.documentId && options.s3Uri
     ? `\n\nDOCUMENT CONTEXT: A document has ALREADY been uploaded and is available for processing.
 The document context is automatically bound to the tools — you do NOT need to pass documentId or s3Uri as parameters.
-Simply call analyze_document() with no arguments, or recommend_capabilities(userRequirements=[...]).
+Simply call analyze_document() with no arguments, or recommend_capabilities(recommendations=[...]).
 NEVER ask the user to upload a document or provide IDs — the document is already available.`
     : '';
 
@@ -115,10 +119,15 @@ OPTIONS RULES:
 CAPABILITY IDS (for recommend_capabilities):
 ${CAPABILITIES.join(', ')}
 
-When you have recommendations, ALSO include them in <recommendation> tags:
-<recommendation>
-{"capabilities": [{"capability": "capability_id", "relevance": 0.9, "rationale": "reason"}]}
-</recommendation>`;
+RELEVANCE SCORING (you decide based on conversation):
+- 0.90-1.0: Essential — directly matches user's stated needs
+- 0.75-0.89: Highly relevant — strongly supports the use case
+- 0.50-0.74: Useful but not critical
+- Below 0.50: Do NOT include — only recommend truly relevant capabilities
+
+The scores you pass to recommend_capabilities are displayed in the UI as-is (e.g. 0.95 = 95%).
+Make them CONSISTENT with what you tell the user. If you say "Very High", the score must be >= 0.90.
+Do NOT include <recommendation> tags — the tool handles the UI update automatically.`;
 }
 
 /**
@@ -235,19 +244,7 @@ export async function runSocraticAgentStrands(
       }
     }
 
-    // Extract recommendation from final text if not already emitted via tool
-    const recMatch = fullText.match(/<recommendation>([\s\S]*?)<\/recommendation>/);
-    if (recMatch) {
-      try {
-        const recData = JSON.parse(recMatch[1]);
-        emitSSE(res, {
-          type: 'recommendation',
-          data: { capabilities: recData.capabilities as CapabilityRecommendation[] },
-        } as ConversationEvent);
-      } catch {
-        // Parse failed
-      }
-    }
+    // Recommendation is emitted via the tool result handler above — no need to parse from text
   } catch (err) {
     console.error('[Strands Socratic Agent Error]', err);
     emitSSE(res, {

@@ -8,7 +8,6 @@ import { CAPABILITY_INFO, CAPABILITY_CATEGORIES, CATEGORY_INFO, getCapabilitiesB
 import { bedrockClient, config } from '../config/aws.js';
 import { emitSSE } from '../services/streaming.js';
 import { analyzeDocument } from './tools/analyze-document.js';
-import { recommendCapabilities } from './tools/recommend-capabilities.js';
 
 // Build capability list dynamically from CAPABILITY_INFO (SSOT: skill .md files)
 function buildCapabilityList(): string {
@@ -114,29 +113,4 @@ export async function runSocraticAgent(
     }
   }
 
-  // Fallback: use tool-based recommendations if the model doesn't produce structured output
-  if (!recMatch && fullText.toLowerCase().includes('recommend')) {
-    try {
-      const userMessages = messages
-        .filter((m) => m.role === 'user')
-        .map((m) => {
-          const textContent = m.content?.find((c) => 'text' in c);
-          return textContent && 'text' in textContent ? textContent.text ?? '' : '';
-        });
-
-      if (options.s3Uri && options.documentId) {
-        const analysis = await analyzeDocument(options.documentId, options.s3Uri);
-        const recs = recommendCapabilities(analysis, userMessages);
-        if (recs.length > 0) {
-          const recEvent: ConversationEvent = {
-            type: 'recommendation',
-            data: { capabilities: recs },
-          };
-          emitSSE(res, recEvent);
-        }
-      }
-    } catch {
-      // Fallback recommendation failed
-    }
-  }
 }

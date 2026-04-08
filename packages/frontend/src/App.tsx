@@ -95,7 +95,14 @@ export default function App() {
 
   const handleUploadComplete = useCallback(
     (doc: UploadResponse) => {
+      // Reset all state for new document
       setDocument(doc);
+      setSelectedCapabilities([]);
+      setPreviewData(null);
+      setPreferredMethod(undefined);
+      setDocumentLanguages([]);
+      setProcessingResults([]);
+      setComparison(null);
       navigate('/conversation');
     },
     [navigate],

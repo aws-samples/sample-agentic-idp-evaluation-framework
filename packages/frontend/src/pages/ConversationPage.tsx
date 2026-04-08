@@ -48,9 +48,9 @@ export default function ConversationPage({
 
   useEffect(() => {
     if (recommendations && selectedCapabilities.length === 0) {
-      const caps = recommendations
-        .filter((r) => r.relevance >= 0.85)
-        .map((r) => r.capability);
+      // Select all recommended capabilities — the LLM already curated the list
+      // based on full conversation context, so all are relevant
+      const caps = recommendations.map((r) => r.capability);
       onCapabilitiesSelected(caps);
     }
   }, [recommendations, selectedCapabilities.length, onCapabilitiesSelected]);
