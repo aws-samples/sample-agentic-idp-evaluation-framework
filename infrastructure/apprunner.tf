@@ -177,6 +177,10 @@ resource "aws_iam_role_policy" "apprunner_textract" {
         "textract:DetectDocumentText",
         "textract:AnalyzeExpense",
         "textract:AnalyzeID",
+        "textract:StartDocumentAnalysis",
+        "textract:GetDocumentAnalysis",
+        "textract:StartDocumentTextDetection",
+        "textract:GetDocumentTextDetection",
       ]
       Resource = "*"
     }]

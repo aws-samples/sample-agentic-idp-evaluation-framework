@@ -48,9 +48,11 @@ export default function ConversationPage({
 
   useEffect(() => {
     if (recommendations && selectedCapabilities.length === 0) {
-      // Select all recommended capabilities — the LLM already curated the list
-      // based on full conversation context, so all are relevant
-      const caps = recommendations.map((r) => r.capability);
+      // Auto-select "Essential" (>=0.90) and "Highly relevant" (>=0.75) capabilities
+      // "Useful but not critical" (<0.75) are shown but not pre-selected
+      const caps = recommendations
+        .filter((r) => r.relevance >= 0.75)
+        .map((r) => r.capability);
       onCapabilitiesSelected(caps);
     }
   }, [recommendations, selectedCapabilities.length, onCapabilitiesSelected]);

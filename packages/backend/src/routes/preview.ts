@@ -7,9 +7,9 @@ import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
 import { BdaStandardProcessor } from '../processors/bda-processor.js';
 import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor } from '../processors/bda-llm.js';
-import { ClaudeSonnetProcessor, ClaudeHaikuProcessor } from '../processors/claude-direct.js';
-import { NovaLiteProcessor } from '../processors/nova-direct.js';
-import { TextractClaudeHaikuProcessor } from '../processors/textract-llm.js';
+import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor } from '../processors/claude-direct.js';
+import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
+import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor, TextractNovaProProcessor } from '../processors/textract-llm.js';
 import { config } from '../config/aws.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { trackActivity } from '../services/activity-tracker.js';
@@ -38,8 +38,13 @@ const PROCESSOR_FACTORY: Partial<Record<ProcessingMethod, () => ProcessorBase>> 
   'bda-nova-lite': () => new BdaNovaLiteProcessor(),
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
   'claude-haiku': () => new ClaudeHaikuProcessor(),
+  'claude-opus': () => new ClaudeOpusProcessor(),
   'nova-lite': () => new NovaLiteProcessor(),
+  'nova-pro': () => new NovaProProcessor(),
+  'textract-claude-sonnet': () => new TextractClaudeSonnetProcessor(),
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
+  'textract-nova-lite': () => new TextractNovaLiteProcessor(),
+  'textract-nova-pro': () => new TextractNovaProProcessor(),
 };
 
 function estimatePageCount(buffer: Buffer): number {
