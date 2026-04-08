@@ -49,7 +49,7 @@ export default function ConversationPage({
   useEffect(() => {
     if (recommendations && selectedCapabilities.length === 0) {
       const caps = recommendations
-        .filter((r) => r.relevance >= 0.5)
+        .filter((r) => r.relevance >= 0.85)
         .map((r) => r.capability);
       onCapabilitiesSelected(caps);
     }

@@ -37,9 +37,14 @@ export class TwoPhaseAdapter implements StreamAdapter {
     // Phase 1: Textract extraction
     emitProgress(res, this.method, 'all', 0, 'Running Textract OCR...');
 
-    // Textract AnalyzeDocument (sync) only supports single-page documents.
-    // Multi-page PDFs must use StartDocumentAnalysis (async, S3 required).
+    // Textract AnalyzeDocument (sync) limits:
+    // - Single-page PDFs only (multi-page requires async StartDocumentAnalysis)
+    // - Max 5MB for PDF, 10MB for images
     const isPDF = /\.pdf$/i.test(fileName);
+    const maxPdfBytes = 5 * 1024 * 1024;
+    if (isPDF && input.documentBuffer.length > maxPdfBytes) {
+      throw new Error(`Textract sync API supports PDFs up to 5MB (this document is ${(input.documentBuffer.length / 1024 / 1024).toFixed(1)}MB). Use BDA or direct LLM methods instead.`);
+    }
     if (isPDF && (input.pageCount ?? 1) > 1) {
       throw new Error(`Textract sync API supports single-page PDFs only (this document has ${input.pageCount} pages). Use BDA or direct LLM methods for multi-page documents.`);
     }

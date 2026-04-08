@@ -76,7 +76,7 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     id: 'bda-claude-sonnet',
     family: 'bda-llm',
     name: 'BDA + Claude Sonnet',
-    shortName: 'BDA+Sonnet',
+    shortName: 'BDA+Sonnet 4.6',
     description: 'Amazon Bedrock Data Automation followed by Claude Sonnet 4.6 for enrichment',
     modelId: 'us.anthropic.claude-sonnet-4-6',
     tokenPricing: { inputPer1MTokens: 3.00, outputPer1MTokens: 15.00 },
@@ -88,7 +88,7 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     id: 'bda-claude-haiku',
     family: 'bda-llm',
     name: 'BDA + Claude Haiku',
-    shortName: 'BDA+Haiku',
+    shortName: 'BDA+Haiku 4.5',
     description: 'Amazon Bedrock Data Automation followed by Claude Haiku 4.5 for fast enrichment',
     modelId: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
     tokenPricing: { inputPer1MTokens: 1.00, outputPer1MTokens: 5.00 },
@@ -100,7 +100,7 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     id: 'bda-nova-lite',
     family: 'bda-llm',
     name: 'BDA + Nova 2 Lite',
-    shortName: 'BDA+Nova',
+    shortName: 'BDA+Nova 2 Lite',
     description: 'Amazon Bedrock Data Automation followed by Nova 2 Lite (GA) for enrichment',
     modelId: 'us.amazon.nova-2-lite-v1:0',
     tokenPricing: { inputPer1MTokens: 0.30, outputPer1MTokens: 2.50 },
@@ -178,7 +178,7 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     id: 'textract-claude-sonnet',
     family: 'textract-llm',
     name: 'Textract + Claude Sonnet',
-    shortName: 'Txt+Sonnet',
+    shortName: 'Txt+Sonnet 4.6',
     description: 'Amazon Textract OCR followed by Claude Sonnet 4.6 for structuring',
     modelId: 'us.anthropic.claude-sonnet-4-6',
     tokenPricing: { inputPer1MTokens: 3.00, outputPer1MTokens: 15.00 },
@@ -190,7 +190,7 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     id: 'textract-claude-haiku',
     family: 'textract-llm',
     name: 'Textract + Claude Haiku',
-    shortName: 'Txt+Haiku',
+    shortName: 'Txt+Haiku 4.5',
     description: 'Amazon Textract OCR followed by Claude Haiku 4.5 for fast structuring',
     modelId: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
     tokenPricing: { inputPer1MTokens: 1.00, outputPer1MTokens: 5.00 },
@@ -202,7 +202,7 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     id: 'textract-nova-lite',
     family: 'textract-llm',
     name: 'Textract + Nova 2 Lite',
-    shortName: 'Txt+Nova',
+    shortName: 'Txt+Nova 2 Lite',
     description: 'Amazon Textract OCR followed by Nova 2 Lite (GA) for structuring',
     modelId: 'us.amazon.nova-2-lite-v1:0',
     tokenPricing: { inputPer1MTokens: 0.30, outputPer1MTokens: 2.50 },
@@ -263,12 +263,23 @@ export const CAPABILITY_SUPPORT = buildCapabilitySupport();
 
 // ─── Language Compatibility ──────────────────────────────────────────────────
 
-/** BDA and Textract do not support non-English documents reliably.
- *  When detected languages are non-English, exclude those families. */
+/** BDA and Textract produce garbled output for non-English documents.
+ *  Filter based on PRIMARY language — if the document is mostly English
+ *  with minor non-English elements, keep BDA/Textract available. */
 export function isMethodLanguageCompatible(method: ProcessingMethod, languages: string[]): boolean {
   if (!languages.length) return true;
-  const isEnglishOnly = languages.every((l) => l.toLowerCase().startsWith('en'));
-  if (isEnglishOnly) return true;
+
+  const normalized = languages.map((l) => l.toLowerCase().trim());
+  const primary = normalized[0];
+
+  // Primary language is English → all methods work
+  // (even if secondary languages include non-English)
+  if (primary.startsWith('en') || primary === 'english') return true;
+
+  // All languages are English → all methods work
+  if (normalized.every((l) => l.startsWith('en') || l === 'english')) return true;
+
+  // Primary language is non-English → exclude BDA/Textract families
   const family = METHOD_INFO[method].family;
   return family !== 'bda' && family !== 'bda-llm' && family !== 'textract-llm';
 }
