@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Capability, ProcessingMethod } from '@idp/shared';
-import { getBestMethodsForCapability, METHOD_INFO, BDA_LIMITS, TEXTRACT_LIMITS } from '@idp/shared';
+import { getBestMethodsForCapability, METHOD_INFO, BDA_LIMITS, TEXTRACT_LIMITS, isMethodLanguageCompatible } from '@idp/shared';
 import { getDocumentBuffer } from '../services/s3.js';
 import { convertOfficeDocument, isOfficeFormat } from '../services/file-converter.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
@@ -20,6 +20,7 @@ interface PreviewRequest {
   capabilities: Capability[];
   methods?: ProcessingMethod[];
   userInstruction?: string;
+  documentLanguages?: string[];
 }
 
 // Return all available methods (filtered by config). Let the LLM/agent decide which to use.
@@ -88,11 +89,14 @@ router.post('/', async (req, res) => {
     const isBdaCompatible = (BDA_LIMITS.async.supportedFormats as readonly string[]).includes(normalizedExt);
     const isTextractCompatible = (TEXTRACT_LIMITS.analyzeDocument.supportedFormats as readonly string[]).includes(normalizedExt);
 
+    const documentLanguages = body.documentLanguages ?? [];
+
     const validMethods = methods.filter((m) => {
       if (m.startsWith('bda-') && m !== 'bda-custom' && !config.bdaProfileArn) return false;
       if (m.startsWith('bda-') && !isBdaCompatible) return false;
       if (m === 'bda-custom' && !config.bdaProjectArn) return false;
       if (m.startsWith('textract-') && !isTextractCompatible) return false;
+      if (documentLanguages.length && !isMethodLanguageCompatible(m, documentLanguages)) return false;
       return !!PROCESSOR_FACTORY[m];
     });
 

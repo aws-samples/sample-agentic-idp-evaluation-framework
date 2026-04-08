@@ -41,7 +41,7 @@ export interface UsePreviewResult {
   preview: PreviewResponse | null;
   isLoading: boolean;
   error: string | null;
-  runPreview: (documentId: string, s3Uri: string, capabilities: Capability[], userInstruction?: string) => Promise<void>;
+  runPreview: (documentId: string, s3Uri: string, capabilities: Capability[], userInstruction?: string, documentLanguages?: string[]) => Promise<void>;
 }
 
 export function usePreview(): UsePreviewResult {
@@ -50,7 +50,7 @@ export function usePreview(): UsePreviewResult {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const runPreview = useCallback(async (documentId: string, s3Uri: string, capabilities: Capability[], userInstruction?: string) => {
+  const runPreview = useCallback(async (documentId: string, s3Uri: string, capabilities: Capability[], userInstruction?: string, documentLanguages?: string[]) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -63,7 +63,7 @@ export function usePreview(): UsePreviewResult {
       const res = await authedFetch('/api/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId, s3Uri, capabilities, userInstruction }),
+        body: JSON.stringify({ documentId, s3Uri, capabilities, userInstruction, documentLanguages }),
         signal: controller.signal,
       });
 

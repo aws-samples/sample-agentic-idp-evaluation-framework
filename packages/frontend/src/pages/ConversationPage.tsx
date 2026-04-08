@@ -73,7 +73,7 @@ export default function ConversationPage({
       !autoPreviewDone.current
     ) {
       autoPreviewDone.current = true;
-      runPreview(document.documentId, document.s3Uri, selectedCapabilities, userInstruction);
+      runPreview(document.documentId, document.s3Uri, selectedCapabilities, userInstruction, documentLanguages ?? undefined);
     }
   }, [document, selectedCapabilities, recommendations, preview, isPreviewLoading, runPreview, userInstruction]);
 
@@ -90,8 +90,8 @@ export default function ConversationPage({
 
   const handleRunPreview = useCallback(() => {
     if (!document || selectedCapabilities.length === 0) return;
-    runPreview(document.documentId, document.s3Uri, selectedCapabilities, userInstruction);
-  }, [document, selectedCapabilities, runPreview, userInstruction]);
+    runPreview(document.documentId, document.s3Uri, selectedCapabilities, userInstruction, documentLanguages ?? undefined);
+  }, [document, selectedCapabilities, runPreview, userInstruction, documentLanguages]);
 
   const handleBuildPipeline = useCallback(() => {
     onStartProcessing(selectedMethod || undefined, preview);
