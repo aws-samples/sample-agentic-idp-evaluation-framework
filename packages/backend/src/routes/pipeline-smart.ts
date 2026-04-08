@@ -25,6 +25,7 @@ interface SmartPipelineRequest {
   previewResults: PreviewMethodResult[];
   preferredMethod?: string;
   optimizeFor?: 'accuracy' | 'cost' | 'speed' | 'balanced';
+  documentLanguages?: string[];
 }
 
 // Build capability support reference for the LLM prompt
@@ -54,18 +55,30 @@ router.post('/', async (req, res) => {
 
   try {
     // Build preview results summary (if available)
-    const validPreviews = (body.previewResults ?? []).filter((r) => !r.error && r.status !== 'error');
+    const allPreviews = body.previewResults ?? [];
+    const validPreviews = allPreviews.filter((r) => !r.error && r.status !== 'error');
+    const failedPreviews = allPreviews.filter((r) => r.error || r.status === 'error');
+
     const previewSummary = validPreviews.length > 0
       ? validPreviews.map((r) => {
-          const capCount = Object.keys(r.results).length;
           const costStr = r.estimatedCost != null
             ? `$${r.estimatedCost.toFixed(4)}`
             : r.actualCost?.totalCost != null
               ? `$${r.actualCost.totalCost.toFixed(6)}`
               : 'N/A';
-          const confStr = r.confidence != null ? `${Math.round(r.confidence * 100)}% avg confidence` : '';
-          return `- ${r.shortName} (${r.family ?? 'unknown'}): ${capCount} capabilities extracted, ${r.latencyMs}ms latency, ${costStr} cost${confStr ? `, ${confStr}` : ''}`;
+          const confStr = r.confidence != null ? `${Math.round(r.confidence * 100)}% avg` : '';
+          // Per-capability confidence breakdown
+          const capDetails = Object.entries(r.results as Record<string, any>)
+            .map(([cap, val]) => {
+              const conf = val?.confidence != null ? `${Math.round(val.confidence * 100)}%` : '?';
+              return `${cap}=${conf}`;
+            })
+            .join(', ');
+          return `- ${r.method} (${r.shortName}, ${r.family ?? 'unknown'}): ${r.latencyMs}ms, ${costStr}, ${confStr} [${capDetails}]`;
         }).join('\n')
+        + (failedPreviews.length > 0
+          ? '\n\nFailed methods (DO NOT use):\n' + failedPreviews.map((r) => `- ${r.method}: ${r.error}`).join('\n')
+          : '')
       : 'No preview results available. Decide based on capability support levels and method characteristics.';
 
     // Build method list dynamically from METHOD_INFO
@@ -84,22 +97,28 @@ router.post('/', async (req, res) => {
     // Build capability support reference
     const supportRef = buildCapabilitySupportRef(body.capabilities);
 
-    const userStrategy = body.optimizeFor ?? 'balanced';
-    const prompt = `You are an IDP pipeline architect. Analyze the data below and recommend the optimal pipeline configuration.
+    const prompt = `You are an IDP pipeline architect. Your job: analyze ACTUAL preview results and build the single best pipeline.
 
 Document type: ${body.documentType ?? 'unknown'}
 Selected capabilities: ${body.capabilities.join(', ')}
-OPTIMIZATION GOAL: User selected "${userStrategy}" strategy. Your "optimizeFor" field MUST be "${userStrategy}".
-${userStrategy === 'accuracy' ? 'Prioritize the highest-confidence methods regardless of cost.' : ''}${userStrategy === 'cost' ? 'Prioritize the cheapest methods that still produce acceptable quality.' : ''}${userStrategy === 'speed' ? 'Prioritize the fastest methods (lowest latency).' : ''}${userStrategy === 'balanced' ? 'Balance cost, speed, and accuracy.' : ''}
-${body.preferredMethod ? `IMPORTANT — User explicitly selected: ${body.preferredMethod}. You MUST use this method (or its family) as the primary method. Only deviate if the selected method fundamentally cannot handle a specific capability.` : ''}
+${body.preferredMethod ? `User preferred method: ${body.preferredMethod}. Use this if its performance is competitive.` : ''}
 
-Preview results:
+PREVIEW RESULTS (actual measured performance):
 ${previewSummary}
 
 ${supportRef}
 
 Available methods (${METHODS.length} total):
 ${methodListStr}
+
+DECISION RULES:
+1. USE THE ACTUAL PREVIEW DATA. The confidence scores, latency, and costs above are real measurements.
+2. For each capability, pick the method that performed BEST in preview (highest confidence).
+3. If two methods have similar confidence (within 5%), prefer the cheaper/faster one.
+4. Group capabilities onto the same method when possible to avoid running multiple methods.
+5. If a method failed or produced garbage output (confidence < 30%), exclude it entirely.
+6. BDA alone produces garbled output for non-Latin text — check if the preview confirms this.
+7. Do NOT blindly pick "balanced" — pick what the DATA says is best.
 
 Return ONLY valid JSON:
 {
@@ -108,16 +127,9 @@ Return ONLY valid JSON:
   "methodAssignments": {
     "<capability>": "<method_id>"
   },
-  "rationale": "2-3 sentence explanation of why this configuration",
+  "rationale": "2-3 sentence explanation citing specific confidence/cost numbers from preview",
   "estimatedSavings": "compared to using the most expensive method for everything"
-}
-
-Be practical. Consider:
-1. If preview results exist, prioritize methods with highest actual confidence scores
-2. Cost vs accuracy tradeoff — cheaper methods are preferred when quality is similar
-3. Whether hybrid routing (different methods per capability) adds value
-4. Group capabilities that can share the same method to reduce cost
-5. BDA alone cannot do KV extraction well — use BDA+LLM or direct LLM for structured extraction`;
+}`;
 
     const command = new ConverseCommand({
       modelId: config.claudeModelId,
@@ -159,6 +171,7 @@ Be practical. Consider:
       optimizeFor: (recommendation.optimizeFor ?? 'balanced') as any,
       enableHybridRouting: recommendation.enableHybridRouting ?? false,
       preferredMethods: preferredMethods.length > 0 ? preferredMethods : undefined,
+      documentLanguages: body.documentLanguages,
     };
 
     const result = generatePipeline(pipelineRequest);
