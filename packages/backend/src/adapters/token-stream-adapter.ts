@@ -38,27 +38,44 @@ function getImageFormat(fileName: string): ImageFormat {
   return map[ext] ?? 'jpeg';
 }
 
+const CAPABILITY_GUIDANCE: Record<string, string> = {
+  document_summarization: 'Write a coherent text summary of the document content. Do NOT output tables or HTML. Output plain text paragraphs.',
+  text_extraction: 'Extract all visible text preserving reading order. Output as plain text.',
+  table_extraction: 'Extract tables as HTML <table> with proper <thead>/<tbody>/<tr>/<td>. Only extract ACTUAL tables visible in the document. Do NOT invent empty tables.',
+  kv_extraction: 'Extract key-value pairs as JSON object {key: value}.',
+  image_description: 'Describe images, charts, and diagrams in the document as text.',
+  entity_extraction: 'Extract named entities (names, dates, amounts, addresses) as JSON.',
+  document_classification: 'Classify the document type (invoice, contract, form, etc.).',
+  document_splitting: 'Identify logical document boundaries and page ranges.',
+  language_detection: 'Detect all languages present in the document.',
+  pii_detection: 'Identify PII (names, SSN, phone numbers, etc.) and their locations.',
+};
+
 function buildSystemPrompt(capabilities: string[], userInstruction?: string): string {
-  const formatHints = capabilities.map((c) => {
+  const capInstructions = capabilities.map((c) => {
     const info = CAPABILITY_INFO[c as keyof typeof CAPABILITY_INFO];
     const fmt = info?.defaultFormat ?? 'json';
-    return `- ${c}: output as ${fmt}`;
+    const guidance = CAPABILITY_GUIDANCE[c] ?? `Extract ${c.replace(/_/g, ' ')} data.`;
+    return `- ${c} (format: ${fmt}): ${guidance}`;
   }).join('\n');
 
   const instructionBlock = userInstruction
     ? `\n\nUser's specific requirements (from interview):\n${userInstruction}\n\nTailor your extraction to match these requirements (language, style, detail level, etc.).`
     : '';
 
-  return `You are a document processing AI. Extract the following capabilities from the provided document:
-${formatHints}
+  return `You are a document processing AI. Extract ONLY the requested capabilities from the document.
+
+Capabilities to extract:
+${capInstructions}
 ${instructionBlock}
 
-Return your results as YAML (not JSON) with each capability as a key. For each capability, provide:
-- data: the extracted content (use the format specified above)
-- confidence: a number between 0 and 1 indicating your confidence
-- format: one of "html", "csv", "json", "text"
-
-Return ONLY valid YAML. No markdown code blocks, no JSON.`;
+RULES:
+- Return YAML with each capability as a top-level key
+- Each capability must have: data, confidence (0-1), format ("html"|"csv"|"json"|"text")
+- ONLY extract what is asked. Do NOT add extra capabilities
+- Do NOT generate empty or placeholder data. If you cannot extract something, set confidence to 0
+- Match the output language to the document language
+- Return ONLY valid YAML. No markdown code blocks, no JSON`;
 }
 
 export class TokenStreamAdapter implements StreamAdapter {
