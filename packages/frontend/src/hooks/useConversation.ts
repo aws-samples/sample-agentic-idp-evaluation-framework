@@ -12,6 +12,7 @@ export interface ChatMessage {
 export interface UseConversationResult {
   messages: ChatMessage[];
   recommendations: CapabilityRecommendation[] | null;
+  documentLanguages: string[] | null;
   ambiguity: AmbiguityScores | null;
   isStreaming: boolean;
   error: string | null;
@@ -74,9 +75,10 @@ function extractQuickReplies(text: string): string[] {
 function buildMessages(
   baseMessages: ChatMessage[],
   events: ConversationEvent[],
-): { messages: ChatMessage[]; recommendations: CapabilityRecommendation[] | null; ambiguity: AmbiguityScores | null } {
+): { messages: ChatMessage[]; recommendations: CapabilityRecommendation[] | null; documentLanguages: string[] | null; ambiguity: AmbiguityScores | null } {
   const result: ChatMessage[] = [...baseMessages];
   let recommendations: CapabilityRecommendation[] | null = null;
+  let documentLanguages: string[] | null = null;
   let ambiguity: AmbiguityScores | null = null;
   let assistantContent = '';
   let toolEvents: { name: string; status: 'running' | 'complete'; result?: unknown }[] = [];
@@ -108,9 +110,12 @@ function buildMessages(
         break;
       }
 
-      case 'recommendation':
-        recommendations = (event.data as { capabilities: CapabilityRecommendation[] }).capabilities;
+      case 'recommendation': {
+        const recData = event.data as { capabilities: CapabilityRecommendation[]; documentLanguages?: string[] };
+        recommendations = recData.capabilities;
+        if (recData.documentLanguages) documentLanguages = recData.documentLanguages;
         break;
+      }
 
       case 'done':
         break;
@@ -132,7 +137,7 @@ function buildMessages(
     });
   }
 
-  return { messages: result, recommendations, ambiguity };
+  return { messages: result, recommendations, documentLanguages, ambiguity };
 }
 
 export function useConversation(
@@ -148,6 +153,7 @@ export function useConversation(
     } catch { return []; }
   });
   const [recommendations, setRecommendations] = useState<CapabilityRecommendation[] | null>(null);
+  const [documentLanguages, setDocumentLanguages] = useState<string[] | null>(null);
   const [ambiguity, setAmbiguity] = useState<AmbiguityScores | null>(null);
   const initDone = useRef(false);
 
@@ -169,12 +175,16 @@ export function useConversation(
   eventsRef.current = events;
 
   // Build messages from base + current events (pure, no mutation)
-  const { messages, recommendations: eventRecs, ambiguity: eventAmbiguity } = buildMessages(baseMessages, events);
+  const { messages, recommendations: eventRecs, documentLanguages: eventLangs, ambiguity: eventAmbiguity } = buildMessages(baseMessages, events);
 
-  // Update recommendations and ambiguity when events produce them
+  // Update recommendations, languages, and ambiguity when events produce them
   useEffect(() => {
     if (eventRecs) setRecommendations(eventRecs);
   }, [eventRecs]);
+
+  useEffect(() => {
+    if (eventLangs) setDocumentLanguages(eventLangs);
+  }, [eventLangs]);
 
   useEffect(() => {
     if (eventAmbiguity) setAmbiguity(eventAmbiguity);
@@ -241,5 +251,5 @@ export function useConversation(
     };
   }, [documentId, s3Uri]);
 
-  return { messages, recommendations, ambiguity, isStreaming, error, sendMessage };
+  return { messages, recommendations, documentLanguages, ambiguity, isStreaming, error, sendMessage };
 }

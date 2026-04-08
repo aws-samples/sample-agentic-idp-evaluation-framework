@@ -19,6 +19,7 @@ interface ConversationPageProps {
   selectedCapabilities: Capability[];
   onCapabilitiesSelected: (caps: Capability[]) => void;
   onStartProcessing: (preferredMethod?: string, preview?: PreviewResponse | null) => void;
+  onDocumentLanguagesDetected?: (languages: string[]) => void;
 }
 
 export default function ConversationPage({
@@ -26,8 +27,9 @@ export default function ConversationPage({
   selectedCapabilities,
   onCapabilitiesSelected,
   onStartProcessing,
+  onDocumentLanguagesDetected,
 }: ConversationPageProps) {
-  const { messages, recommendations, isStreaming, error, sendMessage } = useConversation(
+  const { messages, recommendations, documentLanguages, isStreaming, error, sendMessage } = useConversation(
     document?.documentId ?? null,
     document?.s3Uri,
   );
@@ -52,6 +54,13 @@ export default function ConversationPage({
       onCapabilitiesSelected(caps);
     }
   }, [recommendations, selectedCapabilities.length, onCapabilitiesSelected]);
+
+  // Pass detected languages up to parent for pipeline filtering
+  useEffect(() => {
+    if (documentLanguages && onDocumentLanguagesDetected) {
+      onDocumentLanguagesDetected(documentLanguages);
+    }
+  }, [documentLanguages, onDocumentLanguagesDetected]);
 
   // Auto-run preview once when capabilities are first selected from recommendations
   useEffect(() => {

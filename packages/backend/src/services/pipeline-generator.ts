@@ -20,6 +20,7 @@ import {
   METHOD_INFO,
   getBestMethodsForCapability,
   getMethodFamily,
+  isMethodLanguageCompatible,
 } from '@idp/shared';
 
 // ─── Method Selection Logic ──────────────────────────────────────────────────
@@ -55,8 +56,15 @@ function selectMethod(
   capability: Capability,
   optimizeFor: string,
   preferredMethods?: ProcessingMethod[],
+  documentLanguages?: string[],
 ): ProcessingMethod {
-  const candidates = getBestMethodsForCapability(capability);
+  let candidates = getBestMethodsForCapability(capability);
+
+  // Filter out BDA/Textract for non-English documents
+  if (documentLanguages?.length) {
+    const langFiltered = candidates.filter((m) => isMethodLanguageCompatible(m, documentLanguages));
+    if (langFiltered.length > 0) candidates = langFiltered;
+  }
 
   // Filter to preferred methods if specified
   const filtered =
@@ -172,6 +180,7 @@ export function generatePipeline(
     preferredMethods,
     optimizeFor,
     enableHybridRouting,
+    documentLanguages,
   } = request;
 
   // Reset counters for consistent IDs within this generation
@@ -234,7 +243,7 @@ export function generatePipeline(
   const methodToCapabilities = new Map<ProcessingMethod, Capability[]>();
 
   for (const capability of capabilities) {
-    const method = selectMethod(capability, optimizeFor, preferredMethods);
+    const method = selectMethod(capability, optimizeFor, preferredMethods, documentLanguages);
     if (!methodToCapabilities.has(method)) {
       methodToCapabilities.set(method, []);
     }
@@ -429,6 +438,16 @@ function generateRationale(
     lines.push(
       `Pages are classified by content type (table/image/text-only/form/mixed) and routed to the most suitable method for each type.`,
     );
+  }
+
+  if (request.documentLanguages?.length) {
+    const isEnglish = request.documentLanguages.every((l) => l.toLowerCase().startsWith('en'));
+    if (!isEnglish) {
+      lines.push(`\n**Language Constraint:**`);
+      lines.push(
+        `Document language(s): ${request.documentLanguages.join(', ')}. BDA and Textract methods were excluded as they do not reliably support non-English documents. Only Claude and Nova (multimodal LLM) methods are used.`,
+      );
+    }
   }
 
   lines.push(`\n**Why This Configuration?**`);

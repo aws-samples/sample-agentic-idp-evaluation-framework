@@ -97,6 +97,8 @@ export interface PipelineGenerateRequest {
   preferredMethods?: ProcessingMethod[];
   optimizeFor: 'accuracy' | 'cost' | 'speed' | 'balanced';
   enableHybridRouting: boolean;
+  /** Detected document languages (e.g. ['en'], ['ko'], ['nl']). Non-English excludes BDA/Textract methods. */
+  documentLanguages?: string[];
 }
 
 export interface PipelineGenerateResponse {

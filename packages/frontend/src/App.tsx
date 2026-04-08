@@ -56,6 +56,7 @@ export default function App() {
   const [selectedCapabilities, setSelectedCapabilities] = useState<Capability[]>(() => loadSession('capabilities', []));
   const [previewData, setPreviewData] = useState<PreviewResponse | null>(() => loadSession('previewData', null));
   const [preferredMethod, setPreferredMethod] = useState<string | undefined>(() => loadSession('preferredMethod', undefined));
+  const [documentLanguages, setDocumentLanguages] = useState<string[]>(() => loadSession('documentLanguages', []));
   const [processingResults, setProcessingResults] = useState<ProcessorResult[]>(() => loadSession('processingResults', []));
   const [comparison, setComparison] = useState<ComparisonResult | null>(() => loadSession('comparison', null));
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('idp-dark-mode') === 'true');
@@ -74,6 +75,7 @@ export default function App() {
   useEffect(() => { saveSession('capabilities', selectedCapabilities); }, [selectedCapabilities]);
   useEffect(() => { saveSession('previewData', previewData); }, [previewData]);
   useEffect(() => { saveSession('preferredMethod', preferredMethod); }, [preferredMethod]);
+  useEffect(() => { saveSession('documentLanguages', documentLanguages); }, [documentLanguages]);
   useEffect(() => { saveSession('processingResults', processingResults); }, [processingResults]);
   useEffect(() => { saveSession('comparison', comparison); }, [comparison]);
 
@@ -101,6 +103,11 @@ export default function App() {
 
   const handleCapabilitiesSelected = useCallback(
     (caps: Capability[]) => setSelectedCapabilities(caps),
+    [],
+  );
+
+  const handleDocumentLanguagesDetected = useCallback(
+    (langs: string[]) => setDocumentLanguages(langs),
     [],
   );
 
@@ -158,6 +165,7 @@ export default function App() {
                       onCapabilitiesSelected={handleCapabilitiesSelected}
                       onStartProcessing={handleStartProcessing}
                       selectedCapabilities={selectedCapabilities}
+                      onDocumentLanguagesDetected={handleDocumentLanguagesDetected}
                     />
                   }
                 />
@@ -169,6 +177,7 @@ export default function App() {
                       capabilities={selectedCapabilities}
                       previewData={previewData}
                       preferredMethod={preferredMethod}
+                      documentLanguages={documentLanguages}
                       onViewArchitecture={handleViewArchitecture}
                       onPipelineComplete={handlePipelineComplete}
                     />

@@ -6,7 +6,7 @@ export type ConversationEvent =
   | { type: 'text'; data: string }
   | { type: 'tool_use'; data: { name: string; input: unknown } }
   | { type: 'tool_result'; data: { name: string; result: unknown } }
-  | { type: 'recommendation'; data: { capabilities: CapabilityRecommendation[] } }
+  | { type: 'recommendation'; data: { capabilities: CapabilityRecommendation[]; documentLanguages?: string[] } }
   | { type: 'done' };
 
 export interface CapabilityRecommendation {

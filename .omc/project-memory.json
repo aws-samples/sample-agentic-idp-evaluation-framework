@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775198801335,
+  "lastScanned": 1775626624852,
   "projectRoot": "/Users/sanghwa/workspaces/aws-samples/one-idp",
   "techStack": {
     "languages": [
@@ -55,7 +55,7 @@
       "path": "assets",
       "purpose": "Static assets",
       "fileCount": 3,
-      "lastAccessed": 1775198801279,
+      "lastAccessed": 1775626624813,
       "keyFiles": [
         "favicon.svg",
         "logo-dark.svg",
@@ -66,7 +66,7 @@
       "path": "infrastructure",
       "purpose": null,
       "fileCount": 14,
-      "lastAccessed": 1775198801287,
+      "lastAccessed": 1775626624816,
       "keyFiles": [
         "agentcore.tf",
         "apprunner.tf",
@@ -79,21 +79,21 @@
       "path": "packages",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775198801289,
+      "lastAccessed": 1775626624818,
       "keyFiles": []
     },
     "reference": {
       "path": "reference",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775198801290,
+      "lastAccessed": 1775626624819,
       "keyFiles": []
     },
     "test-samples": {
       "path": "test-samples",
       "purpose": null,
       "fileCount": 23,
-      "lastAccessed": 1775198801292,
+      "lastAccessed": 1775626624819,
       "keyFiles": [
         "01-invoice-korean.pdf",
         "02-contract-multipage.pdf",
@@ -103,13 +103,6 @@
       ]
     }
   },
-  "hotPaths": [
-    {
-      "path": "infra.md",
-      "accessCount": 1,
-      "lastAccessed": 1775198879439,
-      "type": "file"
-    }
-  ],
+  "hotPaths": [],
   "userDirectives": []
 }

@@ -23,6 +23,7 @@ interface PipelinePageProps {
   capabilities: Capability[];
   previewData: PreviewResponse | null;
   preferredMethod?: string;
+  documentLanguages?: string[];
   onViewArchitecture: () => void;
   onPipelineComplete?: (results: ProcessorResult[], comparison: ComparisonResult) => void;
 }
@@ -41,6 +42,7 @@ export default function PipelinePage({
   capabilities,
   previewData,
   preferredMethod,
+  documentLanguages,
   onViewArchitecture,
   onPipelineComplete,
 }: PipelinePageProps) {
@@ -90,6 +92,7 @@ export default function PipelinePage({
           previewResults: previewData?.results ?? [],
           preferredMethod,
           optimizeFor: strategy ?? 'balanced',
+          documentLanguages,
         }),
       });
 
@@ -121,12 +124,13 @@ export default function PipelinePage({
           capabilities,
           optimizeFor: 'balanced',
           enableHybridRouting: false,
+          documentLanguages,
         }).catch(() => {});
       }
     } finally {
       setIsSmartGenerating(false);
     }
-  }, [document, capabilities, previewData, preferredMethod, switchPipeline, generatePipeline]);
+  }, [document, capabilities, previewData, preferredMethod, documentLanguages, switchPipeline, generatePipeline]);
 
   // Auto-generate on mount
   useEffect(() => {
@@ -141,6 +145,7 @@ export default function PipelinePage({
           capabilities,
           optimizeFor: 'balanced',
           enableHybridRouting: true,
+          documentLanguages,
         }).catch(() => {});
       }
     }
@@ -158,10 +163,11 @@ export default function PipelinePage({
           capabilities,
           optimizeFor,
           enableHybridRouting: enableHybrid,
+          documentLanguages,
         }).catch(() => {});
       }
     },
-    [document, capabilities, previewData, generateSmartPipeline, generatePipeline],
+    [document, capabilities, previewData, documentLanguages, generateSmartPipeline, generatePipeline],
   );
 
   const handleExecute = useCallback(() => {

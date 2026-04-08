@@ -13,7 +13,7 @@ import { buildComparison } from '../services/comparison.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { getDocumentBuffer } from '../services/s3.js';
 import { calculateCost } from '../services/pricing.js';
-import { BDA_LIMITS, TEXTRACT_LIMITS } from '@idp/shared';
+import { BDA_LIMITS, TEXTRACT_LIMITS, isMethodLanguageCompatible } from '@idp/shared';
 import { config } from '../config/aws.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
@@ -98,6 +98,7 @@ interface PipelineExecuteRequest {
   documentId: string;
   s3Uri: string;
   pipeline: PipelineDefinition;
+  documentLanguages?: string[];
 }
 
 router.post('/execute', async (req, res) => {
@@ -166,6 +167,8 @@ router.post('/execute', async (req, res) => {
     const isBdaCompatible = (BDA_LIMITS.async.supportedFormats as readonly string[]).includes(normalizedExt);
     const isTextractCompatible = (TEXTRACT_LIMITS.analyzeDocument.supportedFormats as readonly string[]).includes(normalizedExt);
 
+    const documentLanguages: string[] = body.documentLanguages ?? [];
+
     const validMethodNodes = methodNodes.filter((node) => {
       const method: ProcessingMethod = (node.config as any).method;
       if (method === 'bda-custom' && !config.bdaProjectArn) {
@@ -182,6 +185,10 @@ router.post('/execute', async (req, res) => {
       }
       if (method.startsWith('textract-') && !isTextractCompatible) {
         emitSSE(res, { type: 'node_error', nodeId: node.id, error: `Textract does not support .${ext} files` } as PipelineExecutionEvent);
+        return false;
+      }
+      if (documentLanguages.length && !isMethodLanguageCompatible(method, documentLanguages)) {
+        emitSSE(res, { type: 'node_error', nodeId: node.id, error: `${method} does not support non-English documents (${documentLanguages.join(', ')})` } as PipelineExecutionEvent);
         return false;
       }
       return true;

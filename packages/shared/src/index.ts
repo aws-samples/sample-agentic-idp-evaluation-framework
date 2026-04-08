@@ -74,6 +74,7 @@ export {
   getMethodFamily,
   getMethodsByFamily,
   getBestMethodsForCapability,
+  isMethodLanguageCompatible,
 } from './types/processing.js';
 export {
   CONVERSE_API_LIMITS,

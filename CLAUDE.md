@@ -52,7 +52,7 @@ IDP Evaluation Platform that helps AWS SAs and customers find the optimal docume
 | Claude Sonnet 4.6 | $3.00 | $15.00 |
 | Claude Haiku 4.5 | $1.00 | $5.00 |
 | Claude Opus 4.6 | $5.00 | $25.00 |
-| Nova 2 Lite | $0.30 | $2.50 |
+| Nova 2 Lite | $0.30 (fixed 230 tokens/image since 3/30) | $2.50 |
 | Nova 2 Pro | $1.25 | $10.00 |
 | BDA Standard | $0.01/page | — |
 | BDA Custom | $0.04/page | — |

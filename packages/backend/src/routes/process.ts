@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { ProcessRequest, ProcessingMethod, ProcessorResult } from '@idp/shared';
-import { BDA_LIMITS, TEXTRACT_LIMITS } from '@idp/shared';
+import { BDA_LIMITS, TEXTRACT_LIMITS, isMethodLanguageCompatible } from '@idp/shared';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { getDocumentBuffer } from '../services/s3.js';
 import { buildComparison } from '../services/comparison.js';
@@ -63,6 +63,8 @@ router.post('/', async (req, res) => {
     const isBdaCompatible = (BDA_LIMITS.async.supportedFormats as readonly string[]).includes(normalizedExt);
     const isTextractCompatible = (TEXTRACT_LIMITS.analyzeDocument.supportedFormats as readonly string[]).includes(normalizedExt);
 
+    const documentLanguages: string[] = (body as any).documentLanguages ?? [];
+
     const methods = body.methods.filter((m) => {
       if (m === 'bda-custom' && !config.bdaProjectArn) {
         emitSSE(res, { type: 'method_error', method: m, error: 'BDA Custom Blueprint not configured (BDA_PROJECT_ARN is empty)' });
@@ -78,6 +80,10 @@ router.post('/', async (req, res) => {
       }
       if (m.startsWith('textract-') && !isTextractCompatible) {
         emitSSE(res, { type: 'method_error', method: m, error: `Textract does not support .${ext} files` });
+        return false;
+      }
+      if (documentLanguages.length && !isMethodLanguageCompatible(m, documentLanguages)) {
+        emitSSE(res, { type: 'method_error', method: m, error: `${m} does not support non-English documents (${documentLanguages.join(', ')})` });
         return false;
       }
       return true;

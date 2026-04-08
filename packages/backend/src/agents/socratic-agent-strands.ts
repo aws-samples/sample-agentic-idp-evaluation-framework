@@ -47,7 +47,7 @@ function createTools(options: SocraticAgentOptions) {
       console.log('[Tool:recommend_capabilities] Using bound context:', boundDocumentId, boundS3Uri);
       const analysis = await analyzeDocument(boundDocumentId, boundS3Uri);
       const recs = recommendCapabilities(analysis, input.userRequirements);
-      return JSON.stringify({ capabilities: recs });
+      return JSON.stringify({ capabilities: recs, documentLanguages: analysis.languages });
     },
   });
 
@@ -215,14 +215,17 @@ export async function runSocraticAgentStrands(
           data: { name: e.toolUse.name, result: resultText },
         } as ConversationEvent);
 
-        // If recommend_capabilities was called, emit recommendation event
+        // If recommend_capabilities was called, emit recommendation event with languages
         if (e.toolUse.name === 'recommend_capabilities' && resultText) {
           try {
             const parsed = JSON.parse(resultText);
             if (parsed.capabilities) {
               emitSSE(res, {
                 type: 'recommendation',
-                data: { capabilities: parsed.capabilities as CapabilityRecommendation[] },
+                data: {
+                  capabilities: parsed.capabilities as CapabilityRecommendation[],
+                  documentLanguages: parsed.documentLanguages as string[] | undefined,
+                },
               } as ConversationEvent);
             }
           } catch {

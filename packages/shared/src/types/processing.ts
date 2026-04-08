@@ -153,11 +153,11 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     family: 'nova',
     name: 'Nova 2 Lite',
     shortName: 'Nova 2 Lite',
-    description: 'Amazon Nova 2 Lite (GA) - fast, cost-effective multimodal with reasoning capabilities',
+    description: 'Amazon Nova 2 Lite (GA) - fast, cost-effective multimodal with fixed 230 tokens/image pricing',
     modelId: 'us.amazon.nova-2-lite-v1:0',
     tokenPricing: { inputPer1MTokens: 0.30, outputPer1MTokens: 2.50 },
-    estimatedCostPerPage: 0.002,
-    strengths: ['GA model', 'Fastest Nova', 'Lowest cost', 'Reasoning capabilities', 'Good for batch'],
+    estimatedCostPerPage: 0.001,
+    strengths: ['GA model', 'Fastest Nova', 'Lowest cost', 'Fixed 230 tokens/image (resolution-independent)', 'Reasoning capabilities', 'Good for batch'],
     limitations: ['Smaller model', 'Simpler extraction than Pro'],
   },
   'nova-pro': {
@@ -260,6 +260,18 @@ function buildCapabilitySupport(): Record<MethodFamily, Partial<Record<Capabilit
 
 export const CAPABILITY_SUPPORT = buildCapabilitySupport();
 
+
+// ─── Language Compatibility ──────────────────────────────────────────────────
+
+/** BDA and Textract do not support non-English documents reliably.
+ *  When detected languages are non-English, exclude those families. */
+export function isMethodLanguageCompatible(method: ProcessingMethod, languages: string[]): boolean {
+  if (!languages.length) return true;
+  const isEnglishOnly = languages.every((l) => l.toLowerCase().startsWith('en'));
+  if (isEnglishOnly) return true;
+  const family = METHOD_INFO[method].family;
+  return family !== 'bda' && family !== 'bda-llm' && family !== 'textract-llm';
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
