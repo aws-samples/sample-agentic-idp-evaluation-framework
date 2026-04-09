@@ -126,27 +126,18 @@ ADAPTER PATTERNS (these are the actual patterns that worked in our preview):
    - Poll GetDocumentAnalysis for async
 
 REQUIREMENTS:
-- Generate COMPLETE, runnable code — no placeholders or TODOs
+- Generate COMPLETE, runnable Python code only (keep it concise but functional)
 - Include the ACTUAL extraction prompts per capability (from guidance above)
-- Include proper error handling and retry logic
+- Include error handling and retry logic
 - Include cost calculation from token usage
-- Include async polling for BDA/Textract methods
 - Match the exact model IDs from method info
-- Python: use boto3, TypeScript: use @aws-sdk/client-bedrock-runtime
-- Include CDK infrastructure code as well
+- Use boto3 for AWS calls
+- Keep code under 150 lines total
 
-Return your response as:
+Return ONLY the code inside <python> tags. No explanations outside the tags.
 <python>
 ...complete Python code...
-</python>
-
-<typescript>
-...complete TypeScript code...
-</typescript>
-
-<cdk>
-...complete CDK code...
-</cdk>`;
+</python>`;
 }
 
 const router = Router();
@@ -165,20 +156,18 @@ router.post('/', async (req, res) => {
     const command = new ConverseCommand({
       modelId: config.claudeModelId,
       messages: [{ role: 'user', content: [{ text: prompt }] }],
-      inferenceConfig: { maxTokens: 64000, temperature: 0.1 },
+      inferenceConfig: { maxTokens: 8192, temperature: 0.1 },
     });
 
     const response = await bedrockClient.send(command);
     const rawText = response.output?.message?.content?.[0]?.text ?? '';
 
     const pythonMatch = rawText.match(/<python>([\s\S]*?)<\/python>/);
-    const tsMatch = rawText.match(/<typescript>([\s\S]*?)<\/typescript>/);
-    const cdkMatch = rawText.match(/<cdk>([\s\S]*?)<\/cdk>/);
 
     res.json({
-      python: pythonMatch?.[1]?.trim() ?? null,
-      typescript: tsMatch?.[1]?.trim() ?? null,
-      cdk: cdkMatch?.[1]?.trim() ?? null,
+      python: pythonMatch?.[1]?.trim() ?? rawText.trim(),
+      typescript: null,
+      cdk: null,
       tokenUsage: response.usage,
     });
   } catch (err) {
