@@ -25,9 +25,11 @@ export default function PipelineToolbar({
 }: PipelineToolbarProps) {
   const [optimizeFor, setOptimizeFor] = useState<'accuracy' | 'cost' | 'speed' | 'balanced'>('balanced');
   const [enableHybrid, setEnableHybrid] = useState(true);
+  const [dirty, setDirty] = useState(false);
 
   const handleGenerate = useCallback(() => {
     onGenerate(optimizeFor, enableHybrid);
+    setDirty(false);
   }, [optimizeFor, enableHybrid, onGenerate]);
 
   return (
@@ -46,9 +48,10 @@ export default function PipelineToolbar({
           </Box>
           <SegmentedControl
             selectedId={optimizeFor}
-            onChange={({ detail }) =>
-              setOptimizeFor(detail.selectedId as 'accuracy' | 'cost' | 'speed' | 'balanced')
-            }
+            onChange={({ detail }) => {
+              setOptimizeFor(detail.selectedId as 'accuracy' | 'cost' | 'speed' | 'balanced');
+              if (pipeline) setDirty(true);
+            }}
             options={[
               { text: 'Accuracy', id: 'accuracy' },
               { text: 'Cost', id: 'cost' },
@@ -74,8 +77,9 @@ export default function PipelineToolbar({
             loading={isGenerating}
             disabled={isGenerating || isExecuting}
             iconName="refresh"
+            variant={dirty ? 'primary' : 'normal'}
           >
-            Re-Generate Pipeline
+            {dirty ? 'Apply Changes' : 'Re-Generate Pipeline'}
           </Button>
 
           {pipeline && (

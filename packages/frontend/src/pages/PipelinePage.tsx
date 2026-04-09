@@ -9,7 +9,10 @@ import Box from '@cloudscape-design/components/box';
 import ColumnLayout from '@cloudscape-design/components/column-layout';
 import Spinner from '@cloudscape-design/components/spinner';
 import type { UploadResponse, Capability, ProcessorResult, ComparisonResult } from '@idp/shared';
+import { METHOD_INFO, CAPABILITY_INFO } from '@idp/shared';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
+import Tabs from '@cloudscape-design/components/tabs';
+import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import { marked } from 'marked';
 import { authedFetch } from '../services/api.js';
 import PipelineCanvas from '../components/pipeline/PipelineCanvas';
@@ -401,6 +404,62 @@ export default function PipelinePage({
                 <Box>{completionData.comparison.recommendation}</Box>
               </div>
             </ColumnLayout>
+          </Container>
+        )}
+
+        {/* Extraction Results */}
+        {executionComplete && completionData && completionData.processorResults.some(r => r.status === 'complete') && (
+          <Container
+            header={
+              <Header variant="h2">
+                Extraction Results
+              </Header>
+            }
+          >
+            <Tabs
+              tabs={completionData.processorResults
+                .filter(r => r.status === 'complete')
+                .map(r => {
+                  const info = METHOD_INFO[r.method];
+                  return {
+                    id: r.method,
+                    label: `${info?.shortName ?? r.method} ($${r.metrics.cost.toFixed(4)}, ${(r.metrics.latencyMs / 1000).toFixed(1)}s)`,
+                    content: (
+                      <SpaceBetween size="m">
+                        {Object.entries(r.results).map(([capId, capResult]) => {
+                          const capInfo = CAPABILITY_INFO[capId as keyof typeof CAPABILITY_INFO];
+                          const dataStr = typeof capResult.data === 'string'
+                            ? capResult.data
+                            : JSON.stringify(capResult.data, null, 2);
+                          return (
+                            <ExpandableSection
+                              key={capId}
+                              headerText={`${capInfo?.name ?? capId} (${Math.round(capResult.confidence * 100)}%)`}
+                              defaultExpanded={Object.keys(r.results).length <= 3}
+                            >
+                              <pre style={{
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                                fontSize: '13px',
+                                lineHeight: '1.5',
+                                maxHeight: '400px',
+                                overflow: 'auto',
+                                background: '#f2f3f3',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                margin: 0,
+                              }}>
+                                {dataStr}
+                              </pre>
+                            </ExpandableSection>
+                          );
+                        })}
+                      </SpaceBetween>
+                    ),
+                  };
+                })
+              }
+            />
           </Container>
         )}
 
