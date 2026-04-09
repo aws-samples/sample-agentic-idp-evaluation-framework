@@ -23,6 +23,7 @@ import type { ProcessingMethod } from '@idp/shared';
 import { CAPABILITY_INFO, METHOD_INFO, getBestMethodsForCapability } from '@idp/shared';
 import { marked } from 'marked';
 import { useArchitecture } from '../hooks/useArchitecture';
+import { useCodeGen } from '../hooks/useCodeGen';
 import MermaidDiagram from '../components/common/MermaidDiagram';
 
 interface ArchitecturePageProps {
@@ -335,7 +336,9 @@ export default function ArchitecturePage({
 }: ArchitecturePageProps) {
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const { text: aiText, diagram, costProjections, isLoading: aiLoading, error: aiError, generate } = useArchitecture();
+  const { code: aiCode, isGenerating: codeGenLoading, generateCode } = useCodeGen();
   const aiGenerated = useRef(false);
+  const codeGenTriggered = useRef(false);
 
   // Auto-generate AI recommendation when we have processing results
   useEffect(() => {
@@ -345,9 +348,23 @@ export default function ArchitecturePage({
     }
   }, [processingResults, capabilities, comparison, generate]);
 
+  // Auto-generate AI code after architecture recommendation loads
+  useEffect(() => {
+    if (aiText && !aiLoading && !codeGenTriggered.current && processingResults.length > 0) {
+      codeGenTriggered.current = true;
+      generateCode(capabilities, processingResults, comparison);
+    }
+  }, [aiText, aiLoading, processingResults, capabilities, comparison, generateCode]);
+
+  // Template code as fallback
   const pythonCode = useMemo(() => generatePythonCode(capabilities, processingResults, comparison), [capabilities, processingResults, comparison]);
   const tsCode = useMemo(() => generateTypeScriptCode(capabilities, processingResults, comparison), [capabilities, processingResults, comparison]);
   const cdkCode = useMemo(() => generateCDKCode(capabilities), [capabilities]);
+
+  // Use AI code when available, fallback to templates
+  const activePython = aiCode?.python ?? pythonCode;
+  const activeTs = aiCode?.typescript ?? tsCode;
+  const activeCdk = aiCode?.cdk ?? cdkCode;
 
   const methodSummary = useMemo(() => {
     const methodMap = buildMethodMap(capabilities, processingResults, comparison);
@@ -377,17 +394,17 @@ export default function ArchitecturePage({
       '',
       '## Python Implementation',
       '```python',
-      pythonCode,
+      activePython,
       '```',
       '',
       '## TypeScript Implementation',
       '```typescript',
-      tsCode,
+      activeTs,
       '```',
       '',
       '## CDK Infrastructure',
       '```typescript',
-      cdkCode,
+      activeCdk,
       '```',
     ].join('\n');
 
@@ -573,23 +590,23 @@ export default function ArchitecturePage({
             tabs={[
               {
                 id: 'python',
-                label: 'Python (boto3)',
+                label: codeGenLoading ? 'Python (generating...)' : aiCode?.python ? 'Python (AI)' : 'Python (boto3)',
                 content: (
-                  <CodeBlock code={pythonCode} language="python" />
+                  <CodeBlock code={activePython} language="python" />
                 ),
               },
               {
                 id: 'typescript',
-                label: 'TypeScript (AWS SDK v3)',
+                label: codeGenLoading ? 'TypeScript (generating...)' : aiCode?.typescript ? 'TypeScript (AI)' : 'TypeScript (AWS SDK v3)',
                 content: (
-                  <CodeBlock code={tsCode} language="typescript" />
+                  <CodeBlock code={activeTs} language="typescript" />
                 ),
               },
               {
                 id: 'cdk',
-                label: 'CDK Infrastructure',
+                label: codeGenLoading ? 'CDK (generating...)' : aiCode?.cdk ? 'CDK (AI)' : 'CDK Infrastructure',
                 content: (
-                  <CodeBlock code={cdkCode} language="typescript" />
+                  <CodeBlock code={activeCdk} language="typescript" />
                 ),
               },
               {
