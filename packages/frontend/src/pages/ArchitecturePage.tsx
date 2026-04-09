@@ -601,9 +601,12 @@ export default function ArchitecturePage({
               },
               {
                 id: 'cdk',
-                label: codeGenLoading ? 'CDK (generating...)' : aiCode?.cdk ? 'CDK (AI)' : 'CDK Infrastructure',
+                label: 'CDK Infrastructure (Preview)',
                 content: (
-                  <CodeBlock code={activeCdk} language="typescript" />
+                  <SpaceBetween size="s">
+                    <Alert type="info">CDK infrastructure-as-code generation with AI is coming in the next version. The template below provides a starting point.</Alert>
+                    <CodeBlock code={activeCdk} language="typescript" />
+                  </SpaceBetween>
                 ),
               },
               {
