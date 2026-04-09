@@ -215,7 +215,7 @@ export class TokenStreamAdapter implements StreamAdapter {
       for (const cap of capabilities) {
         results[cap] = {
           capability: cap,
-          data: rawOutput.substring(0, 2000),
+          data: rawOutput,
           confidence: 0.5,
           format: 'text',
         };
@@ -250,7 +250,7 @@ export class TokenStreamAdapter implements StreamAdapter {
         // Provide a fallback from the raw text so downstream consumers still get usable data.
         results[cap] = {
           capability: cap,
-          data: rawOutput.length > 0 ? `[Extracted from partial response]\n${rawOutput.substring(0, 1500)}` : null,
+          data: rawOutput.length > 0 ? rawOutput : null,
           confidence: rawOutput.length > 0 ? 0.3 : 0,
           format: 'text',
         };

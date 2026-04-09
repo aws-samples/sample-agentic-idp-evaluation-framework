@@ -181,7 +181,7 @@ export class SyncPollAdapter implements StreamAdapter {
       for (const cap of capabilities) {
         results[cap] = {
           capability: cap,
-          data: rawOutput.substring(0, 2000),
+          data: rawOutput,
           confidence: 0.5,
           format: 'text',
         };
@@ -212,7 +212,7 @@ export class SyncPollAdapter implements StreamAdapter {
         case 'text_extraction':
           results[cap] = {
             capability: cap,
-            data: allText || rawOutput.substring(0, 3000),
+            data: allText || rawOutput,
             confidence: allText ? 0.9 : 0.5,
             format: 'text',
           };
@@ -220,7 +220,7 @@ export class SyncPollAdapter implements StreamAdapter {
         case 'table_extraction':
           results[cap] = {
             capability: cap,
-            data: tableData.length > 0 ? tableData.join('\n\n') : allText.substring(0, 2000),
+            data: tableData.length > 0 ? tableData.join('\n\n') : allText,
             confidence: tableData.length > 0 ? 0.9 : 0.6,
             format: tableData.length > 0 ? 'text' : 'text',
           };
@@ -236,7 +236,7 @@ export class SyncPollAdapter implements StreamAdapter {
         case 'layout_analysis':
           results[cap] = {
             capability: cap,
-            data: elements.map((e) => `[${e.type}${e.sub_type ? ':' + e.sub_type : ''}] ${(e.representation?.markdown ?? '').substring(0, 100)}`).join('\n'),
+            data: elements.map((e) => `[${e.type}${e.sub_type ? ':' + e.sub_type : ''}] ${e.representation?.markdown ?? ''}`).join('\n'),
             confidence: 0.9,
             format: 'text',
           };
@@ -244,7 +244,7 @@ export class SyncPollAdapter implements StreamAdapter {
         case 'document_summarization':
           results[cap] = {
             capability: cap,
-            data: allText.substring(0, 1000),
+            data: allText,
             confidence: 0.7,
             format: 'text',
           };
@@ -252,7 +252,7 @@ export class SyncPollAdapter implements StreamAdapter {
         default:
           results[cap] = {
             capability: cap,
-            data: allText.substring(0, 1000) || 'BDA extraction complete (see raw output)',
+            data: allText || 'BDA extraction complete (see raw output)',
             confidence: 0.6,
             format: 'text',
           };
