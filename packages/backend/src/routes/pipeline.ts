@@ -21,6 +21,7 @@ import {
   BdaStandardProcessor,
   BdaCustomProcessor,
 } from '../processors/bda-processor.js';
+import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor } from '../processors/bda-llm.js';
 import {
   ClaudeSonnetProcessor,
   ClaudeHaikuProcessor,
@@ -37,6 +38,9 @@ import {
 const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Record<string, () => ProcessorBase> = {
   'bda-standard': () => new BdaStandardProcessor(),
   'bda-custom': () => new BdaCustomProcessor(),
+  'bda-claude-sonnet': () => new BdaClaudeSonnetProcessor(),
+  'bda-claude-haiku': () => new BdaClaudeHaikuProcessor(),
+  'bda-nova-lite': () => new BdaNovaLiteProcessor(),
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
   'claude-haiku': () => new ClaudeHaikuProcessor(),
   'claude-opus': () => new ClaudeOpusProcessor(),
