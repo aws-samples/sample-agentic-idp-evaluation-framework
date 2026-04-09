@@ -26,13 +26,13 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
           text: darkMode ? 'Light Mode' : 'Dark Mode',
           onClick: onToggleDarkMode,
         },
-        {
-          type: 'button',
-          text: 'GitHub',
-          href: 'https://github.com/aws-samples/one-idp',
-          external: true,
-          externalIconAriaLabel: '(opens in new tab)',
-        },
+        // {
+        //   type: 'button',
+        //   text: 'GitHub',
+        //   href: 'https://github.com/aws-samples/one-idp',
+        //   external: true,
+        //   externalIconAriaLabel: '(opens in new tab)',
+        // },
         ...(user
           ? [
               {

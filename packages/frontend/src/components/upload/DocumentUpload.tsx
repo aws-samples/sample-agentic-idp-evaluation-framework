@@ -89,6 +89,9 @@ export default function DocumentUpload({ onUploadComplete }: DocumentUploadProps
           showFileLastModified
           tokenLimit={1}
         />
+        <Alert type="warning" statusIconAriaLabel="Warning">
+          Do not upload sensitive customer data or PII. When using customer documents, ensure all personally identifiable information is redacted before uploading.
+        </Alert>
 
         {files.length > 0 && !uploadResult && (
           <Button

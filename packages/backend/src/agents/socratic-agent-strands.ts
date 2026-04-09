@@ -119,14 +119,19 @@ OPTIONS RULES:
 CAPABILITY IDS (for recommend_capabilities):
 ${CAPABILITIES.join(', ')}
 
-RELEVANCE SCORING (you decide based on conversation):
-- 0.90-1.0: Essential — directly matches user's stated needs
-- 0.75-0.89: Highly relevant — strongly supports the use case
-- 0.50-0.74: Useful but not critical
-- Below 0.50: Do NOT include — only recommend truly relevant capabilities
+RELEVANCE SCORING — BE STRICT:
+- 0.90-1.0: CORE capabilities only (max 2-3). These directly perform what the user asked for.
+- 0.75-0.89: Strong supporting capabilities that clearly add value.
+- 0.50-0.74: Nice-to-have — shown but NOT auto-selected. Use this for preprocessing/postprocessing steps.
+- Below 0.50: Do NOT include.
 
-The scores you pass to recommend_capabilities are displayed in the UI as-is (e.g. 0.95 = 95%).
-Make them CONSISTENT with what you tell the user. If you say "Very High", the score must be >= 0.90.
+SCORING RULES:
+- Reserve 0.90+ for the 1-3 capabilities that DIRECTLY answer the user's request.
+- Preprocessing (OCR Enhancement, Format Standardization) and structural analysis (Layout Analysis, Bounding Box) are supporting — score 0.50-0.74 unless they are the PRIMARY goal.
+- Avoid overlap: if Table Extraction covers the need, do NOT also score KV Extraction at 0.90.
+- Fewer high-scoring capabilities = better. Be selective, not generous.
+
+The scores are displayed in the UI as-is (e.g. 0.95 = 95%). Capabilities >= 0.75 are auto-selected.
 Do NOT include <recommendation> tags — the tool handles the UI update automatically.`;
 }
 
