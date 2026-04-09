@@ -128,9 +128,18 @@ export default function ConversationPage({
                     Run Quick Preview ({selectedCapabilities.length} capabilities)
                   </Button>
                 )}
-                <Button variant="primary" onClick={handleBuildPipeline}>
-                  Build Pipeline
-                </Button>
+                {/* When preview results exist, require method selection; otherwise allow direct pipeline build */}
+                {preview && preview.results.some((r) => r.status === 'complete') ? (
+                  <Button variant="primary" onClick={handleBuildPipeline} disabled={!selectedMethod}>
+                    {selectedMethod
+                      ? `Build Pipeline with ${preview.results.find((m) => m.method === selectedMethod)?.shortName ?? 'selected method'}`
+                      : 'Select a method below'}
+                  </Button>
+                ) : (
+                  <Button variant="primary" onClick={handleBuildPipeline}>
+                    Build Pipeline
+                  </Button>
+                )}
               </SpaceBetween>
             ) : undefined
           }
@@ -258,11 +267,15 @@ export default function ConversationPage({
                   <Box variant="h3">Ready to build your pipeline</Box>
                   <Box color="text-body-secondary">
                     Preview analyzed your document with {preview.results.filter(r => r.status === 'complete').length} methods.
-                    Build an optimized pipeline for production use.
+                    {selectedMethod
+                      ? ` Selected: ${preview.results.find((m) => m.method === selectedMethod)?.shortName ?? selectedMethod}.`
+                      : ' Select a method above to continue.'}
                   </Box>
                 </div>
-                <Button variant="primary" onClick={handleBuildPipeline} iconName="angle-right">
-                  Build Pipeline
+                <Button variant="primary" onClick={handleBuildPipeline} iconName="angle-right" disabled={!selectedMethod}>
+                  {selectedMethod
+                    ? `Build Pipeline with ${preview.results.find((m) => m.method === selectedMethod)?.shortName ?? 'selected method'}`
+                    : 'Select a method'}
                 </Button>
               </div>
             </Container>

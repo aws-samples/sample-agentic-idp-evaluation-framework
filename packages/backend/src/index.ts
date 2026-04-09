@@ -22,6 +22,7 @@ import architectureRouter from './routes/architecture.js';
 import architectureCodeRouter from './routes/architecture-code.js';
 import pipelineRouter from './routes/pipeline.js';
 import pipelineSmartRouter from './routes/pipeline-smart.js';
+import pipelineChatRouter from './routes/pipeline-chat.js';
 import previewRouter from './routes/preview.js';
 import adminRouter from './routes/admin.js';
 
@@ -92,6 +93,7 @@ app.use('/api/architecture', architectureRouter);
 app.use('/api/architecture/code', architectureCodeRouter);
 app.use('/api/pipeline', pipelineRouter);
 app.use('/api/pipeline/smart', pipelineSmartRouter);
+app.use('/api/pipeline/chat', pipelineChatRouter);
 app.use('/api/preview', previewRouter);
 app.use('/api/admin', adminRouter);
 

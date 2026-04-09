@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
 import SpaceBetween from '@cloudscape-design/components/space-between';
@@ -7,18 +7,19 @@ import Container from '@cloudscape-design/components/container';
 import Button from '@cloudscape-design/components/button';
 import Box from '@cloudscape-design/components/box';
 import ColumnLayout from '@cloudscape-design/components/column-layout';
+import Grid from '@cloudscape-design/components/grid';
 import Spinner from '@cloudscape-design/components/spinner';
 import type { UploadResponse, Capability, ProcessorResult, ComparisonResult } from '@idp/shared';
 import { METHOD_INFO, CAPABILITY_INFO } from '@idp/shared';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import Tabs from '@cloudscape-design/components/tabs';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
-import { marked } from 'marked';
 import { authedFetch } from '../services/api.js';
+import ChatPanel from '../components/conversation/ChatPanel';
 import PipelineCanvas from '../components/pipeline/PipelineCanvas';
-import PipelineToolbar from '../components/pipeline/PipelineToolbar';
 import PipelineAlternatives from '../components/pipeline/PipelineAlternatives';
 import { usePipeline } from '../hooks/usePipeline';
+import { usePipelineChat } from '../hooks/usePipelineChat';
 import type { PreviewResponse } from '../hooks/usePreview';
 
 interface PipelinePageProps {
@@ -67,6 +68,21 @@ export default function PipelinePage({
     stopExecution,
   } = usePipeline();
 
+  // Pipeline chat for conversational modification
+  const {
+    messages: chatMessages,
+    isStreaming: isChatStreaming,
+    error: chatError,
+    pipelineUpdate,
+    sendMessage: sendChatMessage,
+    addInitialMessage,
+  } = usePipelineChat(
+    pipeline,
+    capabilities,
+    document?.documentType ?? 'pdf',
+    documentLanguages,
+  );
+
   // Notify parent when pipeline execution completes with results
   useEffect(() => {
     if (executionComplete && completionData && onPipelineComplete) {
@@ -77,9 +93,10 @@ export default function PipelinePage({
   const [smartRec, setSmartRec] = useState<SmartRecommendation | null>(null);
   const [isSmartGenerating, setIsSmartGenerating] = useState(false);
   const [smartError, setSmartError] = useState<string | null>(null);
+  const initialMessageSent = useRef(false);
 
   // Smart generation: use LLM to analyze preview results and generate pipeline
-  const generateSmartPipeline = useCallback(async (strategy?: 'accuracy' | 'cost' | 'speed' | 'balanced') => {
+  const generateSmartPipeline = useCallback(async () => {
     if (!document || capabilities.length === 0) return;
 
     setIsSmartGenerating(true);
@@ -94,7 +111,7 @@ export default function PipelinePage({
           documentType: document.documentType ?? 'pdf',
           previewResults: previewData?.results ?? [],
           preferredMethod,
-          optimizeFor: strategy ?? 'balanced',
+          optimizeFor: 'balanced',
           documentLanguages,
         }),
       });
@@ -106,21 +123,14 @@ export default function PipelinePage({
 
       const data = await res.json();
 
-      // Set the pipeline from the smart response
       if (data.pipeline) {
-        // Use the usePipeline's generatePipeline won't work here since we already have the result
-        // We need to manually set it via switchPipeline
-        switchPipeline(data.pipeline);
-      }
-      if (data.alternatives) {
-        // Store alternatives - they come from the standard generator
+        switchPipeline(data.pipeline, data.alternatives ?? []);
       }
       if (data.smartRecommendation) {
         setSmartRec(data.smartRecommendation);
       }
     } catch (err) {
       setSmartError(err instanceof Error ? err.message : 'Unknown error');
-      // Fallback to standard generation
       if (document.documentType) {
         generatePipeline({
           documentType: document.documentType,
@@ -139,10 +149,8 @@ export default function PipelinePage({
   useEffect(() => {
     if (document && capabilities.length > 0 && !pipeline && !isGenerating && !isSmartGenerating) {
       if (previewData) {
-        // Smart generation with preview data
         generateSmartPipeline();
       } else if (document.documentType) {
-        // Fallback to standard generation
         generatePipeline({
           documentType: document.documentType,
           capabilities,
@@ -154,24 +162,39 @@ export default function PipelinePage({
     }
   }, [document, capabilities, pipeline, isGenerating, isSmartGenerating, previewData, generateSmartPipeline, generatePipeline]);
 
-  const handleGenerate = useCallback(
-    (optimizeFor: 'accuracy' | 'cost' | 'speed' | 'balanced', enableHybrid: boolean) => {
-      if (!document || !document.documentType) return;
-      if (previewData) {
-        // Use smart pipeline (LLM-based) when preview data available
-        generateSmartPipeline(optimizeFor);
-      } else {
-        generatePipeline({
-          documentType: document.documentType,
-          capabilities,
-          optimizeFor,
-          enableHybridRouting: enableHybrid,
-          documentLanguages,
-        }).catch(() => {});
+  // Add initial chat message when pipeline is first generated
+  useEffect(() => {
+    if (pipeline && !initialMessageSent.current) {
+      initialMessageSent.current = true;
+
+      const methodNodes = pipeline.nodes.filter((n) => n.type === 'method');
+      const methodNames = methodNodes.map((n) => n.label).join(', ');
+
+      let content = `I've built a **${pipeline.name}** using **${methodNames}**.\n\n`;
+      content += `- Est. cost: **$${pipeline.estimatedCostPerPage.toFixed(4)}/page**\n`;
+      content += `- Est. latency: **${pipeline.estimatedLatencyMs}ms**\n`;
+      content += `- Capabilities: **${capabilities.length}** across **${methodNodes.length}** method(s)\n`;
+
+      if (smartRec?.rationale) {
+        content += `\n${smartRec.rationale}`;
       }
-    },
-    [document, capabilities, previewData, documentLanguages, generateSmartPipeline, generatePipeline],
-  );
+
+      content += '\n\nHow would you like to modify this pipeline?';
+
+      addInitialMessage({
+        role: 'assistant',
+        content,
+        quickReplies: ['Optimize for cost', 'Optimize for accuracy', 'Use fastest methods', 'Explain method choices'],
+      });
+    }
+  }, [pipeline, smartRec, capabilities, addInitialMessage]);
+
+  // Apply pipeline updates from chat
+  useEffect(() => {
+    if (pipelineUpdate) {
+      switchPipeline(pipelineUpdate.pipeline, pipelineUpdate.alternatives);
+    }
+  }, [pipelineUpdate, switchPipeline]);
 
   const handleExecute = useCallback(() => {
     if (!pipeline || !document || !document.s3Uri) return;
@@ -195,6 +218,14 @@ export default function PipelinePage({
       if (newPipeline) switchPipeline(newPipeline);
     },
     [switchPipeline],
+  );
+
+  const handleChatSend = useCallback(
+    (message: string) => {
+      if (isExecuting) return;
+      sendChatMessage(message);
+    },
+    [isExecuting, sendChatMessage],
   );
 
   if (!document) {
@@ -244,122 +275,104 @@ export default function PipelinePage({
                 AI is analyzing your preview results...
               </Box>
               <Box color="text-body-secondary" padding={{ top: 'xs' }}>
-                Claude is reviewing the extraction results from 3 methods and building an optimal pipeline
+                Claude is reviewing the extraction results and building an optimal pipeline
                 for your {capabilities.length} selected capabilities.
               </Box>
             </Box>
           </Container>
         )}
 
-        {/* AI Recommendation */}
-        {smartRec && (
-          <Container
-            header={
-              <Header variant="h2" description="Based on actual extraction preview results">
-                AI Pipeline Recommendation
-              </Header>
-            }
-          >
-            <SpaceBetween size="m">
-              <ColumnLayout columns={2} variant="text-grid">
-                <div>
-                  <Box variant="awsui-key-label">Optimization Strategy</Box>
-                  <Box>
-                    <StatusIndicator type="info">
-                      {smartRec.optimizeFor.charAt(0).toUpperCase() + smartRec.optimizeFor.slice(1)}
-                    </StatusIndicator>
-                    {smartRec.enableHybridRouting && (
-                      <span style={{ marginLeft: '12px', fontSize: '13px', color: '#5f6b7a' }}>Hybrid routing enabled</span>
-                    )}
-                  </Box>
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">Estimated Savings</Box>
-                  <Box fontSize="body-s" color="text-body-secondary">{smartRec.estimatedSavings}</Box>
-                </div>
-              </ColumnLayout>
-
-              <Box fontSize="body-s" color="text-body-secondary">
-                <div
-                  className="chat-markdown"
-                  dangerouslySetInnerHTML={{
-                    __html: marked.parse(smartRec.rationale) as string,
-                  }}
-                  style={{ lineHeight: '1.5' }}
-                />
-              </Box>
-
-              {smartRec.tokenUsage && (
-                <Box color="text-body-secondary" fontSize="body-s">
-                  Pipeline analysis: {smartRec.tokenUsage.inputTokens} input + {smartRec.tokenUsage.outputTokens} output tokens
-                </Box>
-              )}
-            </SpaceBetween>
-          </Container>
-        )}
-
-        {/* Toolbar */}
-        {!isSmartGenerating && (
-          <PipelineToolbar
-            pipeline={pipeline}
-            isGenerating={isGenerating}
-            isExecuting={isExecuting}
-            onGenerate={handleGenerate}
-            onExecute={handleExecute}
-            onExport={handleExport}
-          />
-        )}
-
         {isGenerating && (
           <Alert type="info">Generating pipeline configuration...</Alert>
         )}
 
-        {/* Pipeline Canvas */}
+        {/* Main layout: Chat + Canvas */}
         {pipeline && (
-          <Container
-            header={
-              <Header variant="h2" description={pipeline.description}>
-                {pipeline.name}
-              </Header>
-            }
+          <Grid
+            gridDefinition={[
+              { colspan: { default: 12, l: 5 } },
+              { colspan: { default: 12, l: 7 } },
+            ]}
           >
-            <SpaceBetween size="m">
-              <ColumnLayout columns={4} variant="text-grid">
-                <div>
-                  <Box variant="awsui-key-label">Estimated Cost</Box>
-                  <Box variant="awsui-value-large">${pipeline.estimatedCostPerPage.toFixed(4)}/page</Box>
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">Estimated Latency</Box>
-                  <Box variant="awsui-value-large">{pipeline.estimatedLatencyMs}ms</Box>
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">Pipeline Nodes</Box>
-                  <Box variant="awsui-value-large">{pipeline.nodes.length}</Box>
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">Capabilities</Box>
-                  <Box variant="awsui-value-large">{capabilities.length}</Box>
-                </div>
-              </ColumnLayout>
+            {/* Chat Panel */}
+            <ChatPanel
+              messages={chatMessages}
+              isStreaming={isChatStreaming}
+              error={chatError}
+              onSendMessage={handleChatSend}
+              title="Pipeline Chat"
+              placeholder="Ask to modify the pipeline..."
+            />
 
-              <PipelineCanvas
-                pipeline={pipeline}
-                nodeStates={nodeStates}
-                activeEdges={activeEdges}
-                fileName={document.fileName}
-              />
+            {/* Pipeline Canvas + Actions */}
+            <Container
+              header={
+                <Header
+                  variant="h2"
+                  description={pipeline.description}
+                  actions={
+                    <SpaceBetween direction="horizontal" size="s">
+                      <Button
+                        iconName="download"
+                        onClick={handleExport}
+                        disabled={isExecuting}
+                      >
+                        Export
+                      </Button>
+                      <Button
+                        variant="primary"
+                        onClick={handleExecute}
+                        loading={isExecuting}
+                        disabled={isGenerating || isExecuting}
+                        iconName="caret-right-filled"
+                      >
+                        Execute Pipeline
+                      </Button>
+                    </SpaceBetween>
+                  }
+                >
+                  {pipeline.name}
+                </Header>
+              }
+            >
+              <SpaceBetween size="m">
+                <ColumnLayout columns={4} variant="text-grid">
+                  <div>
+                    <Box variant="awsui-key-label">Estimated Cost</Box>
+                    <Box variant="awsui-value-large">${pipeline.estimatedCostPerPage.toFixed(4)}/page</Box>
+                  </div>
+                  <div>
+                    <Box variant="awsui-key-label">Estimated Latency</Box>
+                    <Box variant="awsui-value-large">{pipeline.estimatedLatencyMs}ms</Box>
+                  </div>
+                  <div>
+                    <Box variant="awsui-key-label">Pipeline Nodes</Box>
+                    <Box variant="awsui-value-large">{pipeline.nodes.length}</Box>
+                  </div>
+                  <div>
+                    <Box variant="awsui-key-label">Capabilities</Box>
+                    <Box variant="awsui-value-large">{capabilities.length}</Box>
+                  </div>
+                </ColumnLayout>
 
-              <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#5f6b7a' }}>
-                <span><strong>1. Input</strong> - Document ingestion</span>
-                <span><strong>2. Classify</strong> - Route by content type</span>
-                <span><strong>3. Capabilities</strong> - What to extract</span>
-                <span><strong>4. Methods</strong> - AI model selection</span>
-                <span><strong>5. Aggregate</strong> - Merge results</span>
-                <span><strong>6. Output</strong> - Structured JSON</span>
-              </div>
-            </SpaceBetween>
-          </Container>
+                <PipelineCanvas
+                  pipeline={pipeline}
+                  nodeStates={nodeStates}
+                  activeEdges={activeEdges}
+                  fileName={document.fileName}
+                />
+
+                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#5f6b7a' }}>
+                  <span><strong>1. Input</strong> - Document ingestion</span>
+                  <span><strong>2. Classify</strong> - Route by content type</span>
+                  <span><strong>3. Capabilities</strong> - What to extract</span>
+                  <span><strong>4. Methods</strong> - AI model selection</span>
+                  <span><strong>5. Aggregate</strong> - Merge results</span>
+                  <span><strong>6. Output</strong> - Structured JSON</span>
+                </div>
+              </SpaceBetween>
+            </Container>
+          </Grid>
         )}
 
         {/* Execution Summary */}

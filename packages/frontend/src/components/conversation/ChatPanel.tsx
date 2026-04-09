@@ -21,9 +21,11 @@ interface ChatPanelProps {
   error: string | null;
   onSendMessage: (message: string) => void;
   hideQuickReplies?: boolean;
+  title?: string;
+  placeholder?: string;
 }
 
-export default function ChatPanel({ messages, isStreaming, error, onSendMessage, hideQuickReplies }: ChatPanelProps) {
+export default function ChatPanel({ messages, isStreaming, error, onSendMessage, hideQuickReplies, title, placeholder }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -61,7 +63,7 @@ export default function ChatPanel({ messages, isStreaming, error, onSendMessage,
       fitHeight
       header={
         <Box variant="h3" padding={{ top: 'xs', bottom: 'xs' }}>
-          Document Analysis Chat
+          {title ?? 'Document Analysis Chat'}
         </Box>
       }
       footer={
@@ -73,7 +75,7 @@ export default function ChatPanel({ messages, isStreaming, error, onSendMessage,
               onKeyDown={({ detail }) => {
                 if (detail.key === 'Enter') handleSend();
               }}
-              placeholder={isStreaming ? 'Waiting for response...' : 'Type your answer or click an option above...'}
+              placeholder={isStreaming ? 'Waiting for response...' : (placeholder ?? 'Type your answer or click an option above...')}
               disabled={isStreaming}
             />
           </div>

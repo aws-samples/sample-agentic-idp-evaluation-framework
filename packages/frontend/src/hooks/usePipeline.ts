@@ -41,7 +41,7 @@ export interface UsePipelineResult {
   executePipeline: (pipeline: PipelineDefinition, documentId: string, s3Uri: string) => void;
   totalCost: number;
   totalLatencyMs: number;
-  switchPipeline: (pipeline: PipelineDefinition) => void;
+  switchPipeline: (pipeline: PipelineDefinition, alternatives?: PipelineDefinition[]) => void;
   stopExecution: () => void;
 }
 
@@ -253,8 +253,9 @@ export function usePipeline(): UsePipelineResult {
     })();
   }, [stopExecution]);
 
-  const switchPipeline = useCallback((newPipeline: PipelineDefinition) => {
+  const switchPipeline = useCallback((newPipeline: PipelineDefinition, newAlternatives?: PipelineDefinition[]) => {
     setPipeline(newPipeline);
+    if (newAlternatives) setAlternatives(newAlternatives);
     const states: Record<string, NodeStateInfo> = {};
     for (const node of newPipeline.nodes) {
       states[node.id] = { state: 'idle' };

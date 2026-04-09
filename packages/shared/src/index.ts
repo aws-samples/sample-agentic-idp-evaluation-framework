@@ -22,6 +22,7 @@ export type {
 } from './types/processing.js';
 export type {
   ConversationEvent,
+  PipelineChatEvent,
   ProcessingEvent,
   ArchitectureEvent,
   CapabilityRecommendation,

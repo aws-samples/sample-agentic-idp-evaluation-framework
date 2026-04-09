@@ -1,5 +1,6 @@
 import type { Capability } from './capabilities.js';
 import type { ProcessorResult, ComparisonResult, ProcessingMethod } from './processing.js';
+import type { PipelineDefinition } from './pipeline.js';
 
 // Conversation SSE events
 export type ConversationEvent =
@@ -23,6 +24,12 @@ export type ProcessingEvent =
   | { type: 'method_error'; method: ProcessingMethod; error: string }
   | { type: 'comparison_update'; data: ComparisonResult }
   | { type: 'all_complete'; data: { results: ProcessorResult[]; comparison: ComparisonResult } };
+
+// Pipeline Chat SSE events
+export type PipelineChatEvent =
+  | { type: 'text'; data: string }
+  | { type: 'pipeline_update'; data: { pipeline: PipelineDefinition; alternatives: PipelineDefinition[] } }
+  | { type: 'done' };
 
 // Architecture SSE events
 export type ArchitectureEvent =

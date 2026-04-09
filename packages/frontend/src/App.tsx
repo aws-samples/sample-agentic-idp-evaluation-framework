@@ -119,7 +119,7 @@ export default function App() {
   );
 
   const handleStartProcessing = useCallback((method?: string, preview?: PreviewResponse | null) => {
-    if (method) setPreferredMethod(method);
+    setPreferredMethod(method); // Always set — clears stale value when no method selected
     if (preview) setPreviewData(preview);
     navigate('/pipeline');
   }, [navigate]);
