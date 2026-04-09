@@ -148,13 +148,10 @@ router.post('/execute', async (req, res) => {
       return;
     }
 
-    // Extract capabilities from capability nodes
-    const capabilityNodes = pipeline.nodes.filter(
-      (node) => node.type === 'capability',
-    );
-    const capabilities = capabilityNodes.map(
-      (node) => (node.config as any).capability,
-    );
+    // Extract capabilities from method nodes (capabilities are stored in method node config)
+    const capabilities = Array.from(new Set(
+      methodNodes.flatMap((node) => (node.config as any).capabilities ?? [])
+    ));
 
     const fileName = s3Uri.split('/').pop() ?? 'document.pdf';
     const input: AdapterInput = {
