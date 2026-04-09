@@ -101,7 +101,7 @@ router.post('/', async (req, res) => {
 
 Document type: ${body.documentType ?? 'unknown'}
 Selected capabilities: ${body.capabilities.join(', ')}
-${body.preferredMethod ? `User preferred method: ${body.preferredMethod}. Use this if its performance is competitive.` : ''}
+${body.preferredMethod ? `User EXPLICITLY selected method: ${body.preferredMethod}. YOU MUST use this method for ALL capabilities unless it completely failed (error status) in the preview. The user made a deliberate choice — respect it even if another method scored slightly higher.` : ''}
 
 PREVIEW RESULTS (actual measured performance):
 ${previewSummary}
