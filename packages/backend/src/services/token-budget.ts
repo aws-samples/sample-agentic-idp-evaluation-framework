@@ -39,11 +39,14 @@ export function calculateMaxTokens(
   format: 'yaml' | 'json' = 'yaml',
   isMedia: boolean = false,
 ): number {
+  // Model max output tokens (minimum across all models: Haiku 4.5 = 64,000)
+  const MODEL_MAX = 64000;
+
   // Media capabilities need more tokens (video transcription, audio, etc.)
-  if (isMedia) return Math.max(4096, Math.min(capCount * 1000, 8192));
+  if (isMedia) return Math.max(8192, Math.min(capCount * 2000, MODEL_MAX));
 
   const formatMult = format === 'yaml' ? 1.0 : 1.3;
   // Base: 1000 tokens per capability + 800 per page (CJK/tables need more headroom)
   const calculated = Math.round((1000 * capCount + pageCount * 800) * formatMult);
-  return Math.max(4096, Math.min(calculated, 16384));
+  return Math.max(4096, Math.min(calculated, MODEL_MAX));
 }

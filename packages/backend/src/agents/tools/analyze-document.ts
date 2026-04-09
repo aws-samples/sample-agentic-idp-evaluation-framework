@@ -124,7 +124,7 @@ async function callBedrock(messages: Message[]): Promise<DocumentAnalysis> {
     modelId: config.claudeModelId,
     system: [{ text: 'You are a document analysis assistant. Return only valid JSON.' }],
     messages,
-    inferenceConfig: { maxTokens: 1024, temperature: 0 },
+    inferenceConfig: { maxTokens: 4096, temperature: 0 },
   });
 
   const response = await bedrockClient.send(command);

@@ -142,7 +142,7 @@ export default function CapabilityCards({
               loading={isPreviewLoading}
               iconName="play"
             >
-              {preview ? 'Re-run Preview' : `Run Preview (${selected.length})`}
+              {isPreviewLoading ? 'Running Preview...' : preview ? 'Re-run Preview' : `Run Preview (${selected.length})`}
             </Button>
           ) : undefined
         }

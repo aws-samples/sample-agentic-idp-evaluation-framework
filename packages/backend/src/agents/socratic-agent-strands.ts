@@ -157,7 +157,7 @@ export async function runSocraticAgentStrands(
   const model = new BedrockModel({
     modelId: config.claudeModelId,
     region: config.region,
-    maxTokens: 2048,
+    maxTokens: 16384,
     temperature: 0.7,
   });
 

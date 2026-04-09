@@ -81,7 +81,7 @@ router.post('/', async (req, res) => {
       system: [{ text: ARCHITECT_SYSTEM_PROMPT }],
       messages,
       inferenceConfig: {
-        maxTokens: 4096,
+        maxTokens: 32768,
         temperature: 0.3,
       },
     });
