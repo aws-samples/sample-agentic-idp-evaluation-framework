@@ -37,37 +37,34 @@ interface ArchitecturePageProps {
 function buildMethodMap(capabilities: Capability[], processingResults: ProcessorResult[], comparison?: ComparisonResult | null): Map<string, string[]> {
   const methodMap = new Map<string, string[]>();
 
-  // Priority 1: Use comparison's best method per capability (reflects actual benchmark winner)
-  if (comparison?.capabilityMatrix) {
-    for (const cap of capabilities) {
-      const matrix = comparison.capabilityMatrix[cap];
-      if (!matrix) continue;
-      // Find the method with highest confidence for this capability
-      let bestMethod = '';
-      let bestConf = -1;
-      for (const [method, data] of Object.entries(matrix)) {
-        const conf = (data as { confidence?: number })?.confidence ?? 0;
-        if (conf > bestConf) {
-          bestConf = conf;
-          bestMethod = method;
-        }
-      }
-      if (bestMethod && bestConf > 0) {
-        if (!methodMap.has(bestMethod)) methodMap.set(bestMethod, []);
-        methodMap.get(bestMethod)!.push(cap);
+  // Priority 1: Use pipeline execution results (the methods that actually ran)
+  if (processingResults.length > 0) {
+    for (const result of processingResults) {
+      if (result.status !== 'complete') continue;
+      const caps = Object.keys(result.results).filter(c => capabilities.includes(c as Capability));
+      if (caps.length > 0) {
+        methodMap.set(result.method, caps);
       }
     }
   }
 
-  // Priority 2: Fill unmapped capabilities from pipeline execution results
+  // Priority 2: Use comparison's best method for unmapped capabilities
   const mappedCaps = new Set(Array.from(methodMap.values()).flat());
-  if (processingResults.length > 0) {
-    for (const result of processingResults) {
-      if (result.status !== 'complete') continue;
-      const caps = Object.keys(result.results).filter(c => capabilities.includes(c as Capability) && !mappedCaps.has(c));
-      for (const cap of caps) {
-        if (!methodMap.has(result.method)) methodMap.set(result.method, []);
-        methodMap.get(result.method)!.push(cap);
+  if (comparison?.capabilityMatrix) {
+    for (const cap of capabilities) {
+      if (mappedCaps.has(cap)) continue;
+      const matrix = comparison.capabilityMatrix[cap];
+      if (!matrix) continue;
+      // Find method with highest confidence (>= 0 to handle zero-confidence cases)
+      let bestMethod = '';
+      let bestConf = -1;
+      for (const [method, data] of Object.entries(matrix)) {
+        const conf = (data as { confidence?: number })?.confidence ?? 0;
+        if (conf > bestConf) { bestConf = conf; bestMethod = method; }
+      }
+      if (bestMethod) {
+        if (!methodMap.has(bestMethod)) methodMap.set(bestMethod, []);
+        methodMap.get(bestMethod)!.push(cap);
         mappedCaps.add(cap);
       }
     }
