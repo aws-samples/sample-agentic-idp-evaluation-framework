@@ -111,9 +111,11 @@ ${supportRef}
 Available methods (${METHODS.length} total):
 ${methodListStr}
 
+IMPORTANT CAVEAT: The "confidence" scores above are SELF-REPORTED by each model — they are NOT objective accuracy measurements. A model claiming 100% confidence does not mean its output is correct. Always weigh confidence scores skeptically. The user should review actual extraction results to judge quality.
+
 DECISION RULES:
-1. USE THE ACTUAL PREVIEW DATA. The confidence scores, latency, and costs above are real measurements.
-2. For each capability, pick the method that performed BEST in preview (highest confidence).
+1. USE THE ACTUAL PREVIEW DATA, but remember confidence is self-assessed and may be inflated.
+2. For each capability, consider method quality holistically — not just highest self-reported confidence.
 3. If two methods have similar confidence (within 5%), prefer the cheaper/faster one.
 4. Group capabilities onto the same method when possible to avoid running multiple methods.
 5. If a method failed or produced garbage output (confidence < 30%), exclude it entirely.

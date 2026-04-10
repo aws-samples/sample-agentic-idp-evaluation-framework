@@ -179,6 +179,7 @@ export default function PipelinePage({
         content += `\n${smartRec.rationale}`;
       }
 
+      content += '\n\n> **Note:** Confidence scores are self-reported by each model and may not reflect actual extraction accuracy. Review the raw results in Step 2 to judge quality yourself.';
       content += '\n\nHow would you like to modify this pipeline?';
 
       addInitialMessage({
