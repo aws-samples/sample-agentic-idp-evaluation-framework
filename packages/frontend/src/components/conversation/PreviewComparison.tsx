@@ -33,7 +33,7 @@ export default function PreviewComparison({
       header={
         <Header
           variant="h2"
-          description="Compare extraction results across methods. Select your preferred method for the pipeline."
+          description="Compare extraction results across methods. Select your preferred method for the pipeline. Confidence scores are self-reported by each model — click 'Show raw' to verify actual output quality."
           actions={
             <Button variant="primary" onClick={onBuildPipeline} disabled={!selectedMethod}>
               Build Pipeline with {preview.results.find((m) => m.method === selectedMethod)?.shortName ?? 'selected method'}
