@@ -13,13 +13,12 @@ import {
   CAPABILITIES,
   CATEGORY_INFO,
   CAPABILITY_CATEGORIES,
-  CAPABILITY_SUPPORT,
   getCapabilitiesByCategory,
   METHOD_FAMILIES,
   METHODS,
   getMethodsByFamily,
 } from '@idp/shared';
-import type { SupportLevel, MethodFamily } from '@idp/shared';
+import type { SupportLevel } from '@idp/shared';
 import Popover from '@cloudscape-design/components/popover';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import {
@@ -39,10 +38,14 @@ interface HomePageProps {
 const FAMILY_NAMES: Record<string, string> = {
   bda: 'Bedrock Data Automation',
   'bda-llm': 'BDA + LLM Hybrid',
-  claude: 'Claude Models',
-  nova: 'Nova Models',
+  claude: 'Claude (LLM)',
+  nova: 'Nova (LLM)',
   'textract-llm': 'Textract + LLM',
-  embeddings: 'Embeddings',
+  textract: 'Amazon Textract',
+  embeddings: 'Nova Embeddings',
+  'nova-embeddings': 'Nova Embeddings',
+  comprehend: 'Amazon Comprehend',
+  'bedrock-guardrails': 'Bedrock Guardrails',
 };
 
 const STEPS = [
@@ -129,22 +132,13 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                         display: 'flex', flexWrap: 'wrap', gap: 6,
                       }}>
                         {caps.map((cap) => {
-                          const families: MethodFamily[] = ['claude', 'bda', 'bda-llm', 'textract-llm', 'nova', 'embeddings'];
-                          const familyLabels: Record<string, string> = {
-                            claude: 'Claude (LLM)',
-                            bda: 'BDA',
-                            'bda-llm': 'BDA+LLM',
-                            'textract-llm': 'Textract+LLM',
-                            nova: 'Nova (LLM)',
-                            embeddings: 'Nova Embeddings',
-                          };
-                          const supportEntries = families
-                            .map((f) => ({
-                              family: f,
-                              label: familyLabels[f],
-                              level: (CAPABILITY_SUPPORT[f]?.[cap.id as keyof typeof CAPABILITY_SUPPORT[typeof f]] ?? 'none') as SupportLevel,
-                            }))
-                            .filter((s) => s.level !== 'none' || families.slice(0, 4).includes(s.family as MethodFamily));
+                          const supportEntries = cap.support
+                            ? Object.entries(cap.support).map(([key, level]) => ({
+                                family: key,
+                                label: FAMILY_NAMES[key] || key,
+                                level: level as SupportLevel,
+                              }))
+                            : [];
 
                           return (
                             <Popover

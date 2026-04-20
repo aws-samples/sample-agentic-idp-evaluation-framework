@@ -10,10 +10,10 @@ tags: ["handwriting", "cursive", "annotations", "notes"]
 exampleInput: "Handwritten medical form"
 exampleOutput: "Digitized text from handwritten fields"
 support:
-  bda: "good"
+  bda: "excellent"
   bda-llm: "excellent"
   claude: "excellent"
-  nova: "good"
+  nova: "excellent"
   textract-llm: "excellent"
 ---
 
@@ -39,8 +39,8 @@ Returns plain text with preserved structure and formatting.
 
 ## Method support
 
-- **bda**: good
+- **bda**: excellent
 - **bda-llm**: excellent
 - **claude**: excellent
-- **nova**: good
+- **nova**: excellent
 - **textract-llm**: excellent

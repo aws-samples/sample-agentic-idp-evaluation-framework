@@ -12,8 +12,7 @@ exampleOutput: "Moderation flags with confidence scores per category"
 support:
   bda: "excellent"
   bda-llm: "excellent"
-  claude: "good"
-  nova: "good"
+  nova: "excellent"
 ---
 
 # Content Moderation
@@ -40,5 +39,4 @@ Returns structured JSON with typed fields.
 
 - **bda**: excellent
 - **bda-llm**: excellent
-- **claude**: good
-- **nova**: good
+- **nova**: excellent

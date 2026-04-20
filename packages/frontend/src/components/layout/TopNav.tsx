@@ -13,10 +13,10 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
     <TopNavigation
       identity={{
         href: '/',
-        title: 'IDP Framework',
+        title: 'ONE IDP Framework',
         logo: {
           src: '/logo-dark.svg',
-          alt: 'IDP Framework',
+          alt: 'ONE IDP Framework',
         },
       }}
       utilities={[
@@ -26,13 +26,20 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
           text: darkMode ? 'Light Mode' : 'Dark Mode',
           onClick: onToggleDarkMode,
         },
-        // {
-        //   type: 'button',
-        //   text: 'GitHub',
-        //   href: 'https://github.com/aws-samples/one-idp',
-        //   external: true,
-        //   externalIconAriaLabel: '(opens in new tab)',
-        // },
+        {
+          type: 'button',
+          text: 'GitLab',
+          href: 'https://gitlab.aws.dev/sanghwa/one-idp',
+          external: true,
+          externalIconAriaLabel: '(opens in new tab)',
+        },
+        {
+          type: 'button',
+          text: 'Slack',
+          href: 'https://amazon.enterprise.slack.com/archives/C0ATLG1TX1U',
+          external: true,
+          externalIconAriaLabel: '(opens in new tab)',
+        },
         ...(user
           ? [
               {

@@ -12,8 +12,7 @@ exampleOutput: "Topic summaries with timestamps and action items"
 support:
   bda: "excellent"
   bda-llm: "excellent"
-  claude: "good"
-  nova: "good"
+  nova: "excellent"
 ---
 
 # Audio Summarization
@@ -40,5 +39,4 @@ Returns structured JSON with typed fields.
 
 - **bda**: excellent
 - **bda-llm**: excellent
-- **claude**: good
-- **nova**: good
+- **nova**: excellent

@@ -12,8 +12,7 @@ exampleOutput: "Chapters with start/end times, summaries, and IAB categories"
 support:
   bda: "excellent"
   bda-llm: "excellent"
-  claude: "good"
-  nova: "good"
+  nova: "excellent"
 ---
 
 # Video Chapter Extraction
@@ -40,5 +39,4 @@ Returns structured JSON with typed fields.
 
 - **bda**: excellent
 - **bda-llm**: excellent
-- **claude**: good
-- **nova**: good
+- **nova**: excellent

@@ -12,8 +12,7 @@ exampleOutput: "Full summary + per-chapter summaries with timestamps"
 support:
   bda: "excellent"
   bda-llm: "excellent"
-  claude: "good"
-  nova: "good"
+  nova: "excellent"
 ---
 
 # Video Summarization
@@ -40,5 +39,4 @@ Returns structured JSON with typed fields.
 
 - **bda**: excellent
 - **bda-llm**: excellent
-- **claude**: good
-- **nova**: good
+- **nova**: excellent

@@ -12,8 +12,7 @@ exampleOutput: "Timestamped transcript with speaker labels (spk_0, spk_1)"
 support:
   bda: "excellent"
   bda-llm: "excellent"
-  claude: "good"
-  nova: "good"
+  nova: "excellent"
 ---
 
 # Audio Transcription
@@ -40,5 +39,4 @@ Returns structured JSON with typed fields.
 
 - **bda**: excellent
 - **bda-llm**: excellent
-- **claude**: good
-- **nova**: good
+- **nova**: excellent

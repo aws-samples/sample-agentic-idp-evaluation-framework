@@ -12,7 +12,7 @@ exampleOutput: "[{"label": "face", "x": 120, "y": 45, "w": 80, "h": 100}]"
 support:
   bda: "excellent"
   bda-llm: "excellent"
-  claude: "limited"
+  claude: "good"
   nova: "excellent"
   textract-llm: "good"
 ---
@@ -41,6 +41,6 @@ Returns structured JSON with typed fields.
 
 - **bda**: excellent
 - **bda-llm**: excellent
-- **claude**: limited
+- **claude**: good
 - **nova**: excellent
 - **textract-llm**: good

@@ -86,10 +86,10 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'Handwritten medical form',
     exampleOutput: 'Digitized text from handwritten fields',
     support: {
-    'bda': 'good' as const,
+    'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
-    'nova': 'good' as const,
+    'nova': 'excellent' as const,
     'textract-llm': 'excellent' as const
     },
   },
@@ -177,7 +177,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     support: {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
-    'claude': 'limited' as const,
+    'claude': 'good' as const,
     'nova': 'excellent' as const,
     'textract-llm': 'good' as const
     },
@@ -322,7 +322,9 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
     'nova': 'good' as const,
-    'textract-llm': 'good' as const
+    'textract-llm': 'good' as const,
+    'comprehend': 'excellent' as const,
+    'bedrock-guardrails': 'excellent' as const
     },
   },
   'pii_redaction': {
@@ -463,8 +465,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     support: {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
-    'claude': 'good' as const,
-    'nova': 'good' as const
+    'nova': 'excellent' as const
     },
   },
   'audio_transcription': {
@@ -480,8 +481,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     support: {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
-    'claude': 'good' as const,
-    'nova': 'good' as const
+    'nova': 'excellent' as const
     },
   },
   'content_moderation': {
@@ -497,8 +497,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     support: {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
-    'claude': 'good' as const,
-    'nova': 'good' as const
+    'nova': 'excellent' as const
     },
   },
   'video_chapter_extraction': {
@@ -514,8 +513,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     support: {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
-    'claude': 'good' as const,
-    'nova': 'good' as const
+    'nova': 'excellent' as const
     },
   },
   'video_summarization': {
@@ -531,8 +529,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     support: {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
-    'claude': 'good' as const,
-    'nova': 'good' as const
+    'nova': 'excellent' as const
     },
   },
   'embedding_generation': {
@@ -560,10 +557,9 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'PDF with embedded product photos and charts',
     exampleOutput: 'Individual images extracted with captions and page locations',
     support: {
-    'bda': 'good' as const,
-    'bda-llm': 'good' as const,
-    'claude': 'good' as const,
-    'nova': 'good' as const
+    'bda': 'excellent' as const,
+    'textract': 'excellent' as const,
+    'nova': 'excellent' as const
     },
   },
   'knowledge_base_ingestion': {
@@ -577,7 +573,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'Extracted text + embeddings from processing pipeline',
     exampleOutput: 'Documents indexed in Bedrock Knowledge Base, queryable via RetrieveAndGenerate API',
     support: {
-    'embeddings': 'good' as const
+    'nova-embeddings': 'excellent' as const
     },
   },
   'format_standardization': {

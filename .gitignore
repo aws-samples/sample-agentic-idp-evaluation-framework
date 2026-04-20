@@ -24,8 +24,8 @@ Thumbs.db
 # Local dev uploads (when USE_LOCAL_STORAGE=true)
 .local-uploads/
 
-# OMC state
-.omc/state/
+# OMC (all state, sessions, memory)
+.omc/
 
 # Terraform
 .terraform/
@@ -40,6 +40,8 @@ reference/*/.terraform/
 reference/*/venv/
 reference/*/__pycache__/
 reference/.omc/
-.omc/state/
-.omc/handoffs/
 packages/backend/.local-uploads/
+
+# drawio backups / autosaves
+.$*.drawio.bkp
+*.drawio.bkp
