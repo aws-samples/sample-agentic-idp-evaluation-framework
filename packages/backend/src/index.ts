@@ -41,6 +41,27 @@ assertSafeAuthConfig();
 app.use('/api', authMiddleware);
 app.use('/api', authUserHeader);
 
+// Pre-route hardening: a raw request like `/api/files/..%2F..%2Fetc%2Fpasswd`
+// passes Express URL normalization and may be served by downstream static
+// middleware before reaching the route handler. Block any percent-encoded
+// traversal/null-byte payloads targeting /api/files/ at the middleware layer.
+app.use('/api/files', (req, res, next) => {
+  const raw = req.originalUrl;
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes('%2e%2e') || // encoded ..
+    lower.includes('%2f%2e%2e') ||
+    lower.includes('%00') ||    // null byte
+    raw.includes('\u0000') ||
+    raw.includes('/../') ||
+    raw.endsWith('/..')
+  ) {
+    res.status(404).json({ error: 'File not found' });
+    return;
+  }
+  next();
+});
+
 // File serving proxy (local files or S3).
 // Keys are user-influenced — sanitize before touching either backend.
 app.get('/api/files/*', async (req, res) => {
