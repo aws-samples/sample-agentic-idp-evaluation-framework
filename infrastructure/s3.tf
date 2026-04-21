@@ -55,7 +55,11 @@ resource "aws_s3_bucket_cors_configuration" "uploads" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "PUT", "POST"]
-    allowed_origins = ["http://localhost:5173", "https://idp.sanghwa.people.aws.dev"]
+    allowed_origins = distinct(concat(
+      ["http://localhost:5173"],
+      var.cors_allowed_origins,
+      var.domain_name != "" ? ["https://${var.domain_name}"] : [],
+    ))
     max_age_seconds = 3600
   }
 }

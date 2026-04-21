@@ -43,10 +43,14 @@ resource "aws_cloudfront_distribution" "main" {
     origin_id   = "AppRunner-API"
 
     custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "https-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
+      http_port                = 80
+      https_port               = 443
+      origin_protocol_policy   = "https-only"
+      origin_ssl_protocols     = ["TLSv1.2"]
+      # Long-lived SSE responses from the backend need a generous read timeout.
+      # These match the original deployment's tuned values.
+      origin_read_timeout      = 60
+      origin_keepalive_timeout = 30
     }
 
     custom_header {

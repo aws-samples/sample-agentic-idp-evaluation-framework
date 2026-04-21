@@ -1,7 +1,14 @@
 #!/bin/sh
-# Entry point for IDP container
-# SERVER_MODE=main  → HTTP API server (App Runner)
-# SERVER_MODE=agent → Strands agent server (AgentCore)
+# Entry point for the ONE IDP container.
+#
+# A single image powers two runtime tiers; the dispatch happens here
+# based on SERVER_MODE:
+#
+#   SERVER_MODE=main   → Express HTTP API on PORT (web tier, App Runner)
+#   SERVER_MODE=agent  → Strands agent server on AGENT_PORT (agent tier,
+#                        Bedrock AgentCore Runtime)
+#
+# See docs/architecture.md for the boundary between tiers.
 
 if [ "$SERVER_MODE" = "agent" ]; then
   echo "Starting Agent Server (mode: agent)"

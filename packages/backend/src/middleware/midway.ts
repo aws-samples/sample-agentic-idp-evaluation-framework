@@ -72,7 +72,14 @@ export function midwayAuth(req: Request, res: Response, next: NextFunction): voi
     return;
   }
 
-  // Check for Midway user header (set by ALB/CloudFront after Midway validation)
+  // Check for Midway user header.
+  //
+  // SECURITY ASSUMPTION: the `x-midway-user` header must only reach this
+  // process after being set by a trusted edge (Midway-aware CloudFront or
+  // ALB). If this backend is exposed directly to the public internet, an
+  // attacker can impersonate any alias by sending this header. Do not flip
+  // AUTH_PROVIDER=midway unless your edge strips inbound x-midway-* headers
+  // before forwarding.
   const midwayUserHeader = req.headers[MIDWAY_HEADER] as string | undefined;
   if (midwayUserHeader) {
     (req as any).midwayUser = {

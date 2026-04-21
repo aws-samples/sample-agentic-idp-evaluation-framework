@@ -8,7 +8,7 @@ dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
 import express from 'express';
 import { corsMiddleware } from './middleware/cors.js';
-import { midwayAuth, midwayUserHeader } from './middleware/midway.js';
+import { authMiddleware, authUserHeader, assertSafeAuthConfig } from './middleware/auth.js';
 import { errorHandler } from './middleware/error.js';
 import { processRateLimit, apiRateLimit } from './middleware/rate-limit.js';
 import { config } from './config/aws.js';
@@ -35,14 +35,28 @@ app.use(express.json({ limit: '50mb' }));
 // Health check before auth (App Runner / ALB health checks need unauthenticated access)
 app.use('/api/health', healthRouter);
 
-// Midway authentication (internal AWS employees only)
-// Set MIDWAY_DISABLED=true in .env for local development
-app.use('/api', midwayAuth);
-app.use('/api', midwayUserHeader);
+// Authentication (pluggable: midway | cognito | none)
+// Configure via AUTH_PROVIDER env var. `MIDWAY_DISABLED=true` forces `none`.
+assertSafeAuthConfig();
+app.use('/api', authMiddleware);
+app.use('/api', authUserHeader);
 
-// File serving proxy (local files or S3)
+// File serving proxy (local files or S3).
+// Keys are user-influenced — sanitize before touching either backend.
 app.get('/api/files/*', async (req, res) => {
   const key = decodeURIComponent(req.path.replace('/api/files/', ''));
+
+  // Reject keys that look like path traversal, absolute paths, or null bytes.
+  // Legitimate keys are always `uploads/<alias>/<uuid>/<filename>` or similar.
+  if (
+    !key ||
+    key.includes('\u0000') ||
+    key.startsWith('/') ||
+    key.split('/').some((seg) => seg === '..' || seg === '.')
+  ) {
+    res.status(404).json({ error: 'File not found' });
+    return;
+  }
 
   // Try local file first
   const filePath = getLocalFilePath(key);
@@ -123,7 +137,9 @@ app.listen(config.port, () => {
   if (!config.claudeModelId) warnings.push('CLAUDE_MODEL_ID not set');
   if (!config.bdaProfileArn) warnings.push('BDA_PROFILE_ARN not set (BDA Standard unavailable)');
   if (!config.bdaProjectArn) warnings.push('BDA_PROJECT_ARN not set (BDA Custom unavailable)');
-  if (process.env.MIDWAY_DISABLED === 'true') warnings.push('Midway auth DISABLED (dev mode)');
+  const effectiveProvider = process.env.MIDWAY_DISABLED === 'true' ? 'none' : config.authProvider;
+  if (effectiveProvider === 'none') warnings.push(`Auth DISABLED (AUTH_PROVIDER=none) — demo mode only`);
+  else warnings.push(`Auth provider: ${effectiveProvider}`);
 
   if (warnings.length > 0) {
     console.warn('⚠ Environment warnings:');

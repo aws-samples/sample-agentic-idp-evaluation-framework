@@ -19,20 +19,34 @@ resource "aws_apprunner_service" "backend" {
       image_configuration {
         port = "3001"
 
-        runtime_environment_variables = {
-          AWS_REGION         = var.aws_region
-          S3_BUCKET          = aws_s3_bucket.uploads.id
-          S3_OUTPUT_PREFIX   = "idp-outputs/"
-          BDA_PROFILE_ARN    = var.bda_profile_arn
-          BDA_PROJECT_ARN    = var.bda_project_arn
-          NODE_ENV           = "production"
-          PORT               = "3001"
-          CLAUDE_MODEL_ID    = "us.anthropic.claude-sonnet-4-6"
-          NOVA_MODEL_ID      = "us.amazon.nova-2-lite-v1:0"
-          SITE_URL           = var.domain_name != "" ? "https://${var.domain_name}" : ""
-          MIDWAY_DISABLED    = "false"
-          AGENTCORE_RUNTIME_ARN = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn
-        }
+        # Only include optional vars when they have non-empty values, to keep
+        # the App Runner service env var set identical to the original
+        # deployment's minimal set when callers don't opt into the new
+        # pluggable-auth features.
+        runtime_environment_variables = merge(
+          {
+            AWS_REGION            = var.aws_region
+            S3_BUCKET             = aws_s3_bucket.uploads.id
+            S3_OUTPUT_PREFIX      = "idp-outputs/"
+            BDA_PROFILE_ARN       = var.bda_profile_arn
+            BDA_PROJECT_ARN       = var.bda_project_arn
+            NODE_ENV              = "production"
+            PORT                  = "3001"
+            CLAUDE_MODEL_ID       = var.claude_model_id
+            NOVA_MODEL_ID         = var.nova_model_id
+            SITE_URL              = var.domain_name != "" ? "https://${var.domain_name}" : ""
+            # MIDWAY_DISABLED is kept for back-compat. The backend now reads
+            # AUTH_PROVIDER as the source of truth, but if auth_provider=midway
+            # we emit MIDWAY_DISABLED=false (original deployment's value).
+            MIDWAY_DISABLED       = var.auth_provider == "midway" ? "false" : "true"
+            AGENTCORE_RUNTIME_ARN = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn
+            ACTIVITY_TABLE        = "${var.project_name}-activity-${var.environment}"
+          },
+          var.auth_provider != "midway" ? { AUTH_PROVIDER = var.auth_provider } : {},
+          var.admin_users != "" ? { ADMIN_USERS = var.admin_users } : {},
+          var.cognito_user_pool_id != "" ? { COGNITO_USER_POOL_ID = var.cognito_user_pool_id } : {},
+          var.cognito_client_id != "" ? { COGNITO_CLIENT_ID = var.cognito_client_id } : {},
+        )
       }
     }
 

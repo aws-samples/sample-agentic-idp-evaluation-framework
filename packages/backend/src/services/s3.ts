@@ -2,12 +2,16 @@ import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 import { s3Client, config } from '../config/aws.js';
 import { mkdir, writeFile, readFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { dirname, join, resolve, sep, basename } from 'path';
 import { existsSync } from 'fs';
 
-// macOS uses NFD (decomposed) for Korean/CJK filenames; S3 keys must be NFC (composed)
+// macOS uses NFD (decomposed) for Korean/CJK filenames; S3 keys must be NFC (composed).
+// Also strip path separators / null bytes / control chars so a user-supplied filename
+// can never escape the `uploads/<alias>/<uuid>/` prefix on either S3 or the local FS.
 function normalizeFileName(name: string): string {
-  return name.normalize('NFC');
+  const base = basename(name).normalize('NFC');
+  // eslint-disable-next-line no-control-regex
+  return base.replace(/[\u0000-\u001f/\\]/g, '_') || 'upload';
 }
 
 const LOCAL_STORAGE_DIR = join(process.cwd(), '.local-uploads');
@@ -54,7 +58,7 @@ export async function uploadDocument(
 export async function getPresignedUrl(s3Uri: string): Promise<string> {
   // Always use backend proxy for file serving (avoids S3 presigned URL issues)
   const key = s3Uri.startsWith('local://')
-    ? s3Uri.replace(/^local:\/\/[^/]+\//, '')
+    ? s3Uri.replace(/^local:\/\/[^/]*\//, '')
     : new URL(s3Uri).pathname.slice(1);
   const encoded = key.split('/').map((seg) => encodeURIComponent(seg)).join('/');
   return `/api/files/${encoded}`;
@@ -62,7 +66,7 @@ export async function getPresignedUrl(s3Uri: string): Promise<string> {
 
 export async function getDocumentBuffer(s3Uri: string): Promise<Buffer> {
   if (s3Uri.startsWith('local://')) {
-    const key = s3Uri.replace(/^local:\/\/[^/]+\//, '');
+    const key = s3Uri.replace(/^local:\/\/[^/]*\//, '');
     const localPath = join(LOCAL_STORAGE_DIR, key);
     return readFile(localPath);
   }
@@ -91,8 +95,15 @@ export async function getDocumentBuffer(s3Uri: string): Promise<Buffer> {
   }
 }
 
-// Serve local files (for dev mode)
+// Serve local files (for dev mode). Guards against path traversal by
+// resolving the absolute path and verifying it stays inside LOCAL_STORAGE_DIR.
 export function getLocalFilePath(key: string): string | null {
-  const localPath = join(LOCAL_STORAGE_DIR, key);
-  return existsSync(localPath) ? localPath : null;
+  // Reject null bytes + obvious traversal attempts up-front so the error is
+  // cheap and the reason is obvious in logs.
+  if (!key || key.includes('\u0000') || key.split('/').some((s) => s === '..')) return null;
+
+  const candidate = resolve(LOCAL_STORAGE_DIR, key);
+  const root = resolve(LOCAL_STORAGE_DIR) + sep;
+  if (candidate !== resolve(LOCAL_STORAGE_DIR) && !candidate.startsWith(root)) return null;
+  return existsSync(candidate) ? candidate : null;
 }

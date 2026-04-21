@@ -8,15 +8,35 @@ interface TopNavProps {
   onToggleDarkMode?: () => void;
 }
 
+const APP_TITLE = import.meta.env.VITE_APP_TITLE || 'ONE IDP Framework';
+// External links (GitLab, Slack) are surfaced only in local dev builds by
+// default. `npm run dev` sets import.meta.env.DEV=true; production `vite build`
+// strips them unless explicitly opted in via VITE_SHOW_LINKS=true.
+const SHOW_LINKS = import.meta.env.DEV || import.meta.env.VITE_SHOW_LINKS === 'true';
+const REPO_URL = SHOW_LINKS ? import.meta.env.VITE_REPO_URL || '' : '';
+const REPO_LABEL = import.meta.env.VITE_REPO_LABEL || 'Source';
+const CHAT_URL = SHOW_LINKS ? import.meta.env.VITE_CHAT_URL || '' : '';
+const CHAT_LABEL = import.meta.env.VITE_CHAT_LABEL || 'Chat';
+
+function externalLink(text: string, href: string) {
+  return {
+    type: 'button' as const,
+    text,
+    href,
+    external: true,
+    externalIconAriaLabel: '(opens in new tab)',
+  };
+}
+
 export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps) {
   return (
     <TopNavigation
       identity={{
         href: '/',
-        title: 'ONE IDP Framework',
+        title: APP_TITLE,
         logo: {
           src: '/logo-dark.svg',
-          alt: 'ONE IDP Framework',
+          alt: APP_TITLE,
         },
       }}
       utilities={[
@@ -26,20 +46,8 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
           text: darkMode ? 'Light Mode' : 'Dark Mode',
           onClick: onToggleDarkMode,
         },
-        {
-          type: 'button',
-          text: 'GitLab',
-          href: 'https://gitlab.aws.dev/sanghwa/one-idp',
-          external: true,
-          externalIconAriaLabel: '(opens in new tab)',
-        },
-        {
-          type: 'button',
-          text: 'Slack',
-          href: 'https://amazon.enterprise.slack.com/archives/C0ATLG1TX1U',
-          external: true,
-          externalIconAriaLabel: '(opens in new tab)',
-        },
+        ...(REPO_URL ? [externalLink(REPO_LABEL, REPO_URL)] : []),
+        ...(CHAT_URL ? [externalLink(CHAT_LABEL, CHAT_URL)] : []),
         ...(user
           ? [
               {

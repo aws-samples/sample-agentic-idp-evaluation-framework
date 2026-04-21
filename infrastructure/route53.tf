@@ -1,13 +1,12 @@
-# Route53 + ACM for .people.aws.dev domain
+# Route53 + ACM for custom domain
 #
-# How .people.aws.dev works:
-# 1. Each Amazonian has a personal subdomain: <alias>.people.aws.dev
-# 2. The hosted zone is pre-created in your AWS account
-# 3. You create subdomains under it: idp.<alias>.people.aws.dev
-# 4. ACM certificate validates via DNS (Route53 record)
-# 5. CloudFront uses the certificate for HTTPS
+# Provide var.domain_name and var.route53_zone_id to enable HTTPS via
+# a custom domain. The hosted zone must already exist in Route53 — this
+# module does not create it.
+#
+# AWS internal note: for *.people.aws.dev, hosted zones are pre-created
+# per alias; supply the zone ID via route53_zone_id.
 
-# Use the pre-existing hosted zone for .people.aws.dev
 locals {
   zone_id = var.route53_zone_id
 }

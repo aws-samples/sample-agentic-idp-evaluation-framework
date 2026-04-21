@@ -8,7 +8,6 @@ data "aws_region" "current" {}
 
 resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
   agent_runtime_name = replace("${var.project_name}_${var.environment}", "-", "_")
-  description        = "IDP Evaluation Framework - document processing agent"
   role_arn           = aws_iam_role.agentcore_execution.arn
 
   agent_runtime_artifact {
@@ -21,18 +20,23 @@ resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
     network_mode = "PUBLIC"
   }
 
+  protocol_configuration {
+    server_protocol = "HTTP"
+  }
+
   environment_variables = {
     SERVER_MODE        = "agent"
     AWS_REGION         = var.aws_region
     AWS_DEFAULT_REGION = var.aws_region
     S3_BUCKET          = aws_s3_bucket.uploads.id
-    S3_OUTPUT_PREFIX    = "idp-outputs/"
+    S3_OUTPUT_PREFIX   = "idp-outputs/"
     BDA_PROFILE_ARN    = var.bda_profile_arn
     BDA_PROJECT_ARN    = var.bda_project_arn
     NODE_ENV           = "production"
     AGENT_PORT         = "8080"
-    CLAUDE_MODEL_ID    = "us.anthropic.claude-sonnet-4-6"
-    NOVA_MODEL_ID      = "us.amazon.nova-2-lite-v1:0"
+    PORT               = "8080" # back-compat with the original deployment
+    CLAUDE_MODEL_ID    = var.claude_model_id
+    NOVA_MODEL_ID      = var.nova_model_id
   }
 
   depends_on = [

@@ -18,16 +18,18 @@ export const docClient = DynamoDBDocumentClient.from(ddbClient);
 
 export const config = {
   region,
-  s3Bucket: process.env.S3_BUCKET ?? 'idp-unified-platform-uploads',
+  s3Bucket: process.env.S3_BUCKET ?? '',
   s3OutputPrefix: process.env.S3_OUTPUT_PREFIX ?? 'outputs/',
   bdaProfileArn: process.env.BDA_PROFILE_ARN ?? '',
   bdaProjectArn: process.env.BDA_PROJECT_ARN ?? '',
   claudeModelId: process.env.CLAUDE_MODEL_ID ?? 'us.anthropic.claude-sonnet-4-6',
-  novaModelId: process.env.NOVA_MODEL_ID ?? 'us.amazon.nova-2-pro-preview-20251202-v1:0',
+  novaModelId: process.env.NOVA_MODEL_ID ?? 'us.amazon.nova-2-lite-v1:0',
   port: parseInt(process.env.PORT ?? '3001', 10),
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
   agentUrl: process.env.AGENT_URL ?? '',
   agentRuntimeArn: process.env.AGENTCORE_RUNTIME_ARN ?? '',
-  activityTable: process.env.ACTIVITY_TABLE ?? 'one-idp-activity-dev',
-  adminUsers: (process.env.ADMIN_USERS ?? 'sanghwa').split(','),
+  activityTable: process.env.ACTIVITY_TABLE ?? 'one-idp-activity',
+  adminUsers: (process.env.ADMIN_USERS ?? '').split(',').map((u) => u.trim()).filter(Boolean),
+  authProvider: (process.env.AUTH_PROVIDER ?? 'none') as 'midway' | 'cognito' | 'none',
+  nodeEnv: process.env.NODE_ENV ?? 'development',
 };

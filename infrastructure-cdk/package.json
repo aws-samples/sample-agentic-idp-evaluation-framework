@@ -1,0 +1,27 @@
+{
+  "name": "one-idp-cdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS CDK TypeScript stack for ONE IDP — parity with infrastructure/*.tf",
+  "bin": {
+    "one-idp-cdk": "bin/app.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "aws-cdk": "^2.170.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.170.0",
+    "constructs": "^10.3.0"
+  }
+}

@@ -8,6 +8,13 @@ terraform {
     }
   }
 
+  # Default backend points at the bucket used by the original deployment so
+  # that `terraform init` with no args continues to work and no state is
+  # migrated. Override via `-backend-config` for public deployments:
+  #   terraform init -reconfigure \
+  #     -backend-config="bucket=<your-state-bucket>" \
+  #     -backend-config="key=one-idp/terraform.tfstate" \
+  #     -backend-config="region=us-west-2"
   backend "s3" {
     bucket = "one-idp-terraform-state"
     key    = "one-idp/terraform.tfstate"

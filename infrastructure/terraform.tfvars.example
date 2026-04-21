@@ -3,6 +3,30 @@ environment   = "dev"
 project_name  = "one-idp"
 ecr_image_tag = "latest"
 
-# Custom domain (leave empty to use CloudFront default domain)
-# For .people.aws.dev: your hosted zone must already exist in Route53
-domain_name = "idp.sanghwa.people.aws.dev"
+# Custom domain (optional; leave empty to use CloudFront default domain)
+# Example: "idp.example.com" — the Route53 hosted zone must already exist.
+# AWS internal note: for *.people.aws.dev, the zone is pre-created per alias.
+domain_name      = ""
+route53_zone_id  = ""
+
+# CORS origins allowed to call the S3 uploads bucket (browser direct-upload)
+# Include your local dev URL plus any public/custom domains.
+cors_allowed_origins = ["http://localhost:5173"]
+
+# Bedrock model IDs (override only if you need a different model or region variant)
+# Defaults match the values baked into the container image.
+# claude_model_id = "us.anthropic.claude-sonnet-4-6"
+# nova_model_id   = "us.amazon.nova-2-lite-v1:0"
+
+# BDA profile ARN — required for BDA-based methods
+# Example: "arn:aws:bedrock:us-west-2:123456789012:data-automation-profile/us.data-automation-v1"
+bda_profile_arn = ""
+bda_project_arn = ""
+
+# Authentication mode ("none" | "midway" | "cognito")
+# "none"    — demo mode, no auth (WARNING: do not use in production)
+# "midway"  — AWS internal only; requires Midway-aware ALB/CloudFront in front
+# "cognito" — provide cognito_user_pool_id + cognito_client_id
+auth_provider = "none"
+# cognito_user_pool_id = ""
+# cognito_client_id    = ""
