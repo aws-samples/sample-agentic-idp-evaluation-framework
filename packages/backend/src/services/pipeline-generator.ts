@@ -178,6 +178,7 @@ export function generatePipeline(
     documentType,
     capabilities,
     preferredMethods,
+    methodAssignments,
     optimizeFor,
     enableHybridRouting,
     documentLanguages,
@@ -239,11 +240,14 @@ export function generatePipeline(
     previousNodeIds = [classifierNodeId];
   }
 
-  // 3. Method Selection — group capabilities by their best method
+  // 3. Method Selection — group capabilities by their best method.
+  //    Explicit `methodAssignments` (from chat) win per-capability; any gaps
+  //    fall back to the auto-selection heuristic.
   const methodToCapabilities = new Map<ProcessingMethod, Capability[]>();
 
   for (const capability of capabilities) {
-    const method = selectMethod(capability, optimizeFor, preferredMethods, documentLanguages);
+    const explicit = methodAssignments?.[capability];
+    const method = explicit ?? selectMethod(capability, optimizeFor, preferredMethods, documentLanguages);
     if (!methodToCapabilities.has(method)) {
       methodToCapabilities.set(method, []);
     }

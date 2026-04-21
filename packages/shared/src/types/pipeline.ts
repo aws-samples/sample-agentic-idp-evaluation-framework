@@ -95,6 +95,12 @@ export interface PipelineGenerateRequest {
   documentType: DocumentType;
   capabilities: Capability[];
   preferredMethods?: ProcessingMethod[];
+  /**
+   * Explicit per-capability method assignment. When supplied, the generator
+   * uses these mappings verbatim (falling back to auto-selection for any
+   * missing capability). Takes precedence over `preferredMethods`.
+   */
+  methodAssignments?: Partial<Record<Capability, ProcessingMethod>>;
   optimizeFor: 'accuracy' | 'cost' | 'speed' | 'balanced';
   enableHybridRouting: boolean;
   /** Detected document languages (e.g. ['en'], ['ko'], ['nl']). Non-English excludes BDA/Textract methods. */

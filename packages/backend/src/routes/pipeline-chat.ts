@@ -4,7 +4,7 @@ import { bedrockClient, config } from '../config/aws.js';
 import { generatePipeline } from '../services/pipeline-generator.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import type { Capability, ProcessingMethod, PipelineDefinition, PipelineGenerateRequest } from '@idp/shared';
-import { METHODS, METHOD_INFO, CAPABILITY_SUPPORT, METHOD_FAMILIES } from '@idp/shared';
+import { METHODS, METHOD_INFO, CAPABILITY_SUPPORT, METHOD_FAMILIES, CAPABILITIES } from '@idp/shared';
 
 interface PipelineChatRequest {
   message: string;
@@ -61,6 +61,8 @@ router.post('/', async (req, res) => {
       return `  ${cap}: ${supports.join(', ')}`;
     }).join('\n');
 
+    const allCapabilitiesStr = CAPABILITIES.join(', ');
+
     const systemPrompt = `You are a pipeline architect assistant. The user has an IDP (Intelligent Document Processing) pipeline and wants to modify it through conversation.
 
 CURRENT PIPELINE:
@@ -70,8 +72,11 @@ CURRENT PIPELINE:
 - Methods in use:
 ${currentConfig}
 
-CAPABILITIES: ${body.capabilities.join(', ')}
+CURRENT CAPABILITIES: ${body.capabilities.join(', ')}
 DOCUMENT TYPE: ${body.documentType ?? 'pdf'}
+
+ALL SUPPORTED CAPABILITIES (user can ask to add/remove any of these):
+${allCapabilitiesStr}
 
 AVAILABLE METHODS:
 ${methodListStr}
@@ -82,9 +87,12 @@ ${supportRef}
 RULES:
 1. Respond conversationally — explain what you're changing and why.
 2. When modifying the pipeline, wrap your changes in <pipeline_update> tags with this JSON:
-   <pipeline_update>{"optimizeFor":"balanced","enableHybridRouting":false,"methodAssignments":{"capability-id":"method-id"}}</pipeline_update>
-   - methodAssignments must map EVERY capability to a valid method ID.
-   - Only use method IDs from the AVAILABLE METHODS list above.
+   <pipeline_update>{"optimizeFor":"balanced","enableHybridRouting":false,"capabilities":["cap-id-1","cap-id-2"],"methodAssignments":{"cap-id-1":"method-id","cap-id-2":"method-id"}}</pipeline_update>
+   - \`capabilities\` (OPTIONAL): list the final set of capabilities the pipeline should run. Use exact IDs from ALL SUPPORTED CAPABILITIES. Omit to keep the current set.
+     - To ADD a capability: include it alongside the existing ones.
+     - To REMOVE a capability: list the remaining ones without it.
+   - \`methodAssignments\` must include EVERY capability in the final set (current or updated). Only use method IDs from AVAILABLE METHODS.
+   - To create MULTIPLE method nodes in the pipeline graph, assign DIFFERENT method IDs across capabilities (e.g. {"text_extraction":"claude-sonnet","table_extraction":"textract-claude-sonnet"}). The graph collapses any two capabilities that share the same method into a single node.
 3. If the user asks a question that doesn't require pipeline changes, just answer without <pipeline_update> tags.
 4. After your response, suggest 2-3 follow-up actions in <options> tags:
    <options>["Optimize for cost", "Optimize for accuracy", "Use fastest methods"]</options>
@@ -132,26 +140,37 @@ RULES:
         const update = JSON.parse(updateMatch[1]) as {
           optimizeFor?: string;
           enableHybridRouting?: boolean;
+          capabilities?: string[];
           methodAssignments?: Record<string, string>;
         };
 
-        // Validate method IDs
+        // Resolve final capability set. If the LLM supplied a capabilities list,
+        // filter to known IDs; otherwise keep the current set.
+        const requestedCaps = Array.isArray(update.capabilities)
+          ? update.capabilities.filter((c): c is Capability => CAPABILITIES.includes(c as Capability))
+          : null;
+        const finalCapabilities: Capability[] =
+          requestedCaps && requestedCaps.length > 0 ? requestedCaps : body.capabilities;
+
+        // Validate method IDs and restrict to capabilities in the final set.
         const validAssignments: Record<string, ProcessingMethod> = {};
         if (update.methodAssignments) {
           for (const [cap, method] of Object.entries(update.methodAssignments)) {
+            if (!finalCapabilities.includes(cap as Capability)) continue;
             if (METHODS.includes(method as ProcessingMethod)) {
               validAssignments[cap] = method as ProcessingMethod;
             }
           }
         }
 
-        const preferredMethods = Object.values(validAssignments);
+        // Pass assignments verbatim to the generator so DIFFERENT capabilities
+        // with DIFFERENT methods create multiple method nodes.
         const pipelineRequest: PipelineGenerateRequest = {
           documentType: (body.documentType ?? 'pdf') as any,
-          capabilities: body.capabilities,
+          capabilities: finalCapabilities,
           optimizeFor: (update.optimizeFor ?? 'balanced') as any,
           enableHybridRouting: update.enableHybridRouting ?? false,
-          preferredMethods: preferredMethods.length > 0 ? preferredMethods : undefined,
+          methodAssignments: Object.keys(validAssignments).length > 0 ? validAssignments : undefined,
           documentLanguages: body.documentLanguages,
         };
 
