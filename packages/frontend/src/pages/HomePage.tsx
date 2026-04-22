@@ -45,6 +45,7 @@ const FAMILY_NAMES: Record<string, string> = {
   embeddings: 'Nova Embeddings',
   'nova-embeddings': 'Nova Embeddings',
   comprehend: 'Amazon Comprehend',
+  guardrails: 'Bedrock Guardrails',
   'bedrock-guardrails': 'Bedrock Guardrails',
 };
 
