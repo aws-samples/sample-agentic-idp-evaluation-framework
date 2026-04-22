@@ -42,6 +42,11 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
       utilities={[
         {
           type: 'button',
+          text: 'Docs',
+          href: '/docs',
+        },
+        {
+          type: 'button',
           iconName: darkMode ? 'status-positive' : 'status-stopped',
           text: darkMode ? 'Light Mode' : 'Dark Mode',
           onClick: onToggleDarkMode,

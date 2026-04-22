@@ -1,0 +1,92 @@
+---
+title: Processing methods
+description: 15 methods spanning BDA, Claude, Nova, and Textract.
+---
+
+# Processing methods
+
+Fifteen methods are available, in six families. The full table lives in `packages/shared/src/types/processing.ts:METHOD_INFO` — the numbers below are copied verbatim.
+
+## Families at a glance
+
+| Family | Description | Hybrid? |
+|---|---|---|
+| `bda` | Amazon Bedrock Data Automation, standalone. | No |
+| `bda-llm` | BDA extraction → LLM for structuring. | Yes (2-phase) |
+| `claude` | Claude on Bedrock, PDF bytes via `Converse`. | No |
+| `nova` | Amazon Nova on Bedrock, PDF/image via `Converse`. | No |
+| `textract-llm` | Textract OCR → LLM for structuring. | Yes (2-phase) |
+| `embeddings` | Nova Multimodal Embeddings. | No (embedding only) |
+
+## Per-method pricing
+
+All prices are Standard Tier, US regions, as of 2026-03.
+
+### BDA (standalone)
+
+| Method | `modelId` | $/page (est.) | Notes |
+|---|---|---|---|
+| `bda-standard` | `us.data-automation-v1` | $0.010 | Fixed extraction schema, no prompt engineering, no bounding boxes. |
+| `bda-custom` | `us.data-automation-v1` | $0.040 | Custom blueprint, field-level confidence, explainability. |
+
+### BDA + LLM (2-phase)
+
+| Method | LLM `modelId` | Input/1M | Output/1M | $/page (combined est.) |
+|---|---|---|---|---|
+| `bda-claude-sonnet` | `us.anthropic.claude-sonnet-4-6` | $3.00 | $15.00 | $0.025 |
+| `bda-claude-haiku` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | $1.00 | $5.00 | $0.014 |
+| `bda-nova-lite` | `us.amazon.nova-2-lite-v1:0` | $0.30 | $2.50 | $0.012 |
+
+### Claude (direct)
+
+| Method | `modelId` | Input/1M | Output/1M | $/page (est.) |
+|---|---|---|---|---|
+| `claude-sonnet` | `us.anthropic.claude-sonnet-4-6` | $3.00 | $15.00 | $0.015 |
+| `claude-haiku` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | $1.00 | $5.00 | $0.004 |
+| `claude-opus` | `us.anthropic.claude-opus-4-6-v1` | $5.00 | $25.00 | $0.025 |
+
+### Nova (direct)
+
+| Method | `modelId` | Input/1M | Output/1M | $/page (est.) |
+|---|---|---|---|---|
+| `nova-lite` | `us.amazon.nova-2-lite-v1:0` | $0.30 | $2.50 | $0.001 |
+| `nova-pro` | `us.amazon.nova-2-pro-preview-20251202-v1:0` | $1.25 | $10.00 | $0.008 |
+
+Nova 2 Pro is a **Gated Preview** (no GA SLA, 100 RPM, limited regions). Nova 2 Lite prices images at a fixed **230 tokens/image** regardless of resolution.
+
+### Textract + LLM (2-phase)
+
+| Method | LLM `modelId` | $/page (combined est.) |
+|---|---|---|
+| `textract-claude-sonnet` | `us.anthropic.claude-sonnet-4-6` | $0.017 |
+| `textract-claude-haiku` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | $0.006 |
+| `textract-nova-lite` | `us.amazon.nova-2-lite-v1:0` | $0.005 |
+| `textract-nova-pro` | `us.amazon.nova-2-pro-preview-20251202-v1:0` | $0.010 |
+
+### Embeddings
+
+| Method | `modelId` | $/1M input tokens |
+|---|---|---|
+| `nova-embeddings` | `amazon.nova-2-multimodal-embeddings-v1:0` | $0.135 |
+
+Nova Multimodal Embeddings currently live in **us-east-1 only**. Text context window is 8 K tokens.
+
+## When to pick what
+
+Rough decision tree — the app computes this empirically for you, but here's the intuition:
+
+1. **Non-English primary language?** → Skip BDA, BDA+LLM, and Textract+LLM — they produce garbled output on non-Latin text. See `isMethodLanguageCompatible()` in `processing.ts`.
+2. **Need bounding boxes?** → `nova-pro` (native) or `bda-custom` (blueprint fields). BDA Standard and LLM-only methods have none.
+3. **Tables-heavy?** → `textract-claude-sonnet` for forms with nested tables; `claude-sonnet` for freestyle tables.
+4. **Cost-first, English, simple?** → `bda-standard` ($0.01/page) or `nova-lite` (cheapest LLM).
+5. **Highest accuracy, budget OK?** → `claude-opus` (reasoning) or `bda-claude-sonnet` (hybrid).
+6. **RAG / semantic search?** → `nova-embeddings` (multimodal) — but as a *complement*, not a replacement for extraction.
+
+## Adapter implementations (for reference)
+
+If you want to copy these patterns into your own code (ONE IDP's codegen does):
+
+- `packages/backend/src/adapters/token-stream-adapter.ts` — Claude/Nova `ConverseStream`, YAML parser with 7 defensive strategies.
+- `packages/backend/src/adapters/sync-poll-adapter.ts` — BDA invoke, 5 s poll, metadata → `standard_output_path` → result JSON.
+- `packages/backend/src/adapters/bda-llm-adapter.ts` — BDA phase 1 + LLM structuring phase 2.
+- `packages/backend/src/adapters/two-phase-adapter.ts` — Textract sync vs. async, NextToken pagination, LLM structuring.

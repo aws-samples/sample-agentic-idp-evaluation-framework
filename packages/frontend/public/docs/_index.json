@@ -1,0 +1,36 @@
+{
+  "sections": [
+    {
+      "title": "Getting started",
+      "items": [
+        { "slug": "introduction", "title": "Introduction", "description": "What ONE IDP is and who it's for." },
+        { "slug": "quickstart", "title": "Quickstart", "description": "Upload a document and run a benchmark in 5 minutes." }
+      ]
+    },
+    {
+      "title": "Concepts",
+      "items": [
+        { "slug": "workflow", "title": "The 5-step workflow", "description": "Upload → Analyze → Pipeline → Results → Architecture." },
+        { "slug": "capabilities", "title": "Capabilities", "description": "33 capabilities across 8 categories." },
+        { "slug": "methods", "title": "Processing methods", "description": "15 methods spanning BDA, Claude, Nova, and Textract." },
+        { "slug": "pricing", "title": "Pricing & cost model", "description": "How costs are calculated and what to expect at scale." }
+      ]
+    },
+    {
+      "title": "Deployment",
+      "items": [
+        { "slug": "architecture", "title": "System architecture", "description": "How the platform is deployed on AWS." },
+        { "slug": "deploy", "title": "Deploying your own instance", "description": "Terraform and CDK paths for a customer-owned deployment." },
+        { "slug": "auth", "title": "Authentication", "description": "Pluggable auth: none / midway / cognito." },
+        { "slug": "security", "title": "Security posture", "description": "Hardening applied and trust boundaries." }
+      ]
+    },
+    {
+      "title": "Generated code",
+      "items": [
+        { "slug": "codegen", "title": "Production-ready project output", "description": "The 10-file project produced at the end of the pipeline." },
+        { "slug": "limitations", "title": "Limitations & FAQ", "description": "Known constraints, language support, and gated-preview models." }
+      ]
+    }
+  ]
+}
