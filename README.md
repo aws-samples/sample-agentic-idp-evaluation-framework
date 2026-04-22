@@ -6,8 +6,6 @@ Upload a sample document, answer a few targeted questions, and watch 16 processi
 
 ![ONE IDP Architecture](docs/images/architecture.png)
 
-> 5-tier topology · ECS Fargate web tier · Bedrock AgentCore for the Socratic advisor · Terraform &amp; CDK parity. Source: [`architecture.drawio`](architecture.drawio) · Re-export with `drawio --export --format png --scale 2 --border 0 --output docs/images/architecture.png architecture.drawio`.
-
 ## Architecture at a glance
 
 | Tier | What it does | AWS services |
