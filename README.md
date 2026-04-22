@@ -2,7 +2,11 @@
 
 Evaluate, compare, and recommend the optimal AWS document processing approach for your use case.
 
-Upload a sample document, answer a few targeted questions, and watch 13+ processing methods run in parallel across 33 capabilities — with real accuracy, cost, and speed comparisons, then generate a production-ready architecture (Terraform or CDK).
+Upload a sample document, answer a few targeted questions, and watch 16 processing methods run in parallel across 33 capabilities — with real accuracy, cost, and speed comparisons, then generate a production-ready architecture (Terraform or CDK).
+
+![ONE IDP Architecture](docs/images/architecture.png)
+
+> 5-tier topology · ECS Fargate web tier · Bedrock AgentCore for the Socratic advisor · Terraform &amp; CDK parity. Source: [`architecture.drawio`](architecture.drawio).
 
 ## Features
 
@@ -69,7 +73,7 @@ one-idp/
 │   │       ├── midway.ts       # AWS-internal Midway validation
 │   │       └── upload.ts       # multer: 50MB limit + mimetype allowlist
 │   └── frontend/             # React 18 + Vite + Cloudscape + ReactFlow
-├── infrastructure/           # Terraform stack (App Runner + AgentCore + CloudFront + S3 + DynamoDB)
+├── infrastructure/           # Terraform stack (ECS Fargate + AgentCore + CloudFront + S3 + DynamoDB)
 ├── infrastructure-cdk/       # AWS CDK TypeScript stack (parity with Terraform)
 ├── test-samples/             # 18 real test documents + coverage results
 ├── docs/
@@ -88,7 +92,7 @@ one-idp/
 | Auth | Pluggable: `none` / Midway / Cognito (real JWT verifier via `jose`) |
 | Storage | Amazon S3 (KMS, versioned, CORS) or local `.local-uploads/` |
 | Activity | DynamoDB pay-per-request |
-| Deploy | App Runner + Bedrock AgentCore Runtime + CloudFront + Route53/ACM |
+| Deploy | ECS Fargate + Bedrock AgentCore Runtime + CloudFront + Route53/ACM |
 | IaC | Terraform `>= 1.6` **and** AWS CDK v2 (pick one) |
 
 ## Processing methods
@@ -133,7 +137,7 @@ Two equivalent IaC stacks. Pick one — do **not** run both against the same acc
 Both produce the same 3-tier topology (see [docs/architecture.md](docs/architecture.md)):
 
 - **Edge tier** — CloudFront + optional Route53 + ACM
-- **Web tier** — App Runner (Express API, pluggable auth)
+- **Web tier** — ECS Fargate behind an ALB (Express API, pluggable auth, HPA on CPU &amp; RPS)
 - **Agent tier** — Bedrock AgentCore Runtime (Strands agent, IAM SigV4 only)
 
 ```bash
@@ -186,9 +190,9 @@ Switch providers without code changes via env vars alone. The dispatcher lives i
 
 ### Known trust assumptions / TODOs for public release
 
-- Midway path trusts the edge. If you deploy behind plain App Runner, set `AUTH_PROVIDER=cognito` or `none` — not `midway`.
+- Midway path trusts the edge. If you deploy behind plain ECS Fargate, set `AUTH_PROVIDER=cognito` or `none` — not `midway`.
 - Rate limiter is per-IP in-memory — use Redis or an edge WAF for real traffic.
-- CloudFront origin has an `X-CloudFront-Secret` header but the Express backend does not currently verify it. Add verification before opening App Runner to the internet, or restrict via VPC.
+- CloudFront origin has an `X-CloudFront-Secret` header but the Express backend does not currently verify it. Add verification before opening ECS Fargate to the internet, or restrict via VPC.
 - `.omc/` was tracked in earlier commits (now gitignored). Consider `git filter-repo` before public publication.
 
 ## Verified end-to-end (this session)
