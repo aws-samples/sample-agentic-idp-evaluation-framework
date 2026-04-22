@@ -3,6 +3,7 @@ import type { ProcessingMethod } from '@idp/shared';
 import { METHOD_INFO } from '@idp/shared';
 import sharp from 'sharp';
 import YAML from 'yaml';
+import { PDFDocument } from 'pdf-lib';
 import {
   ConverseStreamCommand,
   type ContentBlock,
@@ -13,6 +14,34 @@ import { emitProgress } from './stream-adapter.js';
 import { bedrockClient } from '../config/aws.js';
 import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
 import { CAPABILITY_INFO } from '@idp/shared';
+
+// Bedrock Converse rejects PDFs > 100 pages. For large PDFs we slice into
+// ≤CHUNK_PAGES chunks and merge results after processing.
+const CHUNK_PAGES = 90; // safety margin under the 100-page cap
+const CHUNK_OVERLAP_PAGES = 2; // preserves tables/sections that straddle boundaries
+
+export async function splitPdfByPages(
+  buffer: Buffer,
+  chunkSize = CHUNK_PAGES,
+  overlap = CHUNK_OVERLAP_PAGES,
+): Promise<Buffer[]> {
+  const src = await PDFDocument.load(buffer, { ignoreEncryption: true });
+  const total = src.getPageCount();
+  if (total <= chunkSize) return [buffer];
+
+  const chunks: Buffer[] = [];
+  const step = chunkSize - overlap;
+  for (let start = 0; start < total; start += step) {
+    const end = Math.min(start + chunkSize, total);
+    const dst = await PDFDocument.create();
+    const pageIndices = Array.from({ length: end - start }, (_, i) => start + i);
+    const pages = await dst.copyPages(src, pageIndices);
+    pages.forEach((p) => dst.addPage(p));
+    chunks.push(Buffer.from(await dst.save()));
+    if (end === total) break;
+  }
+  return chunks;
+}
 
 const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp)$/i;
@@ -87,8 +116,66 @@ export class TokenStreamAdapter implements StreamAdapter {
 
   async run(res: Response | null, input: AdapterInput): Promise<AdapterOutput> {
     const start = Date.now();
+    const fileName = input.fileName;
+    const isPdf = PDF_EXTENSION.test(fileName);
+    const pageCount = input.pageCount ?? 1;
 
-    emitProgress(res, this.method, 'all', 0, 'Sending document to model...');
+    // Auto-chunk PDFs over the Bedrock 100-page cap. Each chunk uses the same
+    // prompt; results are YAML-merged after every chunk completes.
+    if (isPdf && pageCount > CHUNK_PAGES) {
+      emitProgress(res, this.method, 'all', 0, `Splitting ${pageCount}-page PDF into ≤${CHUNK_PAGES}-page chunks...`);
+      const chunkBuffers = await splitPdfByPages(input.documentBuffer);
+      const n = chunkBuffers.length;
+      emitProgress(res, this.method, 'all', 2, `Processing ${n} chunks sequentially...`);
+
+      const chunkResults: AdapterOutput[] = [];
+      const agg: { inputTokens: number; outputTokens: number; totalTokens: number } = {
+        inputTokens: 0, outputTokens: 0, totalTokens: 0,
+      };
+
+      for (let i = 0; i < n; i++) {
+        const pct = Math.round((i / n) * 90);
+        emitProgress(res, this.method, 'all', pct, `Chunk ${i + 1}/${n}...`);
+        const chunkInput: AdapterInput = {
+          ...input,
+          documentBuffer: chunkBuffers[i],
+          // Estimate per-chunk page count for token budget; last chunk may be smaller.
+          pageCount: Math.min(CHUNK_PAGES, pageCount - i * (CHUNK_PAGES - CHUNK_OVERLAP_PAGES)),
+        };
+        const chunkOut = await this.runSingle(res, chunkInput, /* emitProgress */ false);
+        chunkResults.push(chunkOut);
+        if (chunkOut.tokenUsage) {
+          agg.inputTokens += chunkOut.tokenUsage.inputTokens;
+          agg.outputTokens += chunkOut.tokenUsage.outputTokens;
+          agg.totalTokens += chunkOut.tokenUsage.totalTokens;
+        }
+      }
+
+      emitProgress(res, this.method, 'all', 95, 'Merging chunk results...');
+      const merged = this.mergeChunkResults(chunkResults, input.capabilities);
+      emitProgress(res, this.method, 'all', 100, `Complete (${n} chunks merged)`);
+
+      return {
+        results: merged,
+        rawOutput: chunkResults.map((r, idx) => `--- chunk ${idx + 1}/${n} ---\n${r.rawOutput ?? ''}`).join('\n\n'),
+        latencyMs: Date.now() - start,
+        tokenUsage: agg.totalTokens > 0 ? agg : undefined,
+      };
+    }
+
+    // Single-shot path (original behavior).
+    return this.runSingle(res, input, true);
+  }
+
+  private async runSingle(
+    res: Response | null,
+    input: AdapterInput,
+    emitFineGrainProgress: boolean,
+  ): Promise<AdapterOutput> {
+    const start = Date.now();
+    if (emitFineGrainProgress) {
+      emitProgress(res, this.method, 'all', 0, 'Sending document to model...');
+    }
 
     const contentBlocks: ContentBlock[] = [];
     const fileName = input.fileName;
@@ -104,7 +191,6 @@ export class TokenStreamAdapter implements StreamAdapter {
         document: { name: 'document', format: 'pdf', source: { bytes: input.documentBuffer } },
       });
     } else {
-      // Office/text files: buffer contains extracted text from file-converter
       const text = input.documentBuffer.toString('utf-8');
       contentBlocks.push({ text: `Document content:\n${text}` });
     }
@@ -143,8 +229,10 @@ export class TokenStreamAdapter implements StreamAdapter {
           fullText += chunk;
           tokenCount++;
 
-          const progress = Math.min(Math.floor((tokenCount / 100) * 90), 90);
-          emitProgress(res, this.method, 'all', progress, chunk);
+          if (emitFineGrainProgress) {
+            const progress = Math.min(Math.floor((tokenCount / 100) * 90), 90);
+            emitProgress(res, this.method, 'all', progress, chunk);
+          }
         }
         if (event.metadata?.usage) {
           const u = event.metadata.usage;
@@ -157,7 +245,9 @@ export class TokenStreamAdapter implements StreamAdapter {
       }
     }
 
-    emitProgress(res, this.method, 'all', 100, 'Complete');
+    if (emitFineGrainProgress) {
+      emitProgress(res, this.method, 'all', 100, 'Complete');
+    }
 
     const results = this.parseResults(fullText, input.capabilities);
 
@@ -167,6 +257,61 @@ export class TokenStreamAdapter implements StreamAdapter {
       latencyMs: Date.now() - start,
       tokenUsage,
     };
+  }
+
+  /**
+   * Merge per-chunk results into one object per capability.
+   *
+   *   - text / summary fields: concatenate with \n\n separators
+   *   - JSON objects: shallow-merge (last chunk wins on key collision)
+   *   - JSON arrays: concatenate (dedupe by stringified entry)
+   *   - HTML tables: concatenate table blocks
+   *   - confidence: average
+   */
+  private mergeChunkResults(
+    chunks: AdapterOutput[],
+    capabilities: string[],
+  ): Record<string, { capability: string; data: unknown; confidence: number; format: string }> {
+    const out: Record<string, { capability: string; data: unknown; confidence: number; format: string }> = {};
+    for (const cap of capabilities) {
+      const per = chunks
+        .map((c) => c.results[cap])
+        .filter((r): r is NonNullable<typeof r> => !!r);
+      if (per.length === 0) {
+        out[cap] = { capability: cap, data: null, confidence: 0, format: 'text' };
+        continue;
+      }
+      const format = per[0].format ?? 'text';
+      const avgConf = per.reduce((s, r) => s + (r.confidence ?? 0), 0) / per.length;
+
+      let mergedData: unknown;
+      const allStrings = per.every((r) => typeof r.data === 'string');
+      const allArrays = per.every((r) => Array.isArray(r.data));
+      const allObjects = per.every((r) => r.data && typeof r.data === 'object' && !Array.isArray(r.data));
+
+      if (allStrings) {
+        mergedData = per.map((r) => r.data as string).filter(Boolean).join('\n\n');
+      } else if (allArrays) {
+        const seen = new Set<string>();
+        const combined: unknown[] = [];
+        for (const r of per) {
+          for (const item of (r.data as unknown[])) {
+            const key = typeof item === 'string' ? item : JSON.stringify(item);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            combined.push(item);
+          }
+        }
+        mergedData = combined;
+      } else if (allObjects) {
+        mergedData = Object.assign({}, ...per.map((r) => r.data as Record<string, unknown>));
+      } else {
+        mergedData = per.map((r) => r.data);
+      }
+
+      out[cap] = { capability: cap, data: mergedData, confidence: avgConf, format };
+    }
+    return out;
   }
 
   private parseResults(
