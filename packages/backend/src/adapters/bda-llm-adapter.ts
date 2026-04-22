@@ -18,6 +18,44 @@ const TERMINAL_STATUSES = ['Success', 'ServiceError', 'ClientError'];
 const POLL_INTERVAL_MS = 5_000;
 const MAX_POLL_ATTEMPTS = 60; // ~5 minutes
 
+/**
+ * Rough input-token budgets per model. Claude Haiku 4.5 has a 200k context
+ * window; Sonnet 4.6 / Opus 4.6 have 1M; Nova Lite has 300k. We leave room
+ * for the system prompt (~500 tokens) and the output (up to 16k) by staying
+ * well under the raw ceiling.
+ */
+const INPUT_TOKEN_BUDGETS: Record<string, number> = {
+  'us.anthropic.claude-haiku-4-5-20251001-v1:0': 180_000,
+  'us.anthropic.claude-sonnet-4-6': 700_000,
+  'us.anthropic.claude-opus-4-6-v1': 700_000,
+  'us.amazon.nova-2-lite-v1:0': 250_000,
+  'us.amazon.nova-2-pro-preview-20251202-v1:0': 250_000,
+};
+
+const CHARS_PER_TOKEN = 3.5; // English-ish rough estimate
+
+/**
+ * Head+tail clip a huge BDA output so the LLM stage never over-shoots the
+ * model context cap. Preserves document start and end so both opening and
+ * closing sections are represented; inserts an elision marker in between.
+ */
+export function clipBdaOutputForLlm(raw: string, modelId: string): { text: string; clipped: boolean; originalChars: number } {
+  const budgetTokens = INPUT_TOKEN_BUDGETS[modelId] ?? 180_000;
+  const budgetChars = Math.floor(budgetTokens * CHARS_PER_TOKEN);
+  if (raw.length <= budgetChars) {
+    return { text: raw, clipped: false, originalChars: raw.length };
+  }
+  // 70% head / 30% tail — head is usually richer (metadata, early sections).
+  const headSize = Math.floor(budgetChars * 0.7);
+  const tailSize = Math.floor(budgetChars * 0.3) - 200; // reserve for elision marker
+  const elision = `\n\n[... BDA output truncated to fit model context — ${Math.round((raw.length - headSize - tailSize) / 1000)}k characters removed from the middle ...]\n\n`;
+  return {
+    text: raw.slice(0, headSize) + elision + raw.slice(raw.length - tailSize),
+    clipped: true,
+    originalChars: raw.length,
+  };
+}
+
 export class BdaLlmAdapter implements StreamAdapter {
   constructor(public readonly method: ProcessingMethod) {}
 
@@ -98,7 +136,12 @@ export class BdaLlmAdapter implements StreamAdapter {
 
     emitProgress(res, this.method, 'all', 45, 'Fetching BDA results...');
 
-    const bdaOutput = await this.fetchOutput(outputUri);
+    const rawBdaOutput = await this.fetchOutput(outputUri);
+    const { text: bdaOutput, clipped, originalChars } = clipBdaOutputForLlm(rawBdaOutput, this.modelId);
+    if (clipped) {
+      console.log(`[BDA-LLM] Clipped BDA output for ${this.method}: ${originalChars} → ${bdaOutput.length} chars (model budget exceeded)`);
+      emitProgress(res, this.method, 'all', 48, `BDA output clipped to fit ${this.method} context (${Math.round(originalChars / 1000)}k → ${Math.round(bdaOutput.length / 1000)}k chars)`);
+    }
 
     emitProgress(res, this.method, 'all', 50, 'Phase 1 complete. Phase 2: Structuring with LLM...');
 
@@ -110,7 +153,7 @@ Return your results as a JSON object with each capability as a key. For each cap
 - "confidence": a number between 0 and 1
 - "format": one of "html", "csv", "json", "text"
 
-Return ONLY valid JSON, no markdown code blocks.`;
+Return ONLY valid JSON, no markdown code blocks.${clipped ? '\n\nNOTE: The BDA output below was clipped to fit the model context. Work from the supplied head + tail sample and note lower confidence if details are missing.' : ''}`;
 
     const messages: Message[] = [
       {
