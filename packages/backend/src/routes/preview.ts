@@ -117,6 +117,8 @@ router.post('/', async (req, res) => {
     });
 
     const userAlias = (req as any).midwayUser?.alias ?? 'anonymous';
+    const previewStart = Date.now();
+    console.log(`[Preview] docId=${body.documentId} pages=${pageCount} caps=${body.capabilities.join(',')} methods=${validMethods.join(',')}`);
     trackActivity(userAlias, 'preview_start', {
       documentId: body.documentId,
       s3Uri: body.s3Uri,
@@ -146,10 +148,12 @@ router.post('/', async (req, res) => {
     // minutes on slow methods and intermediaries (CloudFront, ALB) drop it.
     await Promise.allSettled(
       validMethods.map(async (method) => {
+        const methodStart = Date.now();
         try {
           const processor = PROCESSOR_FACTORY[method]!();
           const result = await processor.process(res, input);
           const info = METHOD_INFO[method];
+          console.log(`[Preview] ${method} ${result.status} ${Date.now() - methodStart}ms cost=$${result.metrics.cost.toFixed(4)}`);
           emitSSE(res, {
             type: 'method_result',
             method,
@@ -166,6 +170,8 @@ router.post('/', async (req, res) => {
           });
         } catch (err) {
           const info = METHOD_INFO[method];
+          const msg = (err as Error)?.message ?? 'Unknown error';
+          console.error(`[Preview] ${method} threw after ${Date.now() - methodStart}ms:`, msg);
           emitSSE(res, {
             type: 'method_result',
             method,
@@ -174,12 +180,13 @@ router.post('/', async (req, res) => {
             status: 'error',
             results: {},
             latencyMs: 0,
-            error: (err as Error)?.message ?? 'Unknown error',
+            error: msg,
           });
         }
       }),
     );
 
+    console.log(`[Preview] docId=${body.documentId} completed ${validMethods.length} methods in ${Date.now() - previewStart}ms`);
     emitSSE(res, { type: 'preview_done' });
     endSSE(res, keepalive);
   } catch (err) {

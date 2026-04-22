@@ -50,6 +50,9 @@ export abstract class ProcessorBase {
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      // Always log method errors so we can debug preview failures from App
+      // Runner logs without having to plumb the SSE stream.
+      console.error(`[${this.method}] method failed:`, message);
       if (res) emitSSE(res, { type: 'method_error', method: this.method, error: message });
 
       return {
