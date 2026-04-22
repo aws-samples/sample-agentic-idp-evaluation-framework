@@ -23,6 +23,9 @@ export interface AppRunnerProps {
   readonly cognitoUserPoolId: string;
   readonly cognitoClientId: string;
   readonly siteUrl: string;
+  readonly bedrockGuardrailId?: string;
+  readonly bedrockGuardrailVersion?: string;
+  readonly bedrockGuardrailArn?: string;
 }
 
 /**
@@ -124,6 +127,19 @@ export class AppRunnerConstruct extends Construct {
     if (props.adminUsers) runtimeEnv.ADMIN_USERS = props.adminUsers;
     if (props.cognitoUserPoolId) runtimeEnv.COGNITO_USER_POOL_ID = props.cognitoUserPoolId;
     if (props.cognitoClientId) runtimeEnv.COGNITO_CLIENT_ID = props.cognitoClientId;
+    if (props.bedrockGuardrailId) {
+      runtimeEnv.BEDROCK_GUARDRAIL_ID = props.bedrockGuardrailId;
+      runtimeEnv.BEDROCK_GUARDRAIL_VERSION = props.bedrockGuardrailVersion ?? 'DRAFT';
+    }
+
+    // ApplyGuardrail — scope to the guardrail ARN when we know it, wildcard
+    // otherwise so an out-of-band guardrail id still works.
+    this.instanceRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['bedrock:ApplyGuardrail'],
+        resources: props.bedrockGuardrailArn ? [props.bedrockGuardrailArn] : ['*'],
+      }),
+    );
 
     const service = new CfnResource(this, 'Service', {
       type: 'AWS::AppRunner::Service',

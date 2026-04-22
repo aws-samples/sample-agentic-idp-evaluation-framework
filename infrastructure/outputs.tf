@@ -28,6 +28,21 @@ output "agentcore_runtime_id" {
   value       = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_id
 }
 
+output "bedrock_guardrail_id" {
+  description = "Bedrock Guardrail ID used by the backend"
+  value       = local.effective_guardrail_id
+}
+
+output "bedrock_guardrail_version" {
+  description = "Bedrock Guardrail version used by the backend"
+  value       = local.effective_guardrail_version
+}
+
+output "bedrock_guardrail_arn" {
+  description = "Bedrock Guardrail ARN used by the backend"
+  value       = local.effective_guardrail_arn
+}
+
 output "agentcore_endpoint" {
   description = "AgentCore runtime invocation endpoint"
   value       = "https://bedrock-agentcore.${var.aws_region}.amazonaws.com/runtimes/${urlencode(aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn)}/invocations"

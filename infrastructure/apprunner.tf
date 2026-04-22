@@ -21,16 +21,16 @@ resource "aws_apprunner_service" "backend" {
 
         runtime_environment_variables = merge(
           {
-            AWS_REGION            = var.aws_region
-            S3_BUCKET             = aws_s3_bucket.uploads.id
-            S3_OUTPUT_PREFIX      = "idp-outputs/"
-            BDA_PROFILE_ARN       = var.bda_profile_arn
-            BDA_PROJECT_ARN       = var.bda_project_arn
-            NODE_ENV              = "production"
-            PORT                  = "3001"
-            CLAUDE_MODEL_ID       = var.claude_model_id
-            NOVA_MODEL_ID         = var.nova_model_id
-            SITE_URL              = var.domain_name != "" ? "https://${var.domain_name}" : ""
+            AWS_REGION       = var.aws_region
+            S3_BUCKET        = aws_s3_bucket.uploads.id
+            S3_OUTPUT_PREFIX = "idp-outputs/"
+            BDA_PROFILE_ARN  = var.bda_profile_arn
+            BDA_PROJECT_ARN  = var.bda_project_arn
+            NODE_ENV         = "production"
+            PORT             = "3001"
+            CLAUDE_MODEL_ID  = var.claude_model_id
+            NOVA_MODEL_ID    = var.nova_model_id
+            SITE_URL         = var.domain_name != "" ? "https://${var.domain_name}" : ""
             # AUTH_PROVIDER is the source of truth for the pluggable dispatcher;
             # MIDWAY_DISABLED is kept purely for legacy back-compat.
             AUTH_PROVIDER         = var.auth_provider
@@ -41,6 +41,10 @@ resource "aws_apprunner_service" "backend" {
           var.admin_users != "" ? { ADMIN_USERS = var.admin_users } : {},
           var.cognito_user_pool_id != "" ? { COGNITO_USER_POOL_ID = var.cognito_user_pool_id } : {},
           var.cognito_client_id != "" ? { COGNITO_CLIENT_ID = var.cognito_client_id } : {},
+          local.effective_guardrail_id != "" ? {
+            BEDROCK_GUARDRAIL_ID      = local.effective_guardrail_id
+            BEDROCK_GUARDRAIL_VERSION = local.effective_guardrail_version
+          } : {},
         )
       }
     }
@@ -167,6 +171,13 @@ resource "aws_iam_role_policy" "apprunner_bedrock" {
           "bedrock:GetDataAutomationProject",
         ]
         Resource = "*"
+      },
+      # ApplyGuardrail is scoped to the guardrail ARN when we manage it,
+      # otherwise to * (no resource-level ARN to pin).
+      {
+        Effect   = "Allow"
+        Action   = ["bedrock:ApplyGuardrail"]
+        Resource = local.effective_guardrail_arn != "" ? local.effective_guardrail_arn : "*"
       },
     ]
   })

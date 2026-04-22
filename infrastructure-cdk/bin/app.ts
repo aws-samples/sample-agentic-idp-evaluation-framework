@@ -26,6 +26,11 @@ new OneIdpStack(app, `${projectName}-${environment}`, {
   cognitoUserPoolId: app.node.tryGetContext('cognitoUserPoolId') ?? '',
   cognitoClientId: app.node.tryGetContext('cognitoClientId') ?? '',
   corsAllowedOrigins: app.node.tryGetContext('corsAllowedOrigins') ?? ['http://localhost:5173'],
+  // Guardrails: by default create and manage a PII guardrail alongside the stack.
+  // Override with -c manageGuardrail=false -c bedrockGuardrailId=<id> to reuse an existing one.
+  manageGuardrail: app.node.tryGetContext('manageGuardrail') !== 'false',
+  bedrockGuardrailId: app.node.tryGetContext('bedrockGuardrailId') ?? '',
+  bedrockGuardrailVersion: app.node.tryGetContext('bedrockGuardrailVersion') ?? 'DRAFT',
 });
 
 app.synth();

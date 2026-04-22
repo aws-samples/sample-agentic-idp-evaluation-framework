@@ -99,6 +99,24 @@ variable "manage_activity_table" {
   default     = false
 }
 
+variable "manage_guardrail" {
+  description = "If true, Terraform creates a Bedrock Guardrail and wires it into the backend. Set to false when supplying an existing guardrail via bedrock_guardrail_id."
+  type        = bool
+  default     = true
+}
+
+variable "bedrock_guardrail_id" {
+  description = "Existing Bedrock Guardrail identifier (optional). When set, manage_guardrail should be false."
+  type        = string
+  default     = ""
+}
+
+variable "bedrock_guardrail_version" {
+  description = "Existing Bedrock Guardrail version (DRAFT or numeric). Only used when bedrock_guardrail_id is set."
+  type        = string
+  default     = "DRAFT"
+}
+
 variable "terraform_state_bucket" {
   description = "S3 bucket used for the terraform state backend. Set via -backend-config on init."
   type        = string

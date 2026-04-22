@@ -6,6 +6,7 @@ import { AgentRuntimeConstruct } from './agent-runtime';
 import { AppRunnerConstruct } from './app-runner';
 import { EdgeConstruct } from './edge';
 import { ActivityTableConstruct } from './activity-table';
+import { GuardrailConstruct } from './guardrail';
 
 export interface OneIdpStackProps extends cdk.StackProps {
   readonly projectName: string;
@@ -22,6 +23,9 @@ export interface OneIdpStackProps extends cdk.StackProps {
   readonly cognitoUserPoolId?: string;
   readonly cognitoClientId?: string;
   readonly corsAllowedOrigins: string[];
+  readonly manageGuardrail?: boolean;
+  readonly bedrockGuardrailId?: string;
+  readonly bedrockGuardrailVersion?: string;
 }
 
 /**
@@ -70,6 +74,23 @@ export class OneIdpStack extends cdk.Stack {
       novaModelId: props.novaModelId,
     });
 
+    // Bedrock Guardrail for the `bedrock-guardrails` method (managed PII path).
+    // Defaults to creating one; set manageGuardrail=false + pass bedrockGuardrailId
+    // to reuse an existing guardrail.
+    const manageGuardrail = props.manageGuardrail ?? true;
+    const guardrail = manageGuardrail
+      ? new GuardrailConstruct(this, 'Guardrail', {
+          projectName: props.projectName,
+          environment: props.environment,
+        })
+      : undefined;
+    const guardrailId = guardrail?.guardrailId ?? props.bedrockGuardrailId;
+    const guardrailVersion = guardrail?.guardrailVersion ?? props.bedrockGuardrailVersion ?? 'DRAFT';
+    const guardrailArn = guardrail?.guardrailArn
+      ?? (props.bedrockGuardrailId
+        ? `arn:aws:bedrock:${this.region}:${this.account}:guardrail/${props.bedrockGuardrailId}`
+        : undefined);
+
     const api = new AppRunnerConstruct(this, 'Api', {
       projectName: props.projectName,
       environment: props.environment,
@@ -88,6 +109,9 @@ export class OneIdpStack extends cdk.Stack {
       cognitoUserPoolId: props.cognitoUserPoolId ?? '',
       cognitoClientId: props.cognitoClientId ?? '',
       siteUrl: props.domainName ? `https://${props.domainName}` : '',
+      bedrockGuardrailId: guardrailId,
+      bedrockGuardrailVersion: guardrailVersion,
+      bedrockGuardrailArn: guardrailArn,
     });
 
     const edge = new EdgeConstruct(this, 'Edge', {
