@@ -9,14 +9,37 @@ interface TopNavProps {
 }
 
 const APP_TITLE = import.meta.env.VITE_APP_TITLE || 'ONE IDP Framework';
-// External links (GitLab, Slack) are surfaced only in local dev builds by
-// default. `npm run dev` sets import.meta.env.DEV=true; production `vite build`
-// strips them unless explicitly opted in via VITE_SHOW_LINKS=true.
-const SHOW_LINKS = import.meta.env.DEV || import.meta.env.VITE_SHOW_LINKS === 'true';
-const REPO_URL = SHOW_LINKS ? import.meta.env.VITE_REPO_URL || '' : '';
-const REPO_LABEL = import.meta.env.VITE_REPO_LABEL || 'Source';
-const CHAT_URL = SHOW_LINKS ? import.meta.env.VITE_CHAT_URL || '' : '';
-const CHAT_LABEL = import.meta.env.VITE_CHAT_LABEL || 'Chat';
+
+// External links (GitLab, Slack) are safe on AWS-internal hostnames
+// (Midway-protected) and local dev. They stay hidden on public deployments.
+// Decision is at runtime (hostname) rather than build-time so one artifact
+// serves both internal and public cognito-auth deploys.
+function isInternalHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return (
+    h === 'localhost' ||
+    h === '127.0.0.1' ||
+    h.endsWith('.people.aws.dev') ||
+    h.endsWith('.amazon.com') ||
+    h.endsWith('.aws.dev')
+  );
+}
+const SHOW_LINKS =
+  import.meta.env.DEV ||
+  import.meta.env.VITE_SHOW_LINKS === 'true' ||
+  isInternalHost();
+
+// Defaults point at the internal GitLab + Slack channel. Override via env if
+// you fork the deployment.
+const REPO_URL = SHOW_LINKS
+  ? (import.meta.env.VITE_REPO_URL || 'https://gitlab.aws.dev/sanghwa/one-idp')
+  : '';
+const REPO_LABEL = import.meta.env.VITE_REPO_LABEL || 'GitLab';
+const CHAT_URL = SHOW_LINKS
+  ? (import.meta.env.VITE_CHAT_URL || 'https://amazon.enterprise.slack.com/archives/C0ATLG1TX1U')
+  : '';
+const CHAT_LABEL = import.meta.env.VITE_CHAT_LABEL || 'Slack';
 
 function externalLink(text: string, href: string) {
   return {
@@ -45,14 +68,15 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
           text: 'Docs',
           href: '/docs',
         },
+        // GitLab + Slack sit right after Docs — easier to find from the nav.
+        ...(REPO_URL ? [externalLink(REPO_LABEL, REPO_URL)] : []),
+        ...(CHAT_URL ? [externalLink(CHAT_LABEL, CHAT_URL)] : []),
         {
           type: 'button',
           iconName: darkMode ? 'status-positive' : 'status-stopped',
           text: darkMode ? 'Light Mode' : 'Dark Mode',
           onClick: onToggleDarkMode,
         },
-        ...(REPO_URL ? [externalLink(REPO_LABEL, REPO_URL)] : []),
-        ...(CHAT_URL ? [externalLink(CHAT_LABEL, CHAT_URL)] : []),
         ...(user
           ? [
               {
