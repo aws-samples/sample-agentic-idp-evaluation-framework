@@ -3,8 +3,6 @@ title: Production-ready project output
 description: The 10-file project produced at the end of the pipeline.
 ---
 
-# Production-ready project output
-
 At the Architecture & Code stage, the platform generates a **10-file deployable project** based on your actual benchmark results. This page tells you what each file is and what to expect.
 
 ## Why real files, not boilerplate
@@ -20,13 +18,13 @@ Earlier versions of ONE IDP emitted two generic snippets with BDA commented out 
 | Tab label | Purpose | Typical size |
 |---|---|---|
 | `README.md` | Overview, prerequisites, local usage, deploy, cleanup. | ~80 lines |
-| `process.py` | Python entrypoint with adapter functions per family. | 250-450 lines |
+| `process.py` | Python entrypoint with adapter functions per family. | 250–450 lines |
 | `requirements.txt` | `boto3`, `PyYAML`, `Pillow`. | 4 lines |
-| `process.ts` | Node 20 / TypeScript / ESM entrypoint — same shape as Python. | 250-450 lines |
+| `process.ts` | Node 20 / TypeScript / ESM entrypoint — same shape as Python. | 250–450 lines |
 | `package.json` | `@aws-sdk/*`, `sharp`, `yaml`, `tsx`, `typescript`. | pinned versions |
-| `cdk/lib/idp-stack.ts` | The real CDK stack — S3, DynamoDB, Lambda, Step Functions, API Gateway, least-privilege IAM per model. | 150-250 lines |
-| `cdk/lambda/processor.ts` | Lambda handler the stack points at. APIGateway + S3 event both handled. Writes results to DynamoDB. | 120-200 lines |
-| `cdk/bin/idp.ts` | CDK app entry. | <20 lines |
+| `cdk/lib/idp-stack.ts` | The real CDK stack — S3, DynamoDB, Lambda, Step Functions, API Gateway, least-privilege IAM per model. | 150–250 lines |
+| `cdk/lambda/processor.ts` | Lambda handler the stack points at. APIGateway + S3 event both handled. Writes results to DynamoDB. | 120–200 lines |
+| `cdk/bin/idp.ts` | CDK app entry. | &lt;20 lines |
 | `cdk/package.json` | `aws-cdk-lib`, `constructs`, `aws-cdk`, TypeScript toolchain. | pinned |
 | `cdk/cdk.json` | CDK context + feature flags (matches CDK v2 ^2.170). | standard |
 | `pipeline.json` | Machine-readable config of your method assignments. | JSON |
@@ -40,9 +38,9 @@ Both files implement the same shape:
 - **`PRICING`** map of method → `{ in, out, perPage }` — the exact numbers from your benchmark.
 - **One function per family** used in your pipeline:
   - `run_direct_llm(method, doc_bytes, file_name, capabilities)` — Claude/Nova via Converse.
-  - `run_bda(method, s3_uri, capabilities)` — BDA invoke + 5 s poll + metadata→`standard_output_path` fetch.
+  - `run_bda(method, s3_uri, capabilities)` — BDA invoke + 5 s poll + metadata → `standard_output_path` fetch.
   - `run_bda_llm(method, s3_uri, capabilities)` — BDA phase 1 + structured JSON phase 2.
-  - `run_textract_llm(method, doc_bytes, file_name, capabilities, s3_uri)` — sync vs. async, NextToken pagination, LLM structuring.
+  - `run_textract_llm(method, doc_bytes, file_name, capabilities, s3_uri)` — sync vs async, `NextToken` pagination, LLM structuring.
 - **`process_document(doc_bytes, file_name, s3_uri=None)`** — dispatcher that groups capabilities by method and runs each family exactly once.
 - **CLI entry** — `python process.py sample.pdf` or `python process.py sample.pdf s3://bucket/key` for BDA.
 
@@ -115,7 +113,7 @@ curl -X POST "$API_ENDPOINT/process" \
   -d '{"fileName":"sample.pdf","s3Key":"uploads/sample.pdf"}'
 ```
 
-## AI vs. template fallback
+## AI vs template fallback
 
 When Bedrock is reachable and the code-gen endpoint succeeds, the tab labels show `(AI)` — the project is generated fresh from your benchmark. When it's unavailable (quota, timeout, Bedrock outage), the deterministic template generator in `packages/frontend/src/pages/architectureTemplates.ts` fills in the same structure with the same shape of code. Both are runnable.
 

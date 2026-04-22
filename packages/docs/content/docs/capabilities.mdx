@@ -3,13 +3,11 @@ title: Capabilities
 description: 33 capabilities across 8 categories.
 ---
 
-# Capabilities
-
 ONE IDP ships **33 capabilities** grouped into **8 categories**. A "capability" is the unit of extraction — the agent picks which ones apply to your document, and the pipeline assigns a method per capability.
 
 Capabilities live as individual markdown files under `packages/shared/skills/<category>/<capability>.md`. At build time (`npm run build:skills`), they're compiled into `packages/shared/src/generated/skills.ts` which becomes the source of truth for both the backend and the frontend.
 
-Each skill .md contains: name, description, category, icon, tags, default output format, example input/output, and a support-level matrix mapping each method family to `excellent | good | limited | none`.
+Each skill `.md` contains: name, description, category, icon, tags, default output format, example input/output, and a support-level matrix mapping each method family to `excellent | good | limited | none`.
 
 ## The 8 categories
 
@@ -37,7 +35,7 @@ Colors are stable per category and come from `packages/shared/src/types/capabili
 
 ## The support matrix
 
-Each skill declares how well each method family handles it. Example from a skill .md:
+Each skill declares how well each method family handles it. Example from a skill `.md`:
 
 ```yaml
 support:

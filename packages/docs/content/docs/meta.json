@@ -1,0 +1,21 @@
+{
+  "title": "Docs",
+  "pages": [
+    "---Getting started---",
+    "index",
+    "quickstart",
+    "---Concepts---",
+    "workflow",
+    "capabilities",
+    "methods",
+    "pricing",
+    "---Deployment---",
+    "architecture",
+    "deploy",
+    "auth",
+    "security",
+    "---Generated code---",
+    "codegen",
+    "limitations"
+  ]
+}

@@ -3,8 +3,6 @@ title: Processing methods
 description: 15 methods spanning BDA, Claude, Nova, and Textract.
 ---
 
-# Processing methods
-
 Fifteen methods are available, in six families. The full table lives in `packages/shared/src/types/processing.ts:METHOD_INFO` — the numbers below are copied verbatim.
 
 ## Families at a glance
@@ -89,4 +87,4 @@ If you want to copy these patterns into your own code (ONE IDP's codegen does):
 - `packages/backend/src/adapters/token-stream-adapter.ts` — Claude/Nova `ConverseStream`, YAML parser with 7 defensive strategies.
 - `packages/backend/src/adapters/sync-poll-adapter.ts` — BDA invoke, 5 s poll, metadata → `standard_output_path` → result JSON.
 - `packages/backend/src/adapters/bda-llm-adapter.ts` — BDA phase 1 + LLM structuring phase 2.
-- `packages/backend/src/adapters/two-phase-adapter.ts` — Textract sync vs. async, NextToken pagination, LLM structuring.
+- `packages/backend/src/adapters/two-phase-adapter.ts` — Textract sync vs async, `NextToken` pagination, LLM structuring.

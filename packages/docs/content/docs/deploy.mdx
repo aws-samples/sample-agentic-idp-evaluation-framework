@@ -3,8 +3,6 @@ title: Deploying your own instance
 description: Terraform and CDK paths for a customer-owned deployment.
 ---
 
-# Deploying your own instance
-
 Two supported paths: **Terraform** (the reference live deployment) and **CDK v2 TypeScript** (at parity). Pick one and stick with it — both provision the same topology and will fight over resources if you run both against the same account.
 
 ## Prerequisites
@@ -64,11 +62,12 @@ aws codebuild start-build --project-name one-idp-build
 aws apprunner start-deployment --service-arn <your-app-runner-arn>
 ```
 
-### 5. Deploy the frontend
+### 5. Deploy the frontend and docs
 
 ```bash
-npm run build -w packages/frontend
-aws s3 sync packages/frontend/dist s3://<your-static-bucket>/ --delete
+npm run build -w packages/frontend -w packages/docs
+aws s3 sync packages/frontend/dist s3://<your-static-bucket>/       --delete --exclude 'docs/*'
+aws s3 sync packages/docs/out      s3://<your-static-bucket>/docs/  --delete
 aws cloudfront create-invalidation --distribution-id <your-distribution-id> --paths '/*'
 ```
 
@@ -96,17 +95,18 @@ CDK stacks under `lib/`:
 - `edge-stack.ts` — CloudFront + Route 53.
 - `activity-table-stack.ts` — DynamoDB.
 
-After `cdk deploy` the ECR repo exists but is empty — push the first backend image via CodeBuild (same as Terraform path), then trigger App Runner deployment.
+After `cdk deploy` the ECR repo exists but is empty — push the first backend image via CodeBuild (same as the Terraform path), then trigger App Runner deployment.
 
 ## Post-deploy verification
 
 Every fresh deployment should pass this checklist:
 
 - [ ] `GET https://<your-domain>/` returns the SPA (`200 OK`, `text/html`).
+- [ ] `GET https://<your-domain>/docs/` returns the docs home (`200 OK`, `text/html`).
 - [ ] `GET https://<your-domain>/api/auth/me` returns `200` with your authenticated user (or `401` if you're unauthed and `AUTH_PROVIDER=cognito`).
 - [ ] `POST https://<your-domain>/api/upload` with a small PDF returns `{ documentId, s3Uri }`.
 - [ ] `POST https://<your-domain>/api/preview` with `{ documentId, capabilities, method: 'claude-haiku' }` streams SSE events.
-- [ ] Admin endpoint `GET /api/admin/stats` returns `403` when unauth and `200` when you're in `ADMIN_USERS`.
+- [ ] Admin endpoint `GET /api/admin/stats` returns `403` when unauthed and `200` when you're in `ADMIN_USERS`.
 - [ ] Upload a Korean or non-ASCII filename, hit `/api/files/<key>`, verify it streams correctly.
 - [ ] Path-traversal vectors (`..`, absolute, null byte) all return `404`.
 

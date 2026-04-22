@@ -18,7 +18,6 @@ const PipelinePage = lazy(() => import('./pages/PipelinePage'));
 const ProcessingPage = lazy(() => import('./pages/ProcessingPage'));
 const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
-const DocsPage = lazy(() => import('./pages/DocsPage'));
 
 function PageSpinner() {
   return (
@@ -213,8 +212,6 @@ export default function App() {
                     />
                   }
                 />
-                <Route path="/docs" element={<DocsPage />} />
-                <Route path="/docs/:slug" element={<DocsPage />} />
                 {isAdmin && (
                   <Route path="/admin" element={<AdminPage />} />
                 )}

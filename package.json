@@ -6,15 +6,19 @@
   "workspaces": [
     "packages/shared",
     "packages/backend",
-    "packages/frontend"
+    "packages/frontend",
+    "packages/docs"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w packages/backend\" \"npm run dev -w packages/frontend\"",
+    "dev:docs": "npm run dev -w packages/docs",
     "build": "npm run build -w packages/shared && npm run build -w packages/backend && npm run build -w packages/frontend",
+    "build:docs": "npm run build -w packages/docs",
+    "build:all": "npm run build && npm run build:docs",
     "build:shared": "npm run build -w packages/shared",
     "dev:backend": "npm run dev -w packages/backend",
     "dev:frontend": "npm run dev -w packages/frontend",
-    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules"
+    "clean": "rm -rf packages/*/dist packages/*/node_modules packages/docs/.next packages/docs/.source packages/docs/out node_modules"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

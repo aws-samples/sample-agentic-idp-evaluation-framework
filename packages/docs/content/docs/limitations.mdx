@@ -3,8 +3,6 @@ title: Limitations & FAQ
 description: Known constraints, language support, and gated-preview models.
 ---
 
-# Limitations & FAQ
-
 ## Language support
 
 **BDA and Textract produce garbled output for non-English documents.** The platform detects this and filters methods accordingly.
@@ -86,7 +84,7 @@ Partially. Upload, conversation (in-process fallback), and any LLM adapter still
 
 ### Can I add a new capability?
 
-Yes — create a markdown file under `packages/shared/skills/<category>/<id>.md` with the standard frontmatter + support matrix, run `npm run build:skills -w packages/shared`, and rebuild. See [**Capabilities**](/docs/capabilities#adding-a-new-capability).
+Yes — create a markdown file under `packages/shared/skills/<category>/<id>.md` with the standard frontmatter + support matrix, run `npm run build:skills -w packages/shared`, and rebuild. See [Capabilities](/capabilities).
 
 ### Can I add a new method?
 

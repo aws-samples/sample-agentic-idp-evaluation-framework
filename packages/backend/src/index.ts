@@ -132,13 +132,30 @@ app.use('/api/pipeline/chat', pipelineChatRouter);
 app.use('/api/preview', previewRouter);
 app.use('/api/admin', adminRouter);
 
+// Static docs serving (Fumadocs static export at packages/docs/out, basePath=/docs)
+// Mounted BEFORE the SPA fallback so /docs/* hits real HTML files instead of index.html.
+const docsDist = resolve(__dirname, '../../docs/out');
+if (existsSync(docsDist)) {
+  app.use('/docs', express.static(docsDist, { extensions: ['html'] }));
+  // Fumadocs emits `/docs/<slug>/index.html`; trailing-slash requests are handled by
+  // express.static. For `/docs/<slug>` (no slash, no extension), fall through to index.html.
+  app.get('/docs/*', (req, res, next) => {
+    const fallback = join(docsDist, '404.html');
+    if (existsSync(fallback)) {
+      res.status(404).sendFile(fallback);
+    } else {
+      next();
+    }
+  });
+}
+
 // Static frontend serving (production mode)
 const frontendDist = resolve(__dirname, '../../frontend/dist');
 if (existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
-  // SPA fallback - serve index.html for all non-API routes
+  // SPA fallback - serve index.html for all non-API, non-docs routes
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/docs')) {
       res.sendFile(join(frontendDist, 'index.html'));
     }
   });

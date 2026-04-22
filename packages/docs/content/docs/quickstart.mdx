@@ -3,8 +3,6 @@ title: Quickstart
 description: Upload a document and run a benchmark in 5 minutes.
 ---
 
-# Quickstart
-
 Five steps, five minutes. Pick a representative sample document and drive the full pipeline end-to-end.
 
 ## 1. Upload a document
@@ -22,7 +20,7 @@ The conversation page invokes a Strands agent running on **Bedrock AgentCore**. 
 1. Looks at your document and describes what it sees.
 2. Recommends which capabilities matter for your use case, with a relevance score per capability.
 
-You can accept the recommendation, add/remove capabilities, or chat with the agent to refine.
+You can accept the recommendation, add or remove capabilities, or chat with the agent to refine.
 
 ## 3. Review the pipeline
 
@@ -42,13 +40,13 @@ When all methods finish, you get:
 
 Architecture & Code stage does two things:
 
-1. Streams an **architecture recommendation** (text + Mermaid diagram + cost table at 1k/10k/100k docs/month).
+1. Streams an **architecture recommendation** (text + Mermaid diagram + cost table at 1 k / 10 k / 100 k docs/month).
 2. Generates a **10-file deployable project**: `process.py`, `requirements.txt`, `process.ts`, `package.json`, CDK stack (`lib/idp-stack.ts`, `lambda/processor.ts`, `bin/idp.ts`, `cdk.json`, `cdk/package.json`), and a `README.md`.
 
 Click **Download All Code** — you get a single markdown file with path-hinted sections you can split into a real project tree, then `cd cdk && npm install && npx cdk deploy`.
 
 ## What to try next
 
-- [**Methods**](/docs/methods) — when to prefer BDA vs LLM-only vs the hybrids.
-- [**Pricing**](/docs/pricing) — what these numbers mean at 100k documents/month.
-- [**Generated code**](/docs/codegen) — what each of the 10 files actually contains.
+- [Methods](/methods) — when to prefer BDA vs LLM-only vs the hybrids.
+- [Pricing](/pricing) — what these numbers mean at 100 k documents/month.
+- [Generated code](/codegen) — what each of the 10 files actually contains.

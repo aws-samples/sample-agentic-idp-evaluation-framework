@@ -32,6 +32,13 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      // Forward /docs/* to the backend, which serves the Fumadocs static
+      // export (packages/docs/out) via express.static. Keeps `localhost:5180/docs`
+      // working alongside the SPA during dev.
+      '/docs': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
     },
   },
 });
