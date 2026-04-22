@@ -18,6 +18,7 @@ const PipelinePage = lazy(() => import('./pages/PipelinePage'));
 const ProcessingPage = lazy(() => import('./pages/ProcessingPage'));
 const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
+const DocsPage = lazy(() => import('./pages/DocsPage'));
 
 function PageSpinner() {
   return (
@@ -148,6 +149,19 @@ export default function App() {
   const handleToggleDarkMode = useCallback(() => {
     setDarkMode((prev) => !prev);
   }, []);
+
+  // Docs pages have their own layout (left sidebar, no Cloudscape chrome).
+  // Render them standalone so /docs never shares the app's stepper navigation.
+  if (location.pathname === '/docs' || location.pathname.startsWith('/docs/')) {
+    return (
+      <Suspense fallback={<PageSpinner />}>
+        <Routes>
+          <Route path="/docs" element={<DocsPage />} />
+          <Route path="/docs/:slug" element={<DocsPage />} />
+        </Routes>
+      </Suspense>
+    );
+  }
 
   return (
     <>

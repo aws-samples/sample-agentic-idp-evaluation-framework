@@ -14,6 +14,7 @@ support:
   claude: "excellent"
   nova: "good"
   textract-llm: "good"
+  guardrails: "excellent"
 ---
 
 # PII Redaction
@@ -42,3 +43,4 @@ Returns structured JSON with typed fields.
 - **claude**: excellent
 - **nova**: good
 - **textract-llm**: good
+- **guardrails**: excellent

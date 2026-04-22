@@ -11,6 +11,7 @@ import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor
 import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor } from '../processors/claude-direct.js';
 import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
 import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor, TextractNovaProProcessor } from '../processors/textract-llm.js';
+import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
 import { config } from '../config/aws.js';
 
 const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Record<string, () => ProcessorBase> = {
@@ -28,6 +29,7 @@ const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Re
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
   'textract-nova-lite': () => new TextractNovaLiteProcessor(),
   'textract-nova-pro': () => new TextractNovaProProcessor(),
+  'bedrock-guardrails': () => new BedrockGuardrailsProcessor(),
 };
 
 function estimatePageCount(buffer: Buffer): number {
@@ -81,6 +83,16 @@ router.post('/', async (req, res) => {
       if (m.startsWith('textract-') && !isTextractCompatible) {
         emitSSE(res, { type: 'method_error', method: m, error: `Textract does not support .${ext} files` });
         return false;
+      }
+      if (m === 'bedrock-guardrails') {
+        if (!config.bedrockGuardrailId) {
+          emitSSE(res, { type: 'method_error', method: m, error: 'Bedrock Guardrails not configured (BEDROCK_GUARDRAIL_ID is empty)' });
+          return false;
+        }
+        if (!isTextractCompatible) {
+          emitSSE(res, { type: 'method_error', method: m, error: `Guardrails requires Textract-compatible input; .${ext} not supported` });
+          return false;
+        }
       }
       if (documentLanguages.length && !isMethodLanguageCompatible(m, documentLanguages)) {
         emitSSE(res, { type: 'method_error', method: m, error: `${m} does not support non-English documents (${documentLanguages.join(', ')})` });

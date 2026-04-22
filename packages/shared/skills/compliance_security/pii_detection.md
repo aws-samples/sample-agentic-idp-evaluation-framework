@@ -15,8 +15,7 @@ support:
   claude: "excellent"
   nova: "good"
   textract-llm: "good"
-  comprehend: "excellent"
-  bedrock-guardrails: "excellent"
+  guardrails: "excellent"
 ---
 
 # PII Detection
@@ -46,5 +45,4 @@ Returns structured JSON with typed fields.
 - **claude**: excellent
 - **nova**: good
 - **textract-llm**: good
-- **comprehend**: excellent
-- **bedrock-guardrails**: excellent
+- **guardrails**: excellent

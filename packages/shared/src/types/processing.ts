@@ -19,11 +19,12 @@ export const METHODS = [
   'textract-nova-lite',
   'textract-nova-pro',
   'nova-embeddings',
+  'bedrock-guardrails',
 ] as const;
 
 export type ProcessingMethod = (typeof METHODS)[number];
 
-export const METHOD_FAMILIES = ['bda', 'bda-llm', 'claude', 'nova', 'textract-llm', 'embeddings'] as const;
+export const METHOD_FAMILIES = ['bda', 'bda-llm', 'claude', 'nova', 'textract-llm', 'embeddings', 'guardrails'] as const;
 export type MethodFamily = (typeof METHOD_FAMILIES)[number];
 
 export interface TokenPricing {
@@ -223,6 +224,32 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     limitations: ['Nova Pro is Gated Preview', 'Two-step process', 'Limited regional support'],
   },
 
+  // ─── Guardrails ──────────────────────────────────────────────────────────────
+  'bedrock-guardrails': {
+    id: 'bedrock-guardrails',
+    family: 'guardrails',
+    name: 'Amazon Bedrock Guardrails',
+    shortName: 'Guardrails',
+    description:
+      'Amazon Bedrock Guardrails ApplyGuardrail runtime API — detects PII, regex matches, and sensitive topics. Runs Textract first to extract text from PDFs/images, then applies the guardrail.',
+    modelId: 'bedrock-guardrails-apply',
+    // Pricing is per text-unit (1 unit = 1 KB of text). Modeled as per-page.
+    tokenPricing: { inputPer1MTokens: 0, outputPer1MTokens: 0 },
+    // Textract OCR ($0.0015/page) + sensitive-info-policy ($0.10 per 1K text-units ≈ $0.0001/page typical).
+    estimatedCostPerPage: 0.0016,
+    strengths: [
+      'Managed PII detection (SSN, credit cards, phones, emails, names, addresses, etc.)',
+      'Policy-driven — one config covers all apps',
+      'Deterministic — no LLM tokens consumed',
+      'Can also flag content policy, denied topics, word filters',
+    ],
+    limitations: [
+      'Requires a configured Guardrail ID (BEDROCK_GUARDRAIL_ID)',
+      'Only PII and content-safety capabilities — not general extraction',
+      'Needs Textract first for PDFs/images (handled automatically)',
+    ],
+  },
+
   // ─── Embeddings ──────────────────────────────────────────────────────────────
   'nova-embeddings': {
     id: 'nova-embeddings',
@@ -279,9 +306,15 @@ export function isMethodLanguageCompatible(method: ProcessingMethod, languages: 
   // All languages are English → all methods work
   if (normalized.every((l) => l.startsWith('en') || l === 'english')) return true;
 
-  // Primary language is non-English → exclude BDA/Textract families
+  // Primary language is non-English → exclude BDA/Textract/Guardrails families
+  // (Guardrails PII detectors are English-language-trained; non-English output is unreliable.)
   const family = METHOD_INFO[method].family;
-  return family !== 'bda' && family !== 'bda-llm' && family !== 'textract-llm';
+  return (
+    family !== 'bda' &&
+    family !== 'bda-llm' &&
+    family !== 'textract-llm' &&
+    family !== 'guardrails'
+  );
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -22,6 +22,8 @@ export const config = {
   s3OutputPrefix: process.env.S3_OUTPUT_PREFIX ?? 'outputs/',
   bdaProfileArn: process.env.BDA_PROFILE_ARN ?? '',
   bdaProjectArn: process.env.BDA_PROJECT_ARN ?? '',
+  bedrockGuardrailId: process.env.BEDROCK_GUARDRAIL_ID ?? '',
+  bedrockGuardrailVersion: process.env.BEDROCK_GUARDRAIL_VERSION ?? 'DRAFT',
   claudeModelId: process.env.CLAUDE_MODEL_ID ?? 'us.anthropic.claude-sonnet-4-6',
   novaModelId: process.env.NOVA_MODEL_ID ?? 'us.amazon.nova-2-lite-v1:0',
   port: parseInt(process.env.PORT ?? '3001', 10),

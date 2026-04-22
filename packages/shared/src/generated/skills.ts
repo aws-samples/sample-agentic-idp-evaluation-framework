@@ -323,8 +323,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'claude': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const,
-    'comprehend': 'excellent' as const,
-    'bedrock-guardrails': 'excellent' as const
+    'guardrails': 'excellent' as const
     },
   },
   'pii_redaction': {
@@ -341,7 +340,8 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda-llm': 'good' as const,
     'claude': 'excellent' as const,
     'nova': 'good' as const,
-    'textract-llm': 'good' as const
+    'textract-llm': 'good' as const,
+    'guardrails': 'excellent' as const
     },
   },
   'check_processing': {
