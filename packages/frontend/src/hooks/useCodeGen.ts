@@ -4,9 +4,16 @@ import { authedFetch } from '../services/api.js';
 
 export interface GeneratedCode {
   python: string | null;
+  pythonRequirements: string | null;
   typescript: string | null;
+  typescriptPackageJson: string | null;
   cdk: string | null;
-  tokenUsage?: { inputTokens: number; outputTokens: number };
+  cdkLambdaHandler: string | null;
+  cdkAppEntry: string | null;
+  cdkPackageJson: string | null;
+  cdkJson: string | null;
+  readme: string | null;
+  tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens?: number };
 }
 
 export function useCodeGen() {
