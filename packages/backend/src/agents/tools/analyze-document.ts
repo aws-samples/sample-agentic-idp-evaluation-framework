@@ -1,8 +1,38 @@
 import { ConverseCommand, type Message, type ImageFormat } from '@aws-sdk/client-bedrock-runtime';
 import sharp from 'sharp';
+import { PDFDocument } from 'pdf-lib';
 import { bedrockClient, config } from '../../config/aws.js';
 import { getDocumentBuffer } from '../../services/s3.js';
 import { convertOfficeDocument, isOfficeFormat } from '../../services/file-converter.js';
+
+// Claude rejects PDFs with more than 100 pages. For analysis we only need a
+// representative sample, so we extract the first N and last M pages into a
+// smaller PDF that the Converse API will accept.
+const ANALYSIS_PDF_PAGE_CAP = 80;
+const ANALYSIS_PDF_HEAD_PAGES = 60;
+const ANALYSIS_PDF_TAIL_PAGES = 20;
+
+async function sampleLargePdf(buffer: Buffer): Promise<{ buffer: Buffer; originalPages: number; sampled: boolean }> {
+  try {
+    const src = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const originalPages = src.getPageCount();
+    if (originalPages <= ANALYSIS_PDF_PAGE_CAP) {
+      return { buffer, originalPages, sampled: false };
+    }
+    const dst = await PDFDocument.create();
+    const headIdx = Array.from({ length: Math.min(ANALYSIS_PDF_HEAD_PAGES, originalPages) }, (_, i) => i);
+    const tailStart = Math.max(originalPages - ANALYSIS_PDF_TAIL_PAGES, ANALYSIS_PDF_HEAD_PAGES);
+    const tailIdx = Array.from({ length: originalPages - tailStart }, (_, i) => tailStart + i);
+    const pageIndices = Array.from(new Set([...headIdx, ...tailIdx]));
+    const copied = await dst.copyPages(src, pageIndices);
+    copied.forEach((p) => dst.addPage(p));
+    const bytes = await dst.save();
+    return { buffer: Buffer.from(bytes), originalPages, sampled: true };
+  } catch (err) {
+    console.warn('[analyzeDocument] PDF sampling failed, falling back to raw buffer:', (err as Error).message);
+    return { buffer, originalPages: 0, sampled: false };
+  }
+}
 
 export interface DocumentAnalysis {
   documentType: string;
@@ -65,17 +95,26 @@ export async function analyzeDocument(
       return result;
     }
 
-    // PDF: send as document
+    // PDF: send as document. Claude rejects PDFs > 100 pages, so we down-sample
+    // large PDFs to a head+tail sample before the Converse call.
     const isPdf = /\.pdf$/i.test(fileName);
     if (isPdf) {
+      const { buffer: sampledBuffer, originalPages, sampled } = await sampleLargePdf(docBuffer);
+      const prompt = sampled
+        ? `${ANALYSIS_PROMPT}\n\nNOTE: This is a SAMPLE of a larger ${originalPages}-page PDF (first ${ANALYSIS_PDF_HEAD_PAGES} and last ${ANALYSIS_PDF_TAIL_PAGES} pages). Set pageCount to ${originalPages}. Analyze confidently based on the sample.`
+        : ANALYSIS_PROMPT;
       messages = [{
         role: 'user',
         content: [
-          { document: { name: 'document', format: 'pdf', source: { bytes: docBuffer } } },
-          { text: ANALYSIS_PROMPT },
+          { document: { name: 'document', format: 'pdf', source: { bytes: sampledBuffer } } },
+          { text: prompt },
         ],
       }];
-      return callBedrock(messages);
+      const result = await callBedrock(messages);
+      if (sampled && originalPages > 0) {
+        result.pageCount = originalPages;
+      }
+      return result;
     }
 
     // Image: send as image

@@ -40,6 +40,7 @@ export default function ComparisonTable({ comparison }: ComparisonTableProps) {
     nova: 'Nova',
     'textract-llm': 'Textract+LLM',
     embeddings: 'Embeddings',
+    guardrails: 'Guardrails',
   };
 
   return (

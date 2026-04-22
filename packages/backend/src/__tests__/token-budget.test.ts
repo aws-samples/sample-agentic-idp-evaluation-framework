@@ -19,8 +19,8 @@ describe('calculateMaxTokens', () => {
     expect(tokens5).toBeGreaterThan(tokens1);
   });
 
-  it('caps at 16384', () => {
-    expect(calculateMaxTokens(50, 50, 'json', false)).toBe(16384);
+  it('caps at model max (64000)', () => {
+    expect(calculateMaxTokens(50, 50, 'json', false)).toBe(64000);
   });
 
   it('json format uses 1.3x multiplier', () => {
@@ -29,12 +29,12 @@ describe('calculateMaxTokens', () => {
     expect(json).toBeGreaterThan(yaml);
   });
 
-  it('media capabilities get minimum 4096', () => {
-    expect(calculateMaxTokens(1, 1, 'yaml', true)).toBe(4096);
+  it('media capabilities get minimum 8192', () => {
+    expect(calculateMaxTokens(1, 1, 'yaml', true)).toBe(8192);
   });
 
   it('media scales with cap count', () => {
-    expect(calculateMaxTokens(5, 1, 'yaml', true)).toBe(5000);
+    expect(calculateMaxTokens(5, 1, 'yaml', true)).toBe(10000);
   });
 
   // Real-world examples
@@ -53,9 +53,9 @@ describe('calculateMaxTokens', () => {
     expect(calculateMaxTokens(5, 2, 'yaml', false)).toBe(6600);
   });
 
-  it('15 caps, 10 pages, json -> 16384 (capped)', () => {
-    // (1000*15 + 800*10)*1.3 = 29900 → cap 16384
-    expect(calculateMaxTokens(15, 10, 'json', false)).toBe(16384);
+  it('15 caps, 10 pages, json -> 29900 (under 64k cap)', () => {
+    // (1000*15 + 800*10)*1.3 = 29900 (below 64k model max)
+    expect(calculateMaxTokens(15, 10, 'json', false)).toBe(29900);
   });
 });
 

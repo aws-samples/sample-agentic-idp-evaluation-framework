@@ -19,6 +19,7 @@ const FAMILY_COLORS: Record<MethodFamily, string> = {
   claude: '#8b5cf6',
   nova: '#ec7211',
   'textract-llm': '#037f0c', embeddings: '#2563eb',
+  guardrails: '#d13212',
 };
 
 export default memo(function MethodNode({ data }: { data: MethodNodeData }) {

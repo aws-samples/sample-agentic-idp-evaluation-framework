@@ -36,6 +36,7 @@ export default function MetricsChart({ comparison }: MetricsChartProps) {
     nova: '#ec7211',
     'textract-llm': '#037f0c',
     embeddings: '#2563eb',
+    guardrails: '#d13212',
   };
 
   // Group by family for multiple series
@@ -46,6 +47,7 @@ export default function MetricsChart({ comparison }: MetricsChartProps) {
     nova: [],
     'textract-llm': [],
     embeddings: [],
+    guardrails: [],
   };
 
   for (const item of items) {

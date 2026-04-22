@@ -18,6 +18,7 @@ import PageClassifierNode from './nodes/PageClassifierNode';
 import CapabilityNode from './nodes/CapabilityNode';
 import MethodNode from './nodes/MethodNode';
 import AggregatorNode from './nodes/AggregatorNode';
+import SequentialComposerNode from './nodes/SequentialComposerNode';
 import OutputNode from './nodes/OutputNode';
 import type { NodeStateInfo } from '../../hooks/usePipeline';
 
@@ -26,6 +27,7 @@ const nodeTypes = {
   'page-classifier': PageClassifierNode,
   capability: CapabilityNode,
   method: MethodNode,
+  'sequential-composer': SequentialComposerNode,
   aggregator: AggregatorNode,
   'pipeline-output': OutputNode,
 };

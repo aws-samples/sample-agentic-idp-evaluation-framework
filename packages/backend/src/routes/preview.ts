@@ -10,6 +10,7 @@ import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor
 import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor } from '../processors/claude-direct.js';
 import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
 import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor, TextractNovaProProcessor } from '../processors/textract-llm.js';
+import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
 import { config } from '../config/aws.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { trackActivity } from '../services/activity-tracker.js';
@@ -45,6 +46,7 @@ const PROCESSOR_FACTORY: Partial<Record<ProcessingMethod, () => ProcessorBase>> 
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
   'textract-nova-lite': () => new TextractNovaLiteProcessor(),
   'textract-nova-pro': () => new TextractNovaProProcessor(),
+  'bedrock-guardrails': () => new BedrockGuardrailsProcessor(),
 };
 
 function estimatePageCount(buffer: Buffer): number {
@@ -96,11 +98,20 @@ router.post('/', async (req, res) => {
 
     const documentLanguages = body.documentLanguages ?? [];
 
+    const hasPiiCapability = body.capabilities.some((c) => c === 'pii_detection' || c === 'pii_redaction');
+
     const validMethods = methods.filter((m) => {
       if (m.startsWith('bda-') && m !== 'bda-custom' && !config.bdaProfileArn) return false;
       if (m.startsWith('bda-') && !isBdaCompatible) return false;
       if (m === 'bda-custom' && !config.bdaProjectArn) return false;
       if (m.startsWith('textract-') && !isTextractCompatible) return false;
+      if (m === 'bedrock-guardrails') {
+        // Only include Guardrails when BEDROCK_GUARDRAIL_ID is set, at least one
+        // PII capability is requested, and Textract supports the file format.
+        if (!config.bedrockGuardrailId) return false;
+        if (!hasPiiCapability) return false;
+        if (!isTextractCompatible) return false;
+      }
       if (documentLanguages.length && !isMethodLanguageCompatible(m, documentLanguages)) return false;
       return !!PROCESSOR_FACTORY[m];
     });

@@ -42,6 +42,7 @@ export type {
   PageClassifierConfig,
   CapabilityNodeConfig,
   MethodNodeConfig,
+  SequentialComposerConfig,
   AggregatorConfig,
   OutputConfig,
   PipelineEdge,
@@ -100,6 +101,19 @@ export type {
 // Generated skill definitions (from skills/**/*.md)
 export type { SkillId, SkillInfo } from './generated/skills.js';
 export { SKILL_IDS, SKILL_INFO, GENERATED_CAPABILITIES, GENERATED_CAPABILITY_INFO } from './generated/skills.js';
+
+// Feedback survey
+export type {
+  FeedbackRequest,
+  FeedbackRecord,
+  FeedbackStatus,
+  FeedbackSummary,
+} from './types/feedback.js';
+export {
+  FEEDBACK_RATING_MIN,
+  FEEDBACK_RATING_MAX,
+  FEEDBACK_RATING_STEP,
+} from './types/feedback.js';
 
 // Document schemas (#5)
 export {

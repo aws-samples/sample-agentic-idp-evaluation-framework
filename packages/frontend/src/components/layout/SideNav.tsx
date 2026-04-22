@@ -11,10 +11,12 @@ interface SideNavProps {
   steps: Step[];
 }
 
+const ADMIN_HREFS = new Set(['/admin', '/survey-results']);
+
 export default function SideNav({ activeStep, steps }: SideNavProps) {
-  // Separate workflow steps from admin
-  const workflowSteps = steps.filter((s) => s.href !== '/admin');
-  const hasAdmin = steps.some((s) => s.href === '/admin');
+  // Separate workflow steps from admin-only entries
+  const workflowSteps = steps.filter((s) => !ADMIN_HREFS.has(s.href));
+  const adminSteps = steps.filter((s) => ADMIN_HREFS.has(s.href));
 
   const workflowItems = workflowSteps.map((step, idx) => ({
     type: 'link' as const,
@@ -29,13 +31,15 @@ export default function SideNav({ activeStep, steps }: SideNavProps) {
 
   const items: any[] = [...workflowItems];
 
-  if (hasAdmin) {
+  if (adminSteps.length > 0) {
     items.push({ type: 'divider' as const });
-    items.push({
-      type: 'link' as const,
-      text: 'Admin',
-      href: '/admin',
-    });
+    for (const step of adminSteps) {
+      items.push({
+        type: 'link' as const,
+        text: step.text,
+        href: step.href,
+      });
+    }
   }
 
   return (

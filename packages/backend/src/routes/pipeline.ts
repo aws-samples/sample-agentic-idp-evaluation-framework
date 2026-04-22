@@ -34,6 +34,8 @@ import {
   TextractNovaLiteProcessor,
   TextractNovaProProcessor,
 } from '../processors/textract-llm.js';
+import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
+import { combineUpstreamText } from '../services/pipeline-text-extractor.js';
 
 const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Record<string, () => ProcessorBase> = {
   'bda-standard': () => new BdaStandardProcessor(),
@@ -50,6 +52,7 @@ const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Re
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
   'textract-nova-lite': () => new TextractNovaLiteProcessor(),
   'textract-nova-pro': () => new TextractNovaProProcessor(),
+  'bedrock-guardrails': () => new BedrockGuardrailsProcessor(),
 };
 
 function estimatePageCount(buffer: Buffer): number {
@@ -170,6 +173,14 @@ router.post('/execute', async (req, res) => {
 
     const documentLanguages: string[] = body.documentLanguages ?? [];
 
+    // Guardrails is allowed for non-Textract formats ONLY when it sits inside a
+    // sequential composer — in that case the upstream LLM stage provides the
+    // text and Textract is skipped.
+    const composerNodeForFilter = pipeline.nodes.find((n) => n.type === 'sequential-composer');
+    const sequentialStageIds = new Set<string>(
+      composerNodeForFilter ? ((composerNodeForFilter.config as any).stages as string[]) : [],
+    );
+
     const validMethodNodes = methodNodes.filter((node) => {
       const method: ProcessingMethod = (node.config as any).method;
       if (method === 'bda-custom' && !config.bdaProjectArn) {
@@ -188,6 +199,20 @@ router.post('/execute', async (req, res) => {
         emitSSE(res, { type: 'node_error', nodeId: node.id, error: `Textract does not support .${ext} files` } as PipelineExecutionEvent);
         return false;
       }
+      if (method === 'bedrock-guardrails') {
+        if (!config.bedrockGuardrailId) {
+          emitSSE(res, { type: 'node_error', nodeId: node.id, error: 'Bedrock Guardrails not configured (BEDROCK_GUARDRAIL_ID is empty)' } as PipelineExecutionEvent);
+          return false;
+        }
+        // Guardrails inside a sequential composer is fed by upstream text —
+        // skip the Textract-compat check for that case. Standalone Guardrails
+        // requires Textract-compatible input.
+        const inSequential = sequentialStageIds.has(node.id);
+        if (!inSequential && !isTextractCompatible) {
+          emitSSE(res, { type: 'node_error', nodeId: node.id, error: `Guardrails requires Textract-compatible input; .${ext} not supported (run an LLM stage first)` } as PipelineExecutionEvent);
+          return false;
+        }
+      }
       if (documentLanguages.length && !isMethodLanguageCompatible(method, documentLanguages)) {
         emitSSE(res, { type: 'node_error', nodeId: node.id, error: `${method} does not support non-English documents (${documentLanguages.join(', ')})` } as PipelineExecutionEvent);
         return false;
@@ -199,60 +224,122 @@ router.post('/execute', async (req, res) => {
     let totalCost = 0;
     const allResults: Record<string, CapabilityResult> = {};
 
-    // Execute method nodes in PARALLEL
-    const settled = await Promise.allSettled(
-      validMethodNodes.map(async (methodNode) => {
-        const methodConfig = methodNode.config as any;
-        const method: ProcessingMethod = methodConfig.method;
+    // Detect sequential-composer: if present, we execute stages serially,
+    // forwarding the text extracted by upstream stages into the downstream
+    // Guardrails stage. Otherwise we run every method node in parallel.
+    const composerNode = pipeline.nodes.find((n) => n.type === 'sequential-composer');
+    const composerStages: string[] = composerNode
+      ? ((composerNode.config as any).stages as string[])
+      : [];
+    const composerStageSet = new Set(composerStages);
 
-        // Emit node start
-        emitSSE(res, {
-          type: 'node_start',
-          nodeId: methodNode.id,
-          nodeType: 'method',
-        } as PipelineExecutionEvent);
+    const runMethodNode = async (
+      methodNode: typeof validMethodNodes[number],
+      overrideInput?: AdapterInput,
+    ): Promise<ProcessorResult | undefined> => {
+      const methodConfig = methodNode.config as any;
+      const method: ProcessingMethod = methodConfig.method;
 
-        try {
-          const factory = PROCESSOR_MAP[method];
-          if (!factory) {
-            emitSSE(res, { type: 'node_error', nodeId: methodNode.id, error: `No processor for method: ${method}` } as PipelineExecutionEvent);
-            return;
-          }
-          const processor = factory();
-          const result = await processor.process(res, input);
+      emitSSE(res, {
+        type: 'node_start',
+        nodeId: methodNode.id,
+        nodeType: 'method',
+      } as PipelineExecutionEvent);
 
-          if (result.status === 'complete') {
-            Object.assign(allResults, result.results);
-            totalCost += result.metrics.cost;
-
-            emitSSE(res, {
-              type: 'node_complete',
-              nodeId: methodNode.id,
-              result: result.results,
-              metrics: {
-                latencyMs: result.metrics.latencyMs,
-                cost: result.metrics.cost,
-              },
-            } as PipelineExecutionEvent);
-
-            return result;
-          } else {
-            emitSSE(res, {
-              type: 'node_error',
-              nodeId: methodNode.id,
-              error: `Method ${method} failed`,
-            } as PipelineExecutionEvent);
-          }
-        } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-          emitSSE(res, {
-            type: 'node_error',
-            nodeId: methodNode.id,
-            error: errorMsg,
-          } as PipelineExecutionEvent);
+      try {
+        const factory = PROCESSOR_MAP[method];
+        if (!factory) {
+          emitSSE(res, { type: 'node_error', nodeId: methodNode.id, error: `No processor for method: ${method}` } as PipelineExecutionEvent);
+          return undefined;
         }
-      }),
-    );
+        const processor = factory();
+        const result = await processor.process(res, overrideInput ?? input);
+
+        if (result.status === 'complete') {
+          Object.assign(allResults, result.results);
+          totalCost += result.metrics.cost;
+
+          emitSSE(res, {
+            type: 'node_complete',
+            nodeId: methodNode.id,
+            result: result.results,
+            metrics: {
+              latencyMs: result.metrics.latencyMs,
+              cost: result.metrics.cost,
+            },
+          } as PipelineExecutionEvent);
+
+          return result;
+        }
+        emitSSE(res, {
+          type: 'node_error',
+          nodeId: methodNode.id,
+          error: `Method ${method} failed`,
+        } as PipelineExecutionEvent);
+        return undefined;
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        emitSSE(res, {
+          type: 'node_error',
+          nodeId: methodNode.id,
+          error: errorMsg,
+        } as PipelineExecutionEvent);
+        return undefined;
+      }
+    };
+
+    let settled: PromiseSettledResult<ProcessorResult | undefined>[] = [];
+
+    if (composerNode && composerStages.length > 0) {
+      // Sequential mode:
+      //  - Run every non-composer stage first, in parallel within the extract
+      //    column (all nodes except the last composer stage).
+      //  - Concatenate their extracted text.
+      //  - Run the final composer stage (Guardrails) once with precomputedText.
+      const finalStageId = composerStages[composerStages.length - 1];
+      const extractStageIds = composerStages.slice(0, -1);
+      const extractStageNodes = validMethodNodes.filter((n) => extractStageIds.includes(n.id));
+      const finalStageNode = validMethodNodes.find((n) => n.id === finalStageId);
+      const parallelNodes = validMethodNodes.filter((n) => !composerStageSet.has(n.id));
+
+      emitSSE(res, {
+        type: 'node_start',
+        nodeId: composerNode.id,
+        nodeType: 'sequential-composer',
+      } as PipelineExecutionEvent);
+
+      // Run extract stages + unrelated parallel stages concurrently.
+      const extractSettled = await Promise.allSettled(
+        [...extractStageNodes, ...parallelNodes].map((n) => runMethodNode(n)),
+      );
+      settled.push(...extractSettled);
+
+      // Combine extracted text from extract-stage results only.
+      const extractResults: (ProcessorResult | undefined)[] = extractSettled
+        .slice(0, extractStageNodes.length)
+        .map((s) => (s.status === 'fulfilled' ? s.value : undefined));
+      const combinedText = combineUpstreamText(extractResults);
+
+      // Run the final Guardrails stage with precomputedText.
+      if (finalStageNode) {
+        const guardrailsInput: AdapterInput = {
+          ...input,
+          precomputedText: combinedText || undefined,
+        };
+        const finalSettled = await Promise.allSettled([runMethodNode(finalStageNode, guardrailsInput)]);
+        settled.push(...finalSettled);
+      }
+
+      emitSSE(res, {
+        type: 'node_complete',
+        nodeId: composerNode.id,
+        result: { stages: composerStages.length, textChars: combinedText.length },
+        metrics: { latencyMs: 0, cost: 0 },
+      } as PipelineExecutionEvent);
+    } else {
+      // Parallel mode (default).
+      settled = await Promise.allSettled(validMethodNodes.map((n) => runMethodNode(n)));
+    }
 
     // Collect completed ProcessorResults for comparison
     const processorResults: ProcessorResult[] = settled

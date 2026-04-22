@@ -9,8 +9,10 @@ import SideNav from './components/layout/SideNav';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import HomePage from './pages/HomePage';
 import type { AuthUser } from './services/api';
+import { authedFetch } from './services/api';
 import { initMidwayAuth, getStoredToken, getUserFromToken, hasValidToken } from './services/midway';
 import type { PreviewResponse } from './hooks/usePreview';
+import FeedbackModal from './components/feedback/FeedbackModal';
 
 // Lazy-loaded pages for bundle splitting (#20)
 const ConversationPage = lazy(() => import('./pages/ConversationPage'));
@@ -18,6 +20,7 @@ const PipelinePage = lazy(() => import('./pages/PipelinePage'));
 const ProcessingPage = lazy(() => import('./pages/ProcessingPage'));
 const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
+const SurveyResultsPage = lazy(() => import('./pages/SurveyResultsPage'));
 const DocsPage = lazy(() => import('./pages/DocsPage'));
 
 function PageSpinner() {
@@ -90,9 +93,38 @@ export default function App() {
   }, [darkMode]);
 
   const isAdmin = user ? ADMIN_USERS.includes(user.alias) : false;
-  const steps = isAdmin ? [...STEPS, { href: '/admin', text: 'Admin' }] : STEPS;
+  const steps = isAdmin
+    ? [...STEPS, { href: '/admin', text: 'Admin' }, { href: '/survey-results', text: 'Survey Results' }]
+    : STEPS;
   const currentStepIndex = steps.findIndex((s) => s.href === location.pathname);
   const activeStep = currentStepIndex >= 0 ? currentStepIndex : 0;
+
+  // Feedback survey — one-time per user, checked on login.
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [feedbackChecked, setFeedbackChecked] = useState(false);
+
+  useEffect(() => {
+    if (!user || feedbackChecked) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authedFetch('/api/feedback/status');
+        if (!res.ok) return;
+        const ct = res.headers.get('content-type') ?? '';
+        if (!ct.includes('application/json')) return;
+        const data = await res.json() as { submitted: boolean };
+        if (!cancelled && !data.submitted) {
+          // Show after a short delay so it doesn't hijack the initial load
+          setTimeout(() => { if (!cancelled) setFeedbackVisible(true); }, 3000);
+        }
+      } catch {
+        // Non-blocking
+      } finally {
+        if (!cancelled) setFeedbackChecked(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, feedbackChecked]);
 
   const handleUploadComplete = useCallback(
     (doc: UploadResponse) => {
@@ -229,12 +261,20 @@ export default function App() {
                 {isAdmin && (
                   <Route path="/admin" element={<AdminPage />} />
                 )}
+                {isAdmin && (
+                  <Route path="/survey-results" element={<SurveyResultsPage />} />
+                )}
               </Routes>
             </Suspense>
           </ErrorBoundary>
         }
         toolsHide
         navigationWidth={260}
+      />
+      <FeedbackModal
+        visible={feedbackVisible}
+        onDismiss={() => setFeedbackVisible(false)}
+        onSubmitted={() => setFeedbackVisible(false)}
       />
     </>
   );

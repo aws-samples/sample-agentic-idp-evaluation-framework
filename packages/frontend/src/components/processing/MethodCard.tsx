@@ -35,6 +35,7 @@ export default function MethodCard({ progress, capabilities }: MethodCardProps) 
     nova: 'Nova',
     'textract-llm': 'Textract+LLM',
     embeddings: 'Embeddings',
+    guardrails: 'Guardrails',
   };
 
   return (

@@ -327,6 +327,11 @@ export function getMethodsByFamily(family: MethodFamily): MethodInfo[] {
   return Object.values(METHOD_INFO).filter((m) => m.family === family);
 }
 
+// PII-specialist capabilities are best handled by Bedrock Guardrails
+// (deterministic, policy-driven, no LLM hallucination). When both Guardrails
+// and a general LLM score 'excellent', prefer Guardrails as the tie-breaker.
+const PII_SPECIALIST_CAPABILITIES = new Set<string>(['pii_detection', 'pii_redaction']);
+
 export function getBestMethodsForCapability(capability: Capability): ProcessingMethod[] {
   const results: { method: ProcessingMethod; level: SupportLevel }[] = [];
   for (const [method, info] of Object.entries(METHOD_INFO)) {
@@ -337,8 +342,19 @@ export function getBestMethodsForCapability(capability: Capability): ProcessingM
     }
   }
   const order: Record<SupportLevel, number> = { excellent: 0, good: 1, limited: 2, none: 3 };
+  const isPiiSpecialist = PII_SPECIALIST_CAPABILITIES.has(capability);
   return results
-    .sort((a, b) => order[a.level] - order[b.level])
+    .sort((a, b) => {
+      const levelDiff = order[a.level] - order[b.level];
+      if (levelDiff !== 0) return levelDiff;
+      // Tie-breaker: for PII capabilities, Guardrails wins within the same tier.
+      if (isPiiSpecialist) {
+        const aIsGuardrails = METHOD_INFO[a.method].family === 'guardrails';
+        const bIsGuardrails = METHOD_INFO[b.method].family === 'guardrails';
+        if (aIsGuardrails !== bIsGuardrails) return aIsGuardrails ? -1 : 1;
+      }
+      return 0;
+    })
     .map((r) => r.method);
 }
 

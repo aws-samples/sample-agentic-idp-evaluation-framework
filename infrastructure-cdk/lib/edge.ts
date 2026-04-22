@@ -77,7 +77,8 @@ export class EdgeConstruct extends Construct {
         },
       },
       errorResponses: [
-        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html', ttl: Duration.seconds(0) },
+        // SPA fallback on 404 only. Do NOT rewrite 403 — /api/admin/* legitimately
+        // returns 403 JSON and rewriting to index.html breaks client JSON parsing.
         { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html', ttl: Duration.seconds(0) },
       ],
     });

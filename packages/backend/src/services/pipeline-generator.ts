@@ -12,6 +12,7 @@ import type {
   PageClassifierConfig,
   CapabilityNodeConfig,
   MethodNodeConfig,
+  SequentialComposerConfig,
   AggregatorConfig,
   OutputConfig,
 } from '@idp/shared';
@@ -22,6 +23,13 @@ import {
   getMethodFamily,
   isMethodLanguageCompatible,
 } from '@idp/shared';
+
+// Capabilities that Guardrails handles as a dedicated "PII specialist" stage
+// (fed from an upstream LLM/BDA extraction stage via a sequential composer).
+const PII_CAPABILITIES: ReadonlySet<Capability> = new Set<Capability>([
+  'pii_detection',
+  'pii_redaction',
+]);
 
 // ─── Method Selection Logic ──────────────────────────────────────────────────
 
@@ -50,6 +58,9 @@ const SPEED_RANK: Record<string, number> = {
   'claude-opus': 13,
   'bda-custom': 14,
   'nova-embeddings': 15,
+  // Guardrails is fast (Textract + deterministic policy eval, ~4s). Ranked
+  // between nova-pro and textract-claude-haiku.
+  'bedrock-guardrails': 4,
 };
 
 function selectMethod(
@@ -125,7 +136,16 @@ function balancedScore(method: ProcessingMethod, capability: Capability): number
   const speedScore = ((11 - speedRank) / 11) * 100;
 
   // Weighted average: 40% accuracy, 30% cost, 30% speed
-  return accuracyScore * 0.4 + costScore * 0.3 + speedScore * 0.3;
+  let score = accuracyScore * 0.4 + costScore * 0.3 + speedScore * 0.3;
+
+  // Bonus for PII specialist — Guardrails is deterministic and purpose-built,
+  // so it should win ties for PII capabilities even when cheaper/faster LLMs
+  // exist. Applied only when the method's family is 'guardrails'.
+  if (PII_CAPABILITIES.has(capability) && family === 'guardrails') {
+    score += 25;
+  }
+
+  return score;
 }
 
 // ─── Page Classifier Logic ───────────────────────────────────────────────────
@@ -254,70 +274,159 @@ export function generatePipeline(
     methodToCapabilities.get(method)!.push(capability);
   }
 
-  // 4. Method Nodes (each method handles its assigned capabilities as sub-items)
+  // 3a. Detect a sequential composition pattern:
+  //     - One stage extracts/summarizes text with an LLM/BDA method.
+  //     - A downstream Guardrails stage consumes that text and applies PII
+  //       redaction/detection. We only enter sequential mode when both a PII
+  //       capability is assigned to Guardrails AND at least one non-PII
+  //       capability is assigned to a different method. Otherwise we fall back
+  //       to the normal parallel layout.
+  const guardrailsMethod: ProcessingMethod = 'bedrock-guardrails';
+  const guardrailsCaps = methodToCapabilities.get(guardrailsMethod) ?? [];
+  const hasGuardrailsStage = guardrailsCaps.length > 0 && guardrailsCaps.every((c) => PII_CAPABILITIES.has(c));
+  const nonGuardrailsMethods = Array.from(methodToCapabilities.entries())
+    .filter(([m]) => m !== guardrailsMethod);
+  const sequentialMode = hasGuardrailsStage && nonGuardrailsMethods.length >= 1;
+
+  // 4. Method Nodes (each method handles its assigned capabilities as sub-items).
+  //    In sequential mode we lay out extract methods in one column, then the
+  //    Guardrails node in the next column, then the output. Otherwise we use
+  //    the original parallel-with-aggregator layout.
   const methodNodeIds: string[] = [];
-  const methodYStart = yPos - (methodToCapabilities.size * 140) / 2;
-  let methodIdx = 0;
+  let preOutputNodeId: string;
 
-  for (const [method, caps] of methodToCapabilities.entries()) {
-    const methodNodeId = generateNodeId('method');
-    methodNodeIds.push(methodNodeId);
+  if (sequentialMode) {
+    const extractMethodNodeIds: string[] = [];
 
-    const info = METHOD_INFO[method];
+    // Column 1 of methods: parallel LLM/BDA extract stage(s).
+    const extractMethodCount = nonGuardrailsMethods.length;
+    const extractYStart = yPos - (extractMethodCount * 140) / 2;
+    nonGuardrailsMethods.forEach(([method, caps], idx) => {
+      const extractNodeId = generateNodeId('method');
+      extractMethodNodeIds.push(extractNodeId);
+      methodNodeIds.push(extractNodeId);
+      const info = METHOD_INFO[method];
+      nodes.push({
+        id: extractNodeId,
+        type: 'method',
+        label: info.shortName,
+        description: `${info.name} - extract (${caps.length} capability${caps.length > 1 ? 's' : ''})`,
+        config: {
+          nodeType: 'method',
+          method,
+          family: info.family,
+          capabilities: caps,
+        } as MethodNodeConfig & { capabilities: string[] },
+        position: { x: xPos, y: extractYStart + idx * 140 },
+      });
+      for (const prevId of previousNodeIds) {
+        edges.push({ id: generateEdgeId(), source: prevId, target: extractNodeId, label: 'extract' });
+      }
+    });
+    xPos += xStep;
+
+    // Column 2: Guardrails redact/detect stage, fed by the extract stage text.
+    const guardrailsNodeId = generateNodeId('method');
+    methodNodeIds.push(guardrailsNodeId);
+    const gInfo = METHOD_INFO[guardrailsMethod];
     nodes.push({
-      id: methodNodeId,
+      id: guardrailsNodeId,
       type: 'method',
-      label: info.shortName,
-      description: `${info.name} - processes ${caps.length} capability(s)`,
+      label: gInfo.shortName,
+      description: `${gInfo.name} - ${guardrailsCaps.map((c) => c.replace(/_/g, ' ')).join(', ')}`,
       config: {
         nodeType: 'method',
-        method,
-        family: info.family,
-        capabilities: caps,
+        method: guardrailsMethod,
+        family: gInfo.family,
+        capabilities: guardrailsCaps,
       } as MethodNodeConfig & { capabilities: string[] },
-      position: { x: xPos, y: methodYStart + methodIdx * 140 },
-    });
-
-    // Connect from previous nodes (input or classifier)
-    for (const prevId of previousNodeIds) {
-      edges.push({
-        id: generateEdgeId(),
-        source: prevId,
-        target: methodNodeId,
-      });
-    }
-
-    methodIdx++;
-  }
-  xPos += xStep;
-
-  // 5. Aggregator Node (only when multiple methods need merging)
-  let preOutputNodeId: string;
-  if (methodNodeIds.length > 1) {
-    const aggregatorNodeId = generateNodeId('aggregator');
-    nodes.push({
-      id: aggregatorNodeId,
-      type: 'aggregator',
-      label: 'Aggregator',
-      description: 'Combines results from all methods',
-      config: {
-        nodeType: 'aggregator',
-        strategy: optimizeFor === 'accuracy' ? 'best-confidence' : optimizeFor === 'cost' ? 'best-cost' : optimizeFor === 'speed' ? 'best-speed' : 'best-confidence',
-      } as AggregatorConfig,
       position: { x: xPos, y: yPos },
     });
-
-    for (const methodNodeId of methodNodeIds) {
-      edges.push({
-        id: generateEdgeId(),
-        source: methodNodeId,
-        target: aggregatorNodeId,
-      });
+    for (const extractNodeId of extractMethodNodeIds) {
+      edges.push({ id: generateEdgeId(), source: extractNodeId, target: guardrailsNodeId, label: 'text→redact' });
     }
-    preOutputNodeId = aggregatorNodeId;
+    xPos += xStep;
+
+    // Sequential composer descriptor (not a runtime step — the executor uses
+    // edge structure to drive sequential execution; this node carries the
+    // overall composition metadata for UI display).
+    const composerNodeId = generateNodeId('composer');
+    nodes.push({
+      id: composerNodeId,
+      type: 'sequential-composer',
+      label: 'Sequential Composer',
+      description: 'Chains extract → Guardrails redact',
+      config: {
+        nodeType: 'sequential-composer',
+        stages: [...extractMethodNodeIds, guardrailsNodeId],
+      } as SequentialComposerConfig,
+      position: { x: xPos, y: yPos },
+    });
+    edges.push({ id: generateEdgeId(), source: guardrailsNodeId, target: composerNodeId, label: 'merge' });
+    preOutputNodeId = composerNodeId;
     xPos += xStep;
   } else {
-    preOutputNodeId = methodNodeIds[0];
+    const methodYStart = yPos - (methodToCapabilities.size * 140) / 2;
+    let methodIdx = 0;
+
+    for (const [method, caps] of methodToCapabilities.entries()) {
+      const methodNodeId = generateNodeId('method');
+      methodNodeIds.push(methodNodeId);
+
+      const info = METHOD_INFO[method];
+      nodes.push({
+        id: methodNodeId,
+        type: 'method',
+        label: info.shortName,
+        description: `${info.name} - processes ${caps.length} capability(s)`,
+        config: {
+          nodeType: 'method',
+          method,
+          family: info.family,
+          capabilities: caps,
+        } as MethodNodeConfig & { capabilities: string[] },
+        position: { x: xPos, y: methodYStart + methodIdx * 140 },
+      });
+
+      for (const prevId of previousNodeIds) {
+        edges.push({
+          id: generateEdgeId(),
+          source: prevId,
+          target: methodNodeId,
+        });
+      }
+
+      methodIdx++;
+    }
+    xPos += xStep;
+
+    // 5. Aggregator Node (only when multiple methods need merging)
+    if (methodNodeIds.length > 1) {
+      const aggregatorNodeId = generateNodeId('aggregator');
+      nodes.push({
+        id: aggregatorNodeId,
+        type: 'aggregator',
+        label: 'Aggregator',
+        description: 'Combines results from all methods',
+        config: {
+          nodeType: 'aggregator',
+          strategy: optimizeFor === 'accuracy' ? 'best-confidence' : optimizeFor === 'cost' ? 'best-cost' : optimizeFor === 'speed' ? 'best-speed' : 'best-confidence',
+        } as AggregatorConfig,
+        position: { x: xPos, y: yPos },
+      });
+
+      for (const methodNodeId of methodNodeIds) {
+        edges.push({
+          id: generateEdgeId(),
+          source: methodNodeId,
+          target: aggregatorNodeId,
+        });
+      }
+      preOutputNodeId = aggregatorNodeId;
+      xPos += xStep;
+    } else {
+      preOutputNodeId = methodNodeIds[0];
+    }
   }
 
   // 6. Output Node
@@ -349,16 +458,27 @@ export function generatePipeline(
     return sum + METHOD_INFO[method].estimatedCostPerPage;
   }, 0);
 
-  // Latency estimation: methods run in parallel, add classifier overhead
-  const methodLatencies = uniqueMethods.map((m) => {
+  // Latency estimation:
+  //  - Parallel mode: max over all method latencies + classifier overhead.
+  //  - Sequential mode: max(extract stage) + guardrails stage (run serially).
+  const latencyFor = (m: ProcessingMethod) => {
     const family = METHOD_INFO[m].family;
     if (family === 'bda') return 15000;
-    if (family === 'bda-llm') return 25000; // BDA polling + LLM streaming
+    if (family === 'bda-llm') return 25000;
     if (family === 'textract-llm') return 8000;
+    if (family === 'guardrails') return 4000;
     if (family === 'embeddings') return 2000;
-    return 5000; // claude, nova
-  });
-  const estimatedLatencyMs = Math.max(...methodLatencies) + (enableHybridRouting ? 500 : 0);
+    return 5000;
+  };
+  let estimatedLatencyMs: number;
+  if (sequentialMode) {
+    const extractMax = Math.max(
+      ...nonGuardrailsMethods.map(([m]) => latencyFor(m)),
+    );
+    estimatedLatencyMs = extractMax + latencyFor(guardrailsMethod) + (enableHybridRouting ? 500 : 0);
+  } else {
+    estimatedLatencyMs = Math.max(...uniqueMethods.map(latencyFor)) + (enableHybridRouting ? 500 : 0);
+  }
 
   const pipeline: PipelineDefinition = {
     id: generatePipelineId(),
@@ -396,6 +516,7 @@ export function generatePipeline(
     request,
     uniqueMethods,
     methodToCapabilities,
+    sequentialMode,
   );
 
   return {
@@ -409,11 +530,18 @@ function generateRationale(
   request: PipelineGenerateRequest,
   selectedMethods: ProcessingMethod[],
   methodToCapabilities: Map<ProcessingMethod, Capability[]>,
+  sequentialMode: boolean = false,
 ): string {
   const { optimizeFor, capabilities, enableHybridRouting } = request;
 
   const lines: string[] = [];
   lines.push(`**Pipeline Optimization Strategy: ${optimizeFor.toUpperCase()}**\n`);
+
+  if (sequentialMode) {
+    lines.push(
+      `**Composition: Sequential**\nExtraction runs first (LLM/BDA), then its text output is piped into Amazon Bedrock Guardrails for PII detection/redaction. This avoids asking an LLM to self-redact and keeps PII handling deterministic.\n`,
+    );
+  }
 
   lines.push(`**Selected Methods:**`);
   for (const method of selectedMethods) {

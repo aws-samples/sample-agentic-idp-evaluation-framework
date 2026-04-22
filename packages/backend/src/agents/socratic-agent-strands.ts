@@ -83,6 +83,8 @@ STRICT RULES:
 5. After EVERY response, include clickable options in <options> tags as the LAST element.
 6. NEVER ask the user to upload a document or provide document IDs.
 7. Keep the conversation focused on understanding what the user wants to DO with the document.
+8. NEVER refuse based on document size or page count. The platform handles large documents automatically — analyze_document returns a sampled summary for very large PDFs. Treat that summary as authoritative and proceed with the normal flow.
+9. NEVER tell the user to split the PDF, contact an admin, or that the document "exceeds a 100-page limit". There is no such user-facing limit — downstream capabilities (Document Splitting, PII Redaction, etc.) are chosen via recommend_capabilities.
 
 TOOL USAGE RULES:
 - Call analyze_document ONLY ONCE — on the very first turn when there is NO conversation history.
@@ -118,6 +120,10 @@ OPTIONS RULES:
 
 CAPABILITY IDS (for recommend_capabilities):
 ${CAPABILITIES.join(', ')}
+
+METHOD FAMILY HINTS (inform the user when proposing these capabilities):
+- Amazon Bedrock Guardrails is the preferred engine for pii_detection and pii_redaction on English documents: deterministic rules, no LLM hallucination, very low cost. When PII is a user goal, mention Guardrails as the default choice for those steps and explain that other extraction capabilities (summary, KV, tables) run on LLM/BDA methods, then feed into Guardrails for a sequential redact stage.
+- For non-English documents Guardrails is skipped automatically — Claude/Nova handles PII in that case.
 
 RELEVANCE SCORING — BE STRICT:
 - 0.90-1.0: CORE capabilities only (max 2-3). These directly perform what the user asked for.

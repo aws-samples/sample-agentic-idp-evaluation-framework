@@ -9,6 +9,7 @@ export type PipelineNodeType =
   | 'page-classifier'
   | 'capability'
   | 'method'
+  | 'sequential-composer'
   | 'aggregator'
   | 'pipeline-output';
 
@@ -26,6 +27,7 @@ export type PipelineNodeConfig =
   | PageClassifierConfig
   | CapabilityNodeConfig
   | MethodNodeConfig
+  | SequentialComposerConfig
   | AggregatorConfig
   | OutputConfig;
 
@@ -57,6 +59,18 @@ export interface MethodNodeConfig {
 export interface AggregatorConfig {
   nodeType: 'aggregator';
   strategy: 'best-confidence' | 'best-cost' | 'best-speed' | 'ensemble' | 'custom';
+}
+
+/**
+ * Sequential composer: chains one method's text output into the next method's
+ * input. Used for workflows like "LLM extraction → Guardrails redaction" where
+ * the downstream step needs the upstream step's extracted text rather than the
+ * raw document. `stages` lists method node IDs in execution order.
+ */
+export interface SequentialComposerConfig {
+  nodeType: 'sequential-composer';
+  stages: string[]; // method node IDs, in order
+  passTextFromStage?: number; // which stage's text output to feed forward (default: last)
 }
 
 export interface OutputConfig {

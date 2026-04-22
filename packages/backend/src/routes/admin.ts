@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { config } from '../config/aws.js';
 import { queryActivity, getActivityStats } from '../services/activity-tracker.js';
+import { getFeedbackSummary } from '../services/feedback.js';
 import type { MidwayUser } from '../middleware/midway.js';
 
 const router = Router();
@@ -54,6 +55,17 @@ router.get('/activity', async (req, res) => {
   } catch (err) {
     console.error('[Admin] Activity query error:', err);
     res.status(500).json({ error: 'Failed to query activity' });
+  }
+});
+
+// GET /api/admin/feedback — survey summary + all submissions
+router.get('/feedback', async (_req, res) => {
+  try {
+    const summary = await getFeedbackSummary();
+    res.json(summary);
+  } catch (err) {
+    console.error('[Admin] Feedback error:', err);
+    res.status(500).json({ error: 'Failed to load feedback' });
   }
 });
 

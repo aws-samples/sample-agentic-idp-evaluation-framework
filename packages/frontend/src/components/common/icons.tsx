@@ -27,6 +27,7 @@ import {
   SplitSquareHorizontal,
   Combine,
   FileJson,
+  Workflow,
   Video,
   Film,
   Mic,
@@ -75,6 +76,7 @@ export const CAPABILITY_ICON_MAP: Record<string, LucideIcon> = {
 export const PIPELINE_ICON_MAP: Record<string, LucideIcon> = {
   'document-input': FileUp,
   'page-classifier': SplitSquareHorizontal,
+  'sequential-composer': Workflow,
   aggregator: Combine,
   output: FileJson,
 };

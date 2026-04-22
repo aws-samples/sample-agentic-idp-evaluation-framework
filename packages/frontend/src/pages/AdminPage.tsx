@@ -62,8 +62,12 @@ export default function AdminPage() {
     try {
       const res = await authedFetch('/api/admin/stats');
       if (!res.ok) {
-        if (res.status === 403) throw new Error('Admin access required');
+        if (res.status === 403) throw new Error('Admin access required. Your alias is not on the admin list.');
         throw new Error(`Failed (${res.status})`);
+      }
+      const ct = res.headers.get('content-type') ?? '';
+      if (!ct.includes('application/json')) {
+        throw new Error('Server returned a non-JSON response. This can happen if CloudFront cache is stale — try again in a few minutes.');
       }
       const data = await res.json();
       setStats(data);

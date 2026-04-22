@@ -14,6 +14,13 @@ export interface AdapterInput {
   capabilities: string[];
   pageCount: number;
   userInstruction?: string;
+  /**
+   * When set, adapters that can work from plain text (e.g. Guardrails) should
+   * bypass their own OCR/extraction step and run against this text directly.
+   * Used by sequential pipelines that pipe extraction output into a downstream
+   * text-only stage.
+   */
+  precomputedText?: string;
 }
 
 export interface AdapterOutput {

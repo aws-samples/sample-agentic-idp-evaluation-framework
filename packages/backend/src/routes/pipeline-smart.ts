@@ -121,6 +121,8 @@ DECISION RULES:
 5. If a method failed or produced garbage output (confidence < 30%), exclude it entirely.
 6. BDA alone produces garbled output for non-Latin text — check if the preview confirms this.
 7. Do NOT blindly pick "balanced" — pick what the DATA says is best.
+8. For pii_detection / pii_redaction on ENGLISH documents, prefer "bedrock-guardrails" as the method assignment when it appeared in preview results. Guardrails is deterministic and the platform will automatically compose it as a sequential stage downstream of the LLM extraction stage. Only skip Guardrails if it errored in preview or no PII was requested. For non-English documents Guardrails is excluded — use the LLM method instead.
+9. When the user requests a mix of extraction capabilities (summary / kv / table) AND PII capabilities, it is fine to assign the extraction caps to an LLM method AND assign the PII caps to bedrock-guardrails in the same methodAssignments map. The pipeline generator will wire them into a sequential composition (extract → redact) automatically.
 
 Return ONLY valid JSON:
 {

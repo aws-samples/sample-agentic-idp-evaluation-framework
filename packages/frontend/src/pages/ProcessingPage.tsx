@@ -118,6 +118,7 @@ export default function ProcessingPage({
                   nova: 'Nova Models',
                   'textract-llm': 'Textract + LLM Hybrid',
                   embeddings: 'Multimodal Embeddings',
+                  guardrails: 'Bedrock Guardrails',
                 };
 
                 const familyDescriptions: Record<MethodFamily, string> = {
@@ -127,6 +128,7 @@ export default function ProcessingPage({
                   nova: 'Amazon Nova multimodal models with bounding box support',
                   'textract-llm': 'Amazon Textract OCR combined with LLM structuring',
                   embeddings: 'Nova Multimodal Embeddings for semantic search and RAG',
+                  guardrails: 'Bedrock Guardrails for safety / policy enforcement',
                 };
 
                 return (

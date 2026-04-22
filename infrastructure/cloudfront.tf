@@ -43,10 +43,10 @@ resource "aws_cloudfront_distribution" "main" {
     origin_id   = "AppRunner-API"
 
     custom_origin_config {
-      http_port                = 80
-      https_port               = 443
-      origin_protocol_policy   = "https-only"
-      origin_ssl_protocols     = ["TLSv1.2"]
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
       # Long-lived SSE responses from the backend need a generous read timeout.
       # These match the original deployment's tuned values.
       origin_read_timeout      = 60
@@ -115,13 +115,10 @@ resource "aws_cloudfront_distribution" "main" {
     max_ttl     = 31536000
   }
 
-  # SPA fallback - serve index.html for 403/404
-  custom_error_response {
-    error_code         = 403
-    response_code      = 200
-    response_page_path = "/index.html"
-  }
-
+  # SPA fallback - serve index.html for 404 only.
+  # Do NOT rewrite 403: API routes (/api/admin/*) legitimately return 403,
+  # and rewriting to index.html breaks JSON parsing on the client.
+  # S3 static assets get proper 404 via default_root_object + OAC + ListBucket.
   custom_error_response {
     error_code         = 404
     response_code      = 200
@@ -161,8 +158,13 @@ resource "aws_s3_bucket_policy" "static_assets" {
         Principal = {
           Service = "cloudfront.amazonaws.com"
         }
-        Action   = "s3:GetObject"
-        Resource = "${aws_s3_bucket.static_assets.arn}/*"
+        # ListBucket grants so missing objects return 404 (not 403).
+        # This is required because we no longer map 403→index.html at the CloudFront layer.
+        Action = ["s3:GetObject", "s3:ListBucket"]
+        Resource = [
+          aws_s3_bucket.static_assets.arn,
+          "${aws_s3_bucket.static_assets.arn}/*",
+        ]
         Condition = {
           StringEquals = {
             "AWS:SourceArn" = aws_cloudfront_distribution.main.arn
