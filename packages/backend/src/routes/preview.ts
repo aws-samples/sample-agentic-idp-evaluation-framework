@@ -140,12 +140,15 @@ router.post('/', async (req, res) => {
       })),
     });
 
-    // Run all processors in parallel, emit results as they complete
+    // Run all processors in parallel, emit results as they complete.
+    // Pass `res` so adapters can stream method_progress events (token deltas,
+    // BDA polling status) — without these the SSE connection can go idle for
+    // minutes on slow methods and intermediaries (CloudFront, ALB) drop it.
     await Promise.allSettled(
       validMethods.map(async (method) => {
         try {
           const processor = PROCESSOR_FACTORY[method]!();
-          const result = await processor.process(null, input);
+          const result = await processor.process(res, input);
           const info = METHOD_INFO[method];
           emitSSE(res, {
             type: 'method_result',

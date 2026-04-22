@@ -49,6 +49,12 @@ resource "aws_cloudfront_distribution" "main" {
       origin_ssl_protocols   = ["TLSv1.2"]
       # Long-lived SSE responses from the backend need a generous read timeout.
       # These match the original deployment's tuned values.
+      # Long-lived SSE responses: 60 s is the CloudFront default cap without a
+      # service-quota increase. With `: keepalive\n\n` heartbeats every 15 s
+      # the idle timer resets, so this is the MAX time between packets, not
+      # total duration. Slow methods (Haiku on 146-page Pfizer ~100 s) still
+      # finish fine because they stream incrementally. Request a quota bump
+      # to 180 s via AWS Support if steady-state slow methods become common.
       origin_read_timeout      = 60
       origin_keepalive_timeout = 30
     }
