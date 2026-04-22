@@ -256,7 +256,7 @@
         <mxCell id="e_ecs_tx" edge="1" parent="1" source="ecs_icon" style="edgeStyle=none;html=1;strokeColor=#991B1B;strokeWidth=2;endArrow=classicThin;endSize=8;endFill=1;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" target="tx_card">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="1388" y="476" />
+              <mxPoint x="1391" y="448" />
               <mxPoint x="1388" y="799" />
             </Array>
           </mxGeometry>
@@ -302,10 +302,7 @@
         <mxCell id="cwl" parent="1" style="sketch=0;outlineConnect=0;fontColor=#09090B;fillColor=#DD344C;strokeColor=#fff;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch_2;fontFamily=Amazon Ember;" value="CW Logs" vertex="1">
           <mxGeometry height="40" width="40" x="1000" y="420" as="geometry" />
         </mxCell>
-        <mxCell id="xray" parent="1" style="sketch=0;outlineConnect=0;fontColor=#09090B;fillColor=#DD344C;strokeColor=#fff;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.x_ray;fontFamily=Amazon Ember;" value="X-Ray" vertex="1">
-          <mxGeometry height="40" width="40" x="1100" y="420" as="geometry" />
-        </mxCell>
-        <mxCell id="idsvc" parent="1" style="sketch=0;outlineConnect=0;fontColor=#09090B;fillColor=#DD344C;strokeColor=#fff;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.identity_and_access_management;fontFamily=Amazon Ember;" value="Midway" vertex="1">
+        <mxCell id="idsvc" parent="1" style="sketch=0;outlineConnect=0;fontColor=#09090B;fillColor=#DD344C;strokeColor=#fff;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.identity_and_access_management;fontFamily=Amazon Ember;" value="3rd Party Auth" vertex="1">
           <mxGeometry height="40" width="40" x="1200" y="420" as="geometry" />
         </mxCell>
         <mxCell id="t2_desc" parent="1" style="text;html=1;fontSize=11;fontColor=#71717A;align=left;fontFamily=Amazon Ember;labelBackgroundColor=#FFFFFF;" value="Stateless Express API · SSE streaming · Midway / Cognito auth · HPA on CPU &amp; RPS" vertex="1">
@@ -376,6 +373,9 @@
         </mxCell>
         <mxCell id="b_nova" parent="1" style="rounded=1;fillColor=#FFFFFF;fontColor=#9A3412;fontSize=10;arcSize=40;strokeColor=#FED7AA;strokeWidth=1;fontFamily=Amazon Ember Mono;" value="+ Nova Lite" vertex="1">
           <mxGeometry height="22" width="96" x="736" y="818" as="geometry" />
+        </mxCell>
+        <mxCell id="xray" parent="1" style="sketch=0;outlineConnect=0;fontColor=#09090B;fillColor=#DD344C;strokeColor=#fff;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.x_ray;fontFamily=Amazon Ember;" value="X-Ray" vertex="1">
+          <mxGeometry height="40" width="40" x="1100" y="420" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

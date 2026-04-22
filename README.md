@@ -6,12 +6,28 @@ Upload a sample document, answer a few targeted questions, and watch 16 processi
 
 ![ONE IDP Architecture](docs/images/architecture.png)
 
-> 5-tier topology · ECS Fargate web tier · Bedrock AgentCore for the Socratic advisor · Terraform &amp; CDK parity. Source: [`architecture.drawio`](architecture.drawio).
+> 5-tier topology · ECS Fargate web tier · Bedrock AgentCore for the Socratic advisor · Terraform &amp; CDK parity. Source: [`architecture.drawio`](architecture.drawio) · Re-export with `drawio --export --format png --scale 2 --border 0 --output docs/images/architecture.png architecture.drawio`.
+
+## Architecture at a glance
+
+| Tier | What it does | AWS services |
+| --- | --- | --- |
+| **01 Edge** | TLS termination, DNS, CDN, SPA delivery | Route 53 · ACM · CloudFront · WAF · S3 (SPA bucket) |
+| **02 Web** — ECS Fargate | Stateless Express API, SSE streaming, Midway / Cognito auth, HPA on CPU &amp; RPS | ALB · ECS Fargate (2–10 tasks, 1 vCPU / 2 GB, `awsvpc`) · ECR · Secrets Manager · CloudWatch Logs · X-Ray |
+| **03 Agent** — Strands on AgentCore | Socratic advisor; closure-bound tools `analyze_document()`, `recommend_capabilities()`, `generate_architecture()` — invoked via SigV4 only | Bedrock AgentCore Runtime (arm64, SSE) |
+| **04 AI Services** | 6 families · 16 methods · language-aware routing · sequential Guardrails composition for PII | Amazon Bedrock (Claude Sonnet / Haiku / Opus 4.6, Nova 2 Lite / Pro, Nova Embeddings, Guardrails) · Bedrock Data Automation (up to 3 000 pages per job) · Amazon Textract (sync + async, tables / forms) |
+| **05 Data** | Uploads, activity tracking, Terraform state, KMS encryption, async fan-out | S3 Uploads · DynamoDB · SQS · S3 TF State · KMS |
+
+Three architectural principles worth calling out:
+
+- **Least-privilege IAM everywhere.** Bucket-scoped S3 ARNs, agent-scoped `InvokeAgentRuntime`, per-model foundation-model ARNs. `AUTH_PROVIDER=none` refuses to boot in production unless `ALLOW_UNAUTHENTICATED=true` is set explicitly.
+- **IaC parity.** Terraform (`infrastructure/`) and AWS CDK v2 (`infrastructure-cdk/`) both produce the same five-tier topology. Do not run both against the same account / region.
+- **Data-driven method routing.** The Socratic agent recommends capabilities on the first turn; the comparison dashboard runs every compatible method in parallel and feeds actual preview metrics back into the pipeline generator. PII capabilities fall through to Bedrock Guardrails and chain sequentially behind the extraction stage.
 
 ## Features
 
 - **33 capabilities** across 8 categories: Core Extraction, Visual Analysis, Document Intelligence, Compliance & Security, Industry-Specific, Media Processing, Advanced AI, Document Conversion
-- **13+ processing methods** across 5 families: BDA (Standard / + LLM hybrids), Claude (Sonnet 4.6 / Haiku 4.5 / Opus 4.6), Nova (2 Lite GA / 2 Pro Preview), Textract+LLM, Amazon Comprehend + Bedrock Guardrails (for PII)
+- **16 processing methods** across 6 families: BDA (Standard / + LLM hybrids), Claude (Sonnet 4.6 / Haiku 4.5 / Opus 4.6), Nova (2 Lite GA / 2 Pro Preview), Textract+LLM, Nova Embeddings, Bedrock Guardrails (PII specialist)
 - **18 document types** covered by test fixtures — PDF, Office, image, audio, video
 - **Pipeline builder** — ReactFlow node graph for custom processing pipelines; chat interface to modify pipelines conversationally
 - **Real-time SSE streaming** — token-level progress for every method, 15s keepalive
