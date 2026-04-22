@@ -6,13 +6,19 @@ import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.
 import { bedrockClient, config } from '../config/aws.js';
 import { estimateMonthlyCost } from '../services/pricing.js';
 
-const ARCHITECT_SYSTEM_PROMPT = `You are an AWS Solutions Architect specializing in Intelligent Document Processing (IDP). Based on the processing results and comparison data provided, create an architecture recommendation.
+const ARCHITECT_SYSTEM_PROMPT = `You are an AWS Solutions Architect specializing in Intelligent Document Processing (IDP). Based on the processing results, comparison data, and the EXACT pipeline the user assembled (Step 3), create an architecture recommendation.
+
+CRITICAL RULES:
+- When a \`pipeline\` section is provided, treat its method nodes as the source of truth for which AWS services and Bedrock models to use. Do NOT second-guess the user's method choices.
+- When a \`selectedMethod\` is provided, use that method for the primary extraction path.
+- When a sequential-composer node is present, the architecture MUST show the stages running serially: extract → (downstream text-only stage). Typical case: LLM/BDA extraction → Bedrock Guardrails ApplyGuardrail for PII. Show this chain explicitly in the diagram.
+- Add production AWS best practices ON TOP of the user's pipeline (SQS/EventBridge for async fan-out, Step Functions for orchestration, DLQs, CloudWatch, X-Ray, DynamoDB for state, API Gateway, etc.). Never change the core method assignments.
 
 Your response MUST include:
 
-1. **Architecture Overview**: A text explanation of the recommended architecture, including which AWS services to use and why.
+1. **Architecture Overview**: Text explanation grounded in the actual pipeline (name the methods the user picked).
 
-2. **Architecture Diagram**: A Mermaid diagram showing the complete architecture. Wrap it in <diagram> tags:
+2. **Architecture Diagram**: Mermaid diagram that MATCHES the pipeline structure. Wrap it in <diagram> tags:
 <diagram>
 graph TD
     A[Document Upload] --> B[S3 Bucket]
@@ -29,9 +35,7 @@ graph TD
 </costs>
 <costs>
 {"scale": "large", "docsPerMonth": 100000, "methods": [{"method": "bda-standard", "monthlyCost": 1000}]}
-</costs>
-
-Be specific about AWS services, include error handling and monitoring recommendations.`;
+</costs>`;
 
 const router = Router();
 
@@ -50,6 +54,31 @@ router.post('/', async (req, res) => {
       return;
     }
 
+    // Distill the pipeline to just what the architect needs: method-node
+    // assignments + whether a sequential composer is present (and its stage IDs).
+    const pipelineDigest = body.pipeline
+      ? (() => {
+          const methodNodes = body.pipeline!.nodes
+            .filter((n) => n.type === 'method')
+            .map((n) => ({
+              id: n.id,
+              method: (n.config as any).method,
+              family: (n.config as any).family,
+              capabilities: (n.config as any).capabilities,
+            }));
+          const composer = body.pipeline!.nodes.find((n) => n.type === 'sequential-composer');
+          return {
+            name: body.pipeline!.name,
+            estimatedCostPerPage: body.pipeline!.estimatedCostPerPage,
+            estimatedLatencyMs: body.pipeline!.estimatedLatencyMs,
+            methods: methodNodes,
+            sequentialComposer: composer
+              ? { stages: (composer.config as any).stages }
+              : null,
+          };
+        })()
+      : null;
+
     const contextSummary = JSON.stringify({
       capabilities: body.capabilities,
       comparison: body.comparison ?? { methods: [], recommendation: 'N/A', capabilityMatrix: {} },
@@ -63,6 +92,8 @@ router.post('/', async (req, res) => {
         name: METHOD_INFO[m].name,
         estimatedCostPerPage: METHOD_INFO[m].estimatedCostPerPage,
       })),
+      selectedMethod: (body as any).selectedMethod ?? null,
+      pipeline: pipelineDigest,
     }, null, 2);
 
     const messages: Message[] = [

@@ -31,4 +31,12 @@ export interface ArchitectureRequest {
   processingResults: import('./processing.js').ProcessorResult[];
   comparison: import('./processing.js').ComparisonResult;
   capabilities: Capability[];
+  /**
+   * The pipeline definition the user executed in Step 3. When present the
+   * architecture generator uses the method-node assignments and any
+   * sequential-composer structure instead of re-deriving from preview data.
+   */
+  pipeline?: import('./pipeline.js').PipelineDefinition | null;
+  /** Method the user explicitly selected on the comparison screen, if any. */
+  selectedMethod?: ProcessingMethod;
 }

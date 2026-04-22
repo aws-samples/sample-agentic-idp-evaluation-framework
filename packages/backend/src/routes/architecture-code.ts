@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
-import type { Capability, ProcessorResult, ComparisonResult, ProcessingMethod } from '@idp/shared';
+import type { Capability, ProcessorResult, ComparisonResult, ProcessingMethod, PipelineDefinition } from '@idp/shared';
 import { METHOD_INFO, CAPABILITY_INFO } from '@idp/shared';
 import { bedrockClient, config } from '../config/aws.js';
 
@@ -9,6 +9,8 @@ interface CodeGenRequest {
   processingResults: ProcessorResult[];
   comparison?: ComparisonResult | null;
   pipelineMethods?: Record<string, string>;
+  pipeline?: PipelineDefinition | null;
+  selectedMethod?: ProcessingMethod;
 }
 
 interface GeneratedArtifacts {
@@ -127,9 +129,32 @@ const CAPABILITY_GUIDANCE: Record<string, string> = {
 };
 
 function buildCodeGenPrompt(req: CodeGenRequest): string {
-  // ─── Build method→capabilities map (prefer actual pipeline results) ───────
+  // ─── Build method→capabilities map ────────────────────────────────────────
+  // Priority order:
+  //   1. Pipeline method-nodes (user's Step 3 choice — source of truth).
+  //   2. Explicit pipelineMethods map (older API shape).
+  //   3. Comparison matrix highest-confidence.
+  //   4. Processing results directly.
   const methodCaps = new Map<string, string[]>();
-  if (req.comparison?.capabilityMatrix) {
+  if (req.pipeline) {
+    for (const node of req.pipeline.nodes) {
+      if (node.type !== 'method') continue;
+      const method = (node.config as any).method as string | undefined;
+      const caps = ((node.config as any).capabilities as string[] | undefined) ?? [];
+      if (!method) continue;
+      const filtered = caps.filter((c) => (req.capabilities as string[]).includes(c));
+      if (filtered.length === 0) continue;
+      const existing = methodCaps.get(method) ?? [];
+      methodCaps.set(method, Array.from(new Set([...existing, ...filtered])));
+    }
+  }
+  if (methodCaps.size === 0 && req.pipelineMethods) {
+    for (const [cap, method] of Object.entries(req.pipelineMethods)) {
+      if (!methodCaps.has(method)) methodCaps.set(method, []);
+      methodCaps.get(method)!.push(cap);
+    }
+  }
+  if (methodCaps.size === 0 && req.comparison?.capabilityMatrix) {
     for (const cap of req.capabilities) {
       const matrix = req.comparison.capabilityMatrix[cap];
       if (!matrix) continue;
@@ -145,12 +170,6 @@ function buildCodeGenPrompt(req: CodeGenRequest): string {
       }
     }
   }
-  if (methodCaps.size === 0 && req.pipelineMethods) {
-    for (const [cap, method] of Object.entries(req.pipelineMethods)) {
-      if (!methodCaps.has(method)) methodCaps.set(method, []);
-      methodCaps.get(method)!.push(cap);
-    }
-  }
   if (methodCaps.size === 0) {
     for (const r of req.processingResults) {
       if (r.status !== 'complete') continue;
@@ -158,6 +177,16 @@ function buildCodeGenPrompt(req: CodeGenRequest): string {
       if (caps.length > 0) methodCaps.set(r.method, caps);
     }
   }
+
+  // Detect sequential-composer so we can tell the LLM to emit a serial chain.
+  const composerStages: string[] = req.pipeline?.nodes.find((n) => n.type === 'sequential-composer')
+    ? (req.pipeline!.nodes.find((n) => n.type === 'sequential-composer')!.config as any).stages ?? []
+    : [];
+  const sequentialMethodIds: string[] = composerStages
+    .map((stageId) => req.pipeline?.nodes.find((n) => n.id === stageId))
+    .filter(Boolean)
+    .map((n) => (n!.config as any).method as string)
+    .filter(Boolean);
 
   // ─── Describe each selected method in terms the LLM needs to emit code ────
   const methodDetails = Array.from(methodCaps.entries()).map(([method, caps]) => {
@@ -197,6 +226,21 @@ ${capLines}`;
   const capList = req.capabilities.join(', ');
   const methodIds = Array.from(methodCaps.keys()).join(', ');
 
+  const sequentialBlock = sequentialMethodIds.length >= 2
+    ? `\n\nSEQUENTIAL COMPOSITION REQUIRED:
+The user assembled a pipeline where stages run SERIALLY. The extract stage(s)
+produce text, and the final stage (${sequentialMethodIds[sequentialMethodIds.length - 1]}) consumes that text.
+Emit code that runs these methods in order: ${sequentialMethodIds.join(' → ')}.
+The downstream stage must receive \`precomputedText\` from upstream and SKIP
+its own OCR/Textract step. Typical pattern: LLM extract → Guardrails ApplyGuardrail.
+The CDK Step Functions definition MUST reflect this chain (Task → Task → Choice).
+Do NOT run these methods in parallel and aggregate.`
+    : '';
+
+  const selectedMethodBlock = req.selectedMethod
+    ? `\n\nUSER-SELECTED METHOD: The user explicitly picked ${req.selectedMethod} on the comparison screen. Use this as the primary extraction method where appropriate — do not swap it for a cheaper one.`
+    : '';
+
   return `You are generating a COMPLETE, PRODUCTION-READY, RUNNABLE IDP project.
 The user has already run a live benchmark; you know which methods to use and for which capabilities.
 Do NOT hallucinate models, SDKs, or APIs. Match the reference shapes below exactly.
@@ -205,7 +249,7 @@ REAL BENCHMARK RESULTS — USE THESE EXACT METHODS AND MODEL IDs:
 ${methodDetails}
 
 All requested capabilities: ${capList}
-Method IDs in use: ${methodIds}
+Method IDs in use: ${methodIds}${selectedMethodBlock}${sequentialBlock}
 
 ${REFERENCE_SNIPPETS}
 

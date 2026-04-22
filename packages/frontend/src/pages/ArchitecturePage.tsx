@@ -18,6 +18,7 @@ import type {
   Capability,
   ProcessorResult,
   ComparisonResult,
+  PipelineDefinition,
 } from '@idp/shared';
 import type { ProcessingMethod } from '@idp/shared';
 import { CAPABILITY_INFO, METHOD_INFO } from '@idp/shared';
@@ -44,6 +45,8 @@ interface ArchitecturePageProps {
   processingResults: ProcessorResult[];
   comparison: ComparisonResult | null;
   capabilities: Capability[];
+  executedPipeline?: PipelineDefinition | null;
+  selectedPipelineMethod?: string;
 }
 
 
@@ -52,6 +55,8 @@ export default function ArchitecturePage({
   processingResults,
   comparison,
   capabilities,
+  executedPipeline = null,
+  selectedPipelineMethod,
 }: ArchitecturePageProps) {
   const { text: aiText, diagram, costProjections, isLoading: aiLoading, error: aiError, generate } = useArchitecture();
   const { code: aiCode, isGenerating: codeGenLoading, generateCode } = useCodeGen();
@@ -62,29 +67,55 @@ export default function ArchitecturePage({
   useEffect(() => {
     if (processingResults.length > 0 && !aiGenerated.current) {
       aiGenerated.current = true;
-      generate({ capabilities, processingResults, comparison });
+      generate({
+        capabilities,
+        processingResults,
+        comparison,
+        pipeline: executedPipeline,
+        selectedMethod: selectedPipelineMethod,
+      });
     }
-  }, [processingResults, capabilities, comparison, generate]);
+  }, [processingResults, capabilities, comparison, executedPipeline, selectedPipelineMethod, generate]);
 
   // Auto-generate AI code after architecture recommendation loads
   useEffect(() => {
     if (aiText && !aiLoading && !codeGenTriggered.current && processingResults.length > 0) {
       codeGenTriggered.current = true;
-      generateCode(capabilities, processingResults, comparison);
+      // Build capability→method map from the executed pipeline's method nodes
+      // so code-gen honors the user's preferred-method choice (e.g. Sonnet)
+      // and sequential composer (e.g. Guardrails).
+      const pipelineMethods: Record<string, string> = {};
+      if (executedPipeline) {
+        for (const node of executedPipeline.nodes) {
+          if (node.type !== 'method') continue;
+          const method = (node.config as any).method as string | undefined;
+          const caps = (node.config as any).capabilities as string[] | undefined;
+          if (!method || !caps) continue;
+          for (const cap of caps) pipelineMethods[cap] = method;
+        }
+      }
+      generateCode(
+        capabilities,
+        processingResults,
+        comparison,
+        Object.keys(pipelineMethods).length > 0 ? pipelineMethods : undefined,
+        executedPipeline,
+        selectedPipelineMethod,
+      );
     }
-  }, [aiText, aiLoading, processingResults, capabilities, comparison, generateCode]);
+  }, [aiText, aiLoading, processingResults, capabilities, comparison, executedPipeline, selectedPipelineMethod, generateCode]);
 
   // Deterministic fallback templates — real, runnable code if AI generation is unavailable.
-  const tplPython = useMemo(() => generatePythonCode(capabilities, processingResults, comparison), [capabilities, processingResults, comparison]);
+  const tplPython = useMemo(() => generatePythonCode(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
   const tplRequirements = useMemo(() => generatePythonRequirements(), []);
-  const tplTs = useMemo(() => generateTypeScriptCode(capabilities, processingResults, comparison), [capabilities, processingResults, comparison]);
+  const tplTs = useMemo(() => generateTypeScriptCode(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
   const tplTsPkg = useMemo(() => generateTypeScriptPackageJson(), []);
-  const tplCdk = useMemo(() => generateCdkStack(capabilities, processingResults, comparison), [capabilities, processingResults, comparison]);
-  const tplLambda = useMemo(() => generateCdkLambdaHandler(capabilities, processingResults, comparison), [capabilities, processingResults, comparison]);
+  const tplCdk = useMemo(() => generateCdkStack(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
+  const tplLambda = useMemo(() => generateCdkLambdaHandler(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
   const tplCdkApp = useMemo(() => generateCdkAppEntry(), []);
   const tplCdkPkg = useMemo(() => generateCdkPackageJson(), []);
   const tplCdkJson = useMemo(() => generateCdkJson(), []);
-  const tplReadme = useMemo(() => generateReadme(capabilities, processingResults, comparison), [capabilities, processingResults, comparison]);
+  const tplReadme = useMemo(() => generateReadme(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
 
   const activePython = aiCode?.python ?? tplPython;
   const activeRequirements = aiCode?.pythonRequirements ?? tplRequirements;
@@ -98,13 +129,18 @@ export default function ArchitecturePage({
   const activeReadme = aiCode?.readme ?? tplReadme;
 
   const methodSummary = useMemo(() => {
-    const methodMap = buildMethodMap(capabilities, processingResults, comparison);
+    const methodMap = buildMethodMap(capabilities, processingResults, comparison, executedPipeline);
     return Array.from(methodMap.entries()).map(([method, caps]) => ({
       method,
       info: METHOD_INFO[method as ProcessingMethod],
       capabilities: caps.map(c => CAPABILITY_INFO[c as Capability]?.name ?? c),
     }));
-  }, [capabilities, processingResults]);
+  }, [capabilities, processingResults, comparison, executedPipeline]);
+
+  // Detect sequential composer from the executed pipeline (extract→guardrails).
+  const hasSequentialComposer = useMemo(() => {
+    return !!executedPipeline?.nodes.some((n) => n.type === 'sequential-composer');
+  }, [executedPipeline]);
 
   if (!document || capabilities.length === 0) {
     return (
@@ -300,7 +336,18 @@ export default function ArchitecturePage({
 
         {/* Architecture Summary */}
         <Container
-          header={<Header variant="h2">Pipeline Architecture</Header>}
+          header={
+            <Header
+              variant="h2"
+              description={
+                executedPipeline
+                  ? `Reflects the pipeline you executed in Step 3${selectedPipelineMethod ? ` (preferred: ${selectedPipelineMethod})` : ''}${hasSequentialComposer ? ' — sequential composition active' : ''}.`
+                  : 'No pipeline executed; showing best-guess from preview comparison.'
+              }
+            >
+              Pipeline Architecture
+            </Header>
+          }
         >
           <SpaceBetween size="m">
             <ColumnLayout columns={methodSummary.length} variant="text-grid">

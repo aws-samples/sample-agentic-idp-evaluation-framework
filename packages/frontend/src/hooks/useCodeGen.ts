@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Capability, ProcessorResult, ComparisonResult } from '@idp/shared';
+import type { Capability, ProcessorResult, ComparisonResult, PipelineDefinition } from '@idp/shared';
 import { authedFetch } from '../services/api.js';
 
 export interface GeneratedCode {
@@ -26,6 +26,8 @@ export function useCodeGen() {
     processingResults: ProcessorResult[],
     comparison?: ComparisonResult | null,
     pipelineMethods?: Record<string, string>,
+    pipeline?: PipelineDefinition | null,
+    selectedMethod?: string,
   ) => {
     setIsGenerating(true);
     setError(null);
@@ -34,7 +36,14 @@ export function useCodeGen() {
       const res = await authedFetch('/api/architecture/code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ capabilities, processingResults, comparison, pipelineMethods }),
+        body: JSON.stringify({
+          capabilities,
+          processingResults,
+          comparison,
+          pipelineMethods,
+          pipeline: pipeline ?? null,
+          selectedMethod,
+        }),
       });
 
       if (!res.ok) {

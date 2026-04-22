@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import type { ProcessorResult, ComparisonResult, Capability } from '@idp/shared';
+import type { ProcessorResult, ComparisonResult, Capability, PipelineDefinition } from '@idp/shared';
 import { authedFetch } from '../services/api.js';
 
 export interface CostProjectionData {
@@ -18,6 +18,8 @@ export interface UseArchitectureResult {
     capabilities: Capability[];
     processingResults: ProcessorResult[];
     comparison: ComparisonResult | null;
+    pipeline?: PipelineDefinition | null;
+    selectedMethod?: string;
   }) => void;
 }
 
@@ -33,6 +35,8 @@ export function useArchitecture(): UseArchitectureResult {
     capabilities: Capability[];
     processingResults: ProcessorResult[];
     comparison: ComparisonResult | null;
+    pipeline?: PipelineDefinition | null;
+    selectedMethod?: string;
   }) => {
     abortRef.current?.abort();
     setText('');
@@ -53,6 +57,8 @@ export function useArchitecture(): UseArchitectureResult {
             capabilities: params.capabilities,
             processingResults: params.processingResults,
             comparison: params.comparison,
+            pipeline: params.pipeline ?? null,
+            selectedMethod: params.selectedMethod,
           }),
           signal: controller.signal,
         });

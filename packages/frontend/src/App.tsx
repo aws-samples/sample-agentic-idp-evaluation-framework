@@ -3,7 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from '@cloudscape-design/components/app-layout';
 import Spinner from '@cloudscape-design/components/spinner';
 import Box from '@cloudscape-design/components/box';
-import type { UploadResponse, Capability, ProcessorResult, ComparisonResult } from '@idp/shared';
+import type { UploadResponse, Capability, ProcessorResult, ComparisonResult, PipelineDefinition } from '@idp/shared';
 import TopNav from './components/layout/TopNav';
 import SideNav from './components/layout/SideNav';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -63,6 +63,8 @@ export default function App() {
   const [documentLanguages, setDocumentLanguages] = useState<string[]>(() => loadSession('documentLanguages', []));
   const [processingResults, setProcessingResults] = useState<ProcessorResult[]>(() => loadSession('processingResults', []));
   const [comparison, setComparison] = useState<ComparisonResult | null>(() => loadSession('comparison', null));
+  const [executedPipeline, setExecutedPipeline] = useState<PipelineDefinition | null>(() => loadSession('executedPipeline', null));
+  const [selectedPipelineMethod, setSelectedPipelineMethod] = useState<string | undefined>(() => loadSession('selectedPipelineMethod', undefined));
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('idp-dark-mode') === 'true');
 
   useEffect(() => {
@@ -82,6 +84,8 @@ export default function App() {
   useEffect(() => { saveSession('documentLanguages', documentLanguages); }, [documentLanguages]);
   useEffect(() => { saveSession('processingResults', processingResults); }, [processingResults]);
   useEffect(() => { saveSession('comparison', comparison); }, [comparison]);
+  useEffect(() => { saveSession('executedPipeline', executedPipeline); }, [executedPipeline]);
+  useEffect(() => { saveSession('selectedPipelineMethod', selectedPipelineMethod); }, [selectedPipelineMethod]);
 
   // Dark mode toggle (#16)
   useEffect(() => {
@@ -136,6 +140,8 @@ export default function App() {
       setDocumentLanguages([]);
       setProcessingResults([]);
       setComparison(null);
+      setExecutedPipeline(null);
+      setSelectedPipelineMethod(undefined);
       navigate('/conversation');
     },
     [navigate],
@@ -167,9 +173,16 @@ export default function App() {
   );
 
   const handlePipelineComplete = useCallback(
-    (results: ProcessorResult[], comp: ComparisonResult) => {
+    (
+      results: ProcessorResult[],
+      comp: ComparisonResult,
+      pipeline: PipelineDefinition | null,
+      preferred?: string,
+    ) => {
       setProcessingResults(results);
       setComparison(comp);
+      setExecutedPipeline(pipeline);
+      setSelectedPipelineMethod(preferred);
     },
     [],
   );
@@ -255,6 +268,8 @@ export default function App() {
                       processingResults={processingResults}
                       comparison={comparison}
                       capabilities={selectedCapabilities}
+                      executedPipeline={executedPipeline}
+                      selectedPipelineMethod={selectedPipelineMethod}
                     />
                   }
                 />

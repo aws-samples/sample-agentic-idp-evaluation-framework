@@ -29,7 +29,12 @@ interface PipelinePageProps {
   preferredMethod?: string;
   documentLanguages?: string[];
   onViewArchitecture: () => void;
-  onPipelineComplete?: (results: ProcessorResult[], comparison: ComparisonResult) => void;
+  onPipelineComplete?: (
+    results: ProcessorResult[],
+    comparison: ComparisonResult,
+    pipeline: import('@idp/shared').PipelineDefinition | null,
+    preferredMethod?: string,
+  ) => void;
 }
 
 interface SmartRecommendation {
@@ -86,9 +91,14 @@ export default function PipelinePage({
   // Notify parent when pipeline execution completes with results
   useEffect(() => {
     if (executionComplete && completionData && onPipelineComplete) {
-      onPipelineComplete(completionData.processorResults, completionData.comparison);
+      onPipelineComplete(
+        completionData.processorResults,
+        completionData.comparison,
+        pipeline ?? null,
+        preferredMethod,
+      );
     }
-  }, [executionComplete, completionData, onPipelineComplete]);
+  }, [executionComplete, completionData, onPipelineComplete, pipeline, preferredMethod]);
 
   const [smartRec, setSmartRec] = useState<SmartRecommendation | null>(null);
   const [isSmartGenerating, setIsSmartGenerating] = useState(false);
