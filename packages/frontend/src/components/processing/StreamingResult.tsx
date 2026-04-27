@@ -1,5 +1,5 @@
 import Box from '@cloudscape-design/components/box';
-import { sanitizeHtml } from '../../utils/sanitizeHtml';
+import SafeHtml from '../common/SafeHtml';
 
 interface StreamingResultProps {
   content: string;
@@ -11,7 +11,9 @@ export default function StreamingResult({ content, format }: StreamingResultProp
 
   if (format === 'html') {
     return (
-      <div
+      <SafeHtml
+        html={content}
+        profile="table"
         style={{
           overflow: 'auto',
           maxHeight: '400px',
@@ -20,7 +22,6 @@ export default function StreamingResult({ content, format }: StreamingResultProp
           padding: '12px',
           backgroundColor: '#fafafa',
         }}
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content, 'table') }}
       />
     );
   }

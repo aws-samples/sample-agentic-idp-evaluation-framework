@@ -12,7 +12,7 @@ import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import type { CapabilityRecommendation, Capability, CapabilityCategory } from '@idp/shared';
 import { CAPABILITY_INFO, CAPABILITY_CATEGORIES, CATEGORY_INFO } from '@idp/shared';
 import type { PreviewResponse, MethodResult, CapabilityResult } from '../../hooks/usePreview';
-import { sanitizeHtml } from '../../utils/sanitizeHtml';
+import SafeHtml from '../common/SafeHtml';
 
 interface CapabilityCardsProps {
   recommendations: CapabilityRecommendation[];
@@ -29,9 +29,10 @@ function renderExtraction(data: unknown, format: string): React.ReactNode {
   // HTML tables: sanitize model / extraction output before rendering.
   if (format === 'html' && typeof data === 'string') {
     return (
-      <div
+      <SafeHtml
+        html={data}
+        profile="table"
         style={{ fontSize: '12px', maxHeight: '200px', overflow: 'auto', lineHeight: 1.4 }}
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(data, 'table') }}
       />
     );
   }

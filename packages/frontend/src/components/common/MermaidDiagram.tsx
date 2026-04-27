@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { sanitizeHtml } from '../../utils/sanitizeHtml';
+import SafeHtml from './SafeHtml';
 
 // `securityLevel: 'strict'` makes Mermaid itself escape user-supplied labels,
-// then we additionally run the rendered SVG through DOMPurify before injecting
-// it into the DOM.
+// then we additionally run the rendered SVG through DOMPurify (via <SafeHtml>)
+// before injecting it into the DOM.
 mermaid.initialize({
   startOnLoad: false,
   theme: 'default',
@@ -59,10 +59,8 @@ export default function MermaidDiagram({ chart }: MermaidDiagramProps) {
   }
 
   return (
-    <div
-      ref={containerRef}
-      dangerouslySetInnerHTML={{ __html: sanitizeHtml(svg, 'svg') }}
-      style={{ overflow: 'auto', maxHeight: '500px', textAlign: 'center' }}
-    />
+    <div ref={containerRef} style={{ overflow: 'auto', maxHeight: '500px', textAlign: 'center' }}>
+      <SafeHtml html={svg} profile="svg" />
+    </div>
   );
 }

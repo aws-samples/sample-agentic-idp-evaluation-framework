@@ -7,7 +7,7 @@ import Alert from '@cloudscape-design/components/alert';
 import Spinner from '@cloudscape-design/components/spinner';
 import Box from '@cloudscape-design/components/box';
 import { marked } from 'marked';
-import { sanitizeHtml } from '../utils/sanitizeHtml';
+import SafeHtml from '../components/common/SafeHtml';
 
 interface DocItem {
   slug: string;
@@ -108,7 +108,7 @@ export default function DocsPage() {
     if (!markdown) return { title: undefined, description: undefined, html: '' };
     const { title, description, body } = parseFrontmatter(markdown);
     const rendered = marked.parse(body, { async: false }) as string;
-    return { title, description, html: sanitizeHtml(rendered, 'markdown') };
+    return { title, description, html: rendered };
   }, [markdown]);
 
   useEffect(() => {
@@ -161,7 +161,6 @@ export default function DocsPage() {
                 <Header variant="h1" description={description}>{title}</Header>
                 <article
                   className="docs-markdown"
-                  dangerouslySetInnerHTML={{ __html: html }}
                   onClick={(e) => {
                     const target = e.target as HTMLElement;
                     const anchor = target.closest('a') as HTMLAnchorElement | null;
@@ -172,7 +171,9 @@ export default function DocsPage() {
                       navigate(href);
                     }
                   }}
-                />
+                >
+                  <SafeHtml profile="markdown" html={html} />
+                </article>
               </>
             )}
           </SpaceBetween>

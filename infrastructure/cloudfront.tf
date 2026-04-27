@@ -69,10 +69,12 @@ resource "random_password" "cloudfront_secret" {
 }
 
 # CloudFront Distribution
-# checkov:skip=CKV_AWS_174:Default CloudFront cert does not allow configurable minimum_protocol_version; custom-domain path below already sets TLSv1.2_2021.
-# checkov:skip=CKV2_AWS_47:Sample code. Customers should attach a WAF ACL before production use — documented in README/THREAT_MODEL.
 # nosemgrep: terraform.aws.security.aws-insecure-cloudfront-distribution-tls-version
 resource "aws_cloudfront_distribution" "main" {
+  # checkov:skip=CKV_AWS_174: When cloudfront_default_certificate=true (no custom domain), Terraform forbids setting minimum_protocol_version on the viewer_certificate block; AWS enforces TLSv1 minimum on *.cloudfront.net itself. The custom-domain branch below already pins TLSv1.2_2021.
+  # checkov:skip=CKV2_AWS_47: Sample code; customers should attach a WAF web ACL for production (documented in README and THREAT_MODEL.md).
+  # checkov:skip=CKV_AWS_310: Origin failover not applicable to this sample; single-origin by design.
+  # checkov:skip=CKV_AWS_68: WAF web ACL not provisioned by default; see CKV2_AWS_47 above.
   # Access logging for security / audit trail (CKV_AWS_86)
   logging_config {
     include_cookies = false
