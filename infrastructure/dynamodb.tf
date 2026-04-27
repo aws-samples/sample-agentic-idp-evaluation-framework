@@ -10,6 +10,20 @@
 # capacity to tune.
 # ============================================================================
 
+# Customer-managed KMS key for the activity table (Semgrep aws-dynamodb-table-unencrypted).
+resource "aws_kms_key" "dynamodb" {
+  count                   = var.manage_activity_table ? 1 : 0
+  description             = "${var.project_name} DynamoDB activity table encryption"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+}
+
+resource "aws_kms_alias" "dynamodb" {
+  count         = var.manage_activity_table ? 1 : 0
+  name          = "alias/${var.project_name}-ddb"
+  target_key_id = aws_kms_key.dynamodb[0].key_id
+}
+
 resource "aws_dynamodb_table" "activity" {
   count = var.manage_activity_table ? 1 : 0
 
@@ -33,7 +47,8 @@ resource "aws_dynamodb_table" "activity" {
   }
 
   server_side_encryption {
-    enabled = true
+    enabled     = true
+    kms_key_arn = aws_kms_key.dynamodb[0].arn
   }
 
   tags = {

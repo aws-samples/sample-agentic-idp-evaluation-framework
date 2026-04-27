@@ -3,6 +3,47 @@ resource "aws_s3_bucket" "static_assets" {
   bucket = "${var.project_name}-static-${var.environment}"
 }
 
+# S3 bucket for CloudFront access logs (CKV_AWS_86)
+resource "aws_s3_bucket" "cloudfront_logs" {
+  bucket = "${var.project_name}-cf-logs-${var.environment}"
+}
+
+resource "aws_s3_bucket_public_access_block" "cloudfront_logs" {
+  bucket                  = aws_s3_bucket.cloudfront_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "cloudfront_logs" {
+  bucket = aws_s3_bucket.cloudfront_logs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_ownership_controls" "cloudfront_logs" {
+  bucket = aws_s3_bucket.cloudfront_logs.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
+  bucket = aws_s3_bucket.cloudfront_logs.id
+  rule {
+    id     = "expire-old-logs"
+    status = "Enabled"
+    filter {}
+    expiration {
+      days = 90
+    }
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "static_assets" {
   bucket = aws_s3_bucket.static_assets.id
 
@@ -28,7 +69,17 @@ resource "random_password" "cloudfront_secret" {
 }
 
 # CloudFront Distribution
+# checkov:skip=CKV_AWS_174:Default CloudFront cert does not allow configurable minimum_protocol_version; custom-domain path below already sets TLSv1.2_2021.
+# checkov:skip=CKV2_AWS_47:Sample code. Customers should attach a WAF ACL before production use — documented in README/THREAT_MODEL.
+# nosemgrep: terraform.aws.security.aws-insecure-cloudfront-distribution-tls-version
 resource "aws_cloudfront_distribution" "main" {
+  # Access logging for security / audit trail (CKV_AWS_86)
+  logging_config {
+    include_cookies = false
+    bucket          = aws_s3_bucket.cloudfront_logs.bucket_domain_name
+    prefix          = "cf/"
+  }
+
   # S3 Origin for frontend static assets
   origin {
     domain_name              = aws_s3_bucket.static_assets.bucket_regional_domain_name

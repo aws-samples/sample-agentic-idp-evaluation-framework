@@ -1074,12 +1074,24 @@ export class IdpStack extends cdk.Stack {
     super(scope, id, props);
 
     // ── Storage ─────────────────────────────────────────────────────────
+    // Dedicated bucket to receive S3 server access logs for audit trail.
+    const accessLogsBucket = new s3.Bucket(this, 'AccessLogsBucket', {
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      objectOwnership: s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
+      lifecycleRules: [{ expiration: cdk.Duration.days(90) }],
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     const inputBucket = new s3.Bucket(this, 'InputBucket', {
       versioned: true,
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
       eventBridgeEnabled: true,
+      serverAccessLogsBucket: accessLogsBucket,
+      serverAccessLogsPrefix: 'input/',
       lifecycleRules: [{ noncurrentVersionExpiration: cdk.Duration.days(90) }],
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
@@ -1089,6 +1101,8 @@ export class IdpStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
+      serverAccessLogsBucket: accessLogsBucket,
+      serverAccessLogsPrefix: 'output/',
       lifecycleRules: [{ noncurrentVersionExpiration: cdk.Duration.days(90) }],
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });

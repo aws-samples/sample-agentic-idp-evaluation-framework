@@ -8,6 +8,7 @@ import Spinner from '@cloudscape-design/components/spinner';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import { marked } from 'marked';
 import type { ChatMessage } from '../../hooks/useConversation';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 // Configure marked for safe inline rendering
 marked.setOptions({
@@ -185,13 +186,14 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
   const htmlContent = useMemo(() => {
     if (isUser) return null;
-    // Strip any residual tags and parse markdown for assistant messages
+    // Strip any residual tags and parse markdown for assistant messages,
+    // then sanitize to defuse injected HTML from LLM output.
     const clean = message.content
       .replace(/<options>[\s\S]*?<\/options>/g, '')
       .replace(/<recommendation>[\s\S]*?<\/recommendation>/g, '')
       .replace(/<(?:options|recommendation)[^>]*$/g, '')
       .trim();
-    return marked.parse(clean) as string;
+    return sanitizeHtml(marked.parse(clean) as string, 'markdown');
   }, [message.content, isUser]);
 
   return (
@@ -229,6 +231,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         {isUser ? (
           <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
         ) : (
+          // htmlContent is already sanitized via sanitizeHtml('markdown') in useMemo above.
           <div
             className="chat-markdown"
             dangerouslySetInnerHTML={{ __html: htmlContent ?? '' }}

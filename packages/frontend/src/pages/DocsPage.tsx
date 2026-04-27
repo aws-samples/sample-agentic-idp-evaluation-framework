@@ -7,6 +7,7 @@ import Alert from '@cloudscape-design/components/alert';
 import Spinner from '@cloudscape-design/components/spinner';
 import Box from '@cloudscape-design/components/box';
 import { marked } from 'marked';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 
 interface DocItem {
   slug: string;
@@ -106,7 +107,8 @@ export default function DocsPage() {
   const { title, description, html } = useMemo(() => {
     if (!markdown) return { title: undefined, description: undefined, html: '' };
     const { title, description, body } = parseFrontmatter(markdown);
-    return { title, description, html: marked.parse(body, { async: false }) as string };
+    const rendered = marked.parse(body, { async: false }) as string;
+    return { title, description, html: sanitizeHtml(rendered, 'markdown') };
   }, [markdown]);
 
   useEffect(() => {

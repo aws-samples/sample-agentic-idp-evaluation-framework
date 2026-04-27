@@ -97,6 +97,11 @@ resource "aws_iam_role_policy" "agentcore_execution" {
         ]
         Resource = aws_ecr_repository.backend.arn
       },
+      # ecr:GetAuthorizationToken does not support resource-level ARNs
+      # (see https://docs.aws.amazon.com/AmazonECR/latest/userguide/security_iam_service-with-iam.html).
+      # The wildcard below is required by the service design and returns a
+      # short-lived auth token for the calling principal only.
+      # nosemgrep: terraform.lang.security.iam.no-iam-creds-exposure
       {
         Sid      = "ECRTokenAccess"
         Effect   = "Allow"
@@ -168,6 +173,8 @@ resource "aws_iam_role_policy" "agentcore_execution" {
         ]
         Resource = "*"
       },
+      # S3 access is scoped to the uploads bucket only — bucket ARN + objects.
+      # nosemgrep: terraform.lang.security.iam.no-iam-data-exfiltration
       {
         Sid    = "S3DocumentAccess"
         Effect = "Allow"

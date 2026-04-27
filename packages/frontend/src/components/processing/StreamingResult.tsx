@@ -1,4 +1,5 @@
 import Box from '@cloudscape-design/components/box';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 interface StreamingResultProps {
   content: string;
@@ -19,7 +20,7 @@ export default function StreamingResult({ content, format }: StreamingResultProp
           padding: '12px',
           backgroundColor: '#fafafa',
         }}
-        dangerouslySetInnerHTML={{ __html: content }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content, 'table') }}
       />
     );
   }

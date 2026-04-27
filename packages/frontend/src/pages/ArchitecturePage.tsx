@@ -26,6 +26,7 @@ import { marked } from 'marked';
 import { useArchitecture } from '../hooks/useArchitecture';
 import { useCodeGen } from '../hooks/useCodeGen';
 import MermaidDiagram from '../components/common/MermaidDiagram';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 import {
   buildMethodMap,
   generatePythonCode,
@@ -282,7 +283,7 @@ export default function ArchitecturePage({
                         <div
                           key={i}
                           className="chat-markdown"
-                          dangerouslySetInnerHTML={{ __html: marked.parse(part.content) as string }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(marked.parse(part.content) as string, 'markdown') }}
                           style={{ fontSize: '14px', lineHeight: '1.6' }}
                         />
                       )

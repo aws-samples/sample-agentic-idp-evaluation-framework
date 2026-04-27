@@ -121,6 +121,8 @@ resource "aws_iam_role_policy" "apprunner_s3" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # S3 access is scoped to the uploads bucket + its objects only.
+      # nosemgrep: terraform.lang.security.iam.no-iam-data-exfiltration
       {
         Effect = "Allow"
         Action = [
