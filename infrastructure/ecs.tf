@@ -115,8 +115,8 @@ resource "aws_ecs_task_definition" "backend" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:3001/api/health || exit 1"]
-        interval    = 10
+        command     = ["CMD-SHELL", "wget -qO- http://localhost:3001/api/health || exit 1"]
+        interval    = 15
         timeout     = 5
         retries     = 5
         startPeriod = 30
@@ -137,8 +137,13 @@ resource "aws_ecs_service" "backend" {
   name            = "${var.project_name}-backend-${var.environment}"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.backend.arn
-  desired_count   = 1
+  desired_count   = 2
   launch_type     = "FARGATE"
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   network_configuration {
     subnets         = aws_subnet.private[*].id

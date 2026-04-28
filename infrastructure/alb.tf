@@ -76,14 +76,14 @@ resource "aws_lb_target_group" "backend" {
     port                = "traffic-port"
     protocol            = "HTTP"
     healthy_threshold   = 2
-    unhealthy_threshold = 5
+    unhealthy_threshold = 3
     timeout             = 5
     interval            = 10
     matcher             = "200"
   }
 
-  # Allow long-lived SSE connections to drain gracefully
-  deregistration_delay = 120
+  # Shorter drain for faster rollouts. SSE clients reconnect automatically.
+  deregistration_delay = 30
 
   tags = {
     Name = "${var.project_name}-tg"
