@@ -13,7 +13,8 @@
     "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "paths": {
-      "@idp/shared": ["../shared/src/index.ts"]
+      "@idp/shared": ["../shared/src/index.ts"],
+      "@idp/midway": ["./src/services/midway-stub.ts"]
     }
   },
   "include": ["src"],

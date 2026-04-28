@@ -1,6 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
+
+const midwayReal = path.resolve(__dirname, 'src/services/midway.ts');
+const midwayStub = path.resolve(__dirname, 'src/services/midway-stub.ts');
 
 export default defineConfig({
   plugins: [react()],
@@ -8,6 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@idp/shared': path.resolve(__dirname, '../shared/src/index.ts'),
+      '@idp/midway': fs.existsSync(midwayReal) ? midwayReal : midwayStub,
     },
   },
   build: {

@@ -2,27 +2,21 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import '@cloudscape-design/global-styles/index.css';
+import { handleOidcCallback, hasValidToken, redirectToMidway } from '@idp/midway';
 import App from './App';
 
 (async () => {
   // ─── Midway auth pre-check ────────────────────────────────────────────────
   // Must complete BEFORE React renders so the app never flashes anonymous UI
-  // before redirecting to Midway. Wrapped in the same async IIFE that renders
-  // React so we can `await` without top-level await (esbuild es2020 target).
+  // before redirecting to Midway. @idp/midway resolves to the real module when
+  // present, or a no-op stub in the public distribution (vite.config alias).
   if (import.meta.env.VITE_AUTH_PROVIDER === 'midway') {
     const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (!isLocalDev) {
-      try {
-        const midwayPath = './services/midway' + '';
-        const midway = await import(/* @vite-ignore */ midwayPath) as
-          { handleOidcCallback: () => boolean; hasValidToken: () => boolean; redirectToMidway: () => void };
-        midway.handleOidcCallback();
-        if (!midway.hasValidToken()) {
-          midway.redirectToMidway();
-          return; // stop — page will reload after Midway redirect
-        }
-      } catch {
-        console.error('Midway auth module not available in this distribution');
+      handleOidcCallback();
+      if (!hasValidToken()) {
+        redirectToMidway();
+        return;
       }
     }
   }

@@ -70,23 +70,14 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      // Midway OIDC implicit flow — dynamic import so the app compiles
-      // without the midway module (public distribution).
-      // Computed path prevents static resolution at compile time.
+      // Midway OIDC — @idp/midway resolves to real module or no-op stub via vite alias.
       if (import.meta.env.VITE_AUTH_PROVIDER === 'midway') {
-        try {
-          const midwayPath = './services/midway' + '';
-          const midway = await import(/* @vite-ignore */ midwayPath) as
-            { initMidwayAuth: () => { alias: string; email: string } | null };
-          const midwayUser = midway.initMidwayAuth();
-          if (midwayUser) {
-            setUser(midwayUser);
-          }
-          // If initMidwayAuth returns null, it's redirecting to Midway — page will reload
-          return;
-        } catch {
-          console.error('Midway auth module not available in this distribution');
+        const { initMidwayAuth } = await import('@idp/midway');
+        const midwayUser = initMidwayAuth();
+        if (midwayUser) {
+          setUser(midwayUser);
         }
+        return;
       }
 
       // Cognito / none — fetch user from backend
