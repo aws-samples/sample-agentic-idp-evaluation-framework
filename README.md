@@ -26,10 +26,11 @@ Three architectural principles worth calling out:
 
 - **33 capabilities** across 8 categories: Core Extraction, Visual Analysis, Document Intelligence, Compliance & Security, Industry-Specific, Media Processing, Advanced AI, Document Conversion
 - **16 processing methods** across 6 families: BDA (Standard / + LLM hybrids), Claude (Sonnet 4.6 / Haiku 4.5 / Opus 4.6), Nova (2 Lite GA / 2 Pro Preview), Textract+LLM, Nova Embeddings, Bedrock Guardrails (PII specialist)
-- **18 document types** covered by test fixtures — PDF, Office, image, audio, video
 - **Pipeline builder** — ReactFlow node graph for custom processing pipelines; chat interface to modify pipelines conversationally
 - **Real-time SSE streaming** — token-level progress for every method, 15s keepalive
 - **Architecture recommendations** — cost projections at scale, generated IaC in Terraform or CDK
+- **Recent Runs** — save and reload past evaluation sessions with full journey detail (upload, analysis, preview, pipeline, architecture). User-separated; admin can view all users' runs.
+- **Admin dashboard** — usage stats, evaluation runs with click-to-detail, activity log with type-specific detail panels
 - **Pluggable auth** — `none` (demo), Amazon Cognito (real JWT verifier against a user pool)
 
 ## Quick Start (local dev)
@@ -86,7 +87,7 @@ one-idp/
 │   └── frontend/             # React 18 + Vite + Cloudscape + ReactFlow
 ├── infrastructure/           # Terraform stack (ECS Fargate + AgentCore + CloudFront + S3 + DynamoDB)
 ├── infrastructure-cdk/       # AWS CDK TypeScript stack (parity with Terraform)
-├── test-samples/             # 18 real test documents + coverage results
+├── test-samples/             # Test documents (gitignored — add your own samples)
 └── docs/
     └── architecture.md       # 3-tier topology, auth boundary, deploy lifecycle
 ```
@@ -127,7 +128,10 @@ Full list in [`.env.example`](.env.example). Highlights:
 | `USE_LOCAL_STORAGE` | *(unset)* | `true` → uses `.local-uploads/` instead of S3 |
 | `AUTH_PROVIDER` | `none` | `none` \| `cognito` |
 | `ALLOW_UNAUTHENTICATED` | *(unset)* | Only with `AUTH_PROVIDER=none` + `NODE_ENV=production`. Otherwise boot is refused. |
-| `ADMIN_USERS` | `''` | Comma-separated aliases. Ignored when `AUTH_PROVIDER=none`. |
+| `ADMIN_USERS` | `''` | Comma-separated aliases. Ignored when `AUTH_PROVIDER=none` (unless `ALLOW_UNAUTHENTICATED=true`). |
+| `DEV_USER_ALIAS` | `local-user` | Override local user alias when `AUTH_PROVIDER=none`. Set to match an `ADMIN_USERS` entry to test admin locally. |
+| `CLOUDFRONT_SECRET` | *(unset)* | Shared secret for CloudFront → ALB origin validation. When set in production, requests without the matching `X-CloudFront-Secret` header are rejected. |
+| `ACTIVITY_TABLE` | *(unset)* | DynamoDB table name for activity tracking + recent runs. |
 | `COGNITO_USER_POOL_ID` | *(empty)* | Required when `AUTH_PROVIDER=cognito` |
 | `COGNITO_CLIENT_ID` | *(empty)* | Optional allowlist, comma-separated |
 | `BDA_PROFILE_ARN` / `BDA_PROJECT_ARN` | *(empty)* | Optional — BDA methods unavailable if unset |
@@ -197,8 +201,9 @@ Switch providers without code changes via env vars alone. The dispatcher lives i
 
 ### Known trust assumptions / TODOs
 
-- Rate limiter is per-IP in-memory — use Redis or an edge WAF for real traffic.
-- CloudFront origin has an `X-CloudFront-Secret` header but the Express backend does not currently verify it. Add verification before opening ECS Fargate to the internet, or restrict via VPC.
+- Rate limiter is per-IP in-memory. With ECS auto-scaling, an attacker hitting N instances gets N× the rate limit. Use Redis or an edge WAF (CloudFront + AWS WAF rate-based rules) for production traffic.
+- **CloudFront origin validation** — `cloudfront-secret.ts` middleware validates `X-CloudFront-Secret` header in production. Set `CLOUDFRONT_SECRET` env var on the ECS task to match the Terraform-managed `random_password.cloudfront_secret`. Health-check paths are exempt.
+- `AUTH_PROVIDER=none` uses `DEV_USER_ALIAS` env var (default: `local-user`) instead of the OS username. This prevents accidental admin privilege escalation when the OS user matches an `ADMIN_USERS` entry.
 
 ## License
 
