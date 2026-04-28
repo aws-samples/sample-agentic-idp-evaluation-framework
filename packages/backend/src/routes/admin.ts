@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { config } from '../config/aws.js';
-import { queryActivity, getActivityStats } from '../services/activity-tracker.js';
+import { queryActivityPaginated, getActivityStats } from '../services/activity-tracker.js';
 import { getFeedbackSummary } from '../services/feedback.js';
 import type { AuthUser } from '../middleware/auth.js';
 
@@ -40,17 +40,18 @@ router.get('/stats', async (_req, res) => {
   }
 });
 
-// GET /api/admin/activity?userId=X&startDate=Y&limit=Z
+// GET /api/admin/activity?userId=X&startDate=Y&limit=Z&nextToken=abc
 router.get('/activity', async (req, res) => {
   try {
-    const { userId, startDate, endDate, limit } = req.query;
-    const records = await queryActivity({
+    const { userId, startDate, endDate, limit, nextToken } = req.query;
+    const result = await queryActivityPaginated({
       userId: userId as string | undefined,
       startDate: startDate as string | undefined,
       endDate: endDate as string | undefined,
       limit: limit ? parseInt(limit as string, 10) : 100,
+      nextToken: nextToken as string | undefined,
     });
-    res.json({ records, count: records.length });
+    res.json({ records: result.records, count: result.records.length, nextToken: result.nextToken });
   } catch (err) {
     console.error('[Admin] Activity query error:', err);
     res.status(500).json({ error: 'Failed to query activity' });

@@ -295,18 +295,36 @@ export async function getRunById(userId: string, runId: string): Promise<RunReco
   }
 }
 
+/**
+ * Paginated scan that follows LastEvaluatedKey to retrieve all items.
+ */
+async function scanAll(tableName: string, filterExpression?: string, exprAttrNames?: Record<string, string>, exprAttrValues?: Record<string, unknown>): Promise<Record<string, unknown>[]> {
+  const allItems: Record<string, unknown>[] = [];
+  let lastKey: Record<string, unknown> | undefined;
+  do {
+    const params: Record<string, unknown> = {
+      TableName: tableName,
+      ExclusiveStartKey: lastKey,
+    };
+    if (filterExpression) {
+      params.FilterExpression = filterExpression;
+      if (exprAttrNames) params.ExpressionAttributeNames = exprAttrNames;
+      if (exprAttrValues) params.ExpressionAttributeValues = exprAttrValues;
+    }
+    const result = await docClient.send(new ScanCommand(params as any));
+    allItems.push(...(result.Items ?? []));
+    lastKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+  } while (lastKey);
+  return allItems;
+}
+
 export async function getActivityStats(): Promise<{
   totalUsers: number;
   totalUploads: number;
   totalConversations: number;
   totalPreviews: number;
-  recentActivity: ActivityRecord[];
 }> {
-  const result = await docClient.send(new ScanCommand({
-    TableName: config.activityTable,
-  }));
-
-  const items = (result.Items ?? []) as ActivityRecord[];
+  const items = await scanAll(config.activityTable!) as unknown as ActivityRecord[];
   const users = new Set(items.map((i) => i.userId));
 
   return {
@@ -314,8 +332,65 @@ export async function getActivityStats(): Promise<{
     totalUploads: items.filter((i) => i.type === 'upload').length,
     totalConversations: items.filter((i) => i.type === 'conversation_start').length,
     totalPreviews: items.filter((i) => i.type === 'preview_start').length,
-    recentActivity: items
-      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-      .slice(0, 50),
+  };
+}
+
+/**
+ * Paginated activity query. Returns items + optional nextToken for cursor-based pagination.
+ */
+export async function queryActivityPaginated(options: {
+  userId?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  nextToken?: string;
+}): Promise<{ records: ActivityRecord[]; nextToken?: string }> {
+  const { userId, startDate, endDate, limit = 100, nextToken } = options;
+  const exclusiveStartKey = nextToken ? JSON.parse(Buffer.from(nextToken, 'base64url').toString()) : undefined;
+
+  if (userId) {
+    const params: Record<string, unknown> = {
+      TableName: config.activityTable,
+      KeyConditionExpression: 'userId = :uid',
+      ExpressionAttributeValues: { ':uid': userId } as Record<string, unknown>,
+      ScanIndexForward: false,
+      Limit: limit,
+      ExclusiveStartKey: exclusiveStartKey,
+    };
+    if (startDate && endDate) {
+      (params as any).KeyConditionExpression += ' AND sk BETWEEN :start AND :end';
+      (params.ExpressionAttributeValues as Record<string, unknown>)[':start'] = startDate;
+      (params.ExpressionAttributeValues as Record<string, unknown>)[':end'] = endDate + '￿';
+    } else if (startDate) {
+      (params as any).KeyConditionExpression += ' AND sk >= :start';
+      (params.ExpressionAttributeValues as Record<string, unknown>)[':start'] = startDate;
+    }
+    const result = await docClient.send(new QueryCommand(params as any));
+    const records = (result.Items ?? []) as ActivityRecord[];
+    const lastKey = result.LastEvaluatedKey;
+    return {
+      records,
+      nextToken: lastKey ? Buffer.from(JSON.stringify(lastKey)).toString('base64url') : undefined,
+    };
+  }
+
+  // Scan all users
+  const params: Record<string, unknown> = {
+    TableName: config.activityTable,
+    Limit: limit,
+    ExclusiveStartKey: exclusiveStartKey,
+  };
+  if (startDate) {
+    (params as any).FilterExpression = '#ts >= :start';
+    (params as any).ExpressionAttributeNames = { '#ts': 'timestamp' };
+    (params as any).ExpressionAttributeValues = { ':start': startDate };
+  }
+  const result = await docClient.send(new ScanCommand(params as any));
+  const records = (result.Items ?? []) as ActivityRecord[];
+  records.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  const lastKey = result.LastEvaluatedKey;
+  return {
+    records,
+    nextToken: lastKey ? Buffer.from(JSON.stringify(lastKey)).toString('base64url') : undefined,
   };
 }

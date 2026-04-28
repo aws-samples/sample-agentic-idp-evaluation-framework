@@ -236,11 +236,13 @@ export default function AdminPage({ onLoadRun }: AdminPageProps) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [activity, setActivity] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activityLoading, setActivityLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState('');
   const [dateRange, setDateRange] = useState<DateRangePickerProps.Value | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<ActivityRecord | null>(null);
   const [activeTab, setActiveTab] = useState('runs');
+  const [nextToken, setNextToken] = useState<string | undefined>(undefined);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -255,7 +257,6 @@ export default function AdminPage({ onLoadRun }: AdminPageProps) {
       }
       const data = await res.json();
       setStats(data);
-      setActivity(data.recentActivity);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
@@ -265,8 +266,8 @@ export default function AdminPage({ onLoadRun }: AdminPageProps) {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  const fetchFiltered = useCallback(async () => {
-    setLoading(true);
+  const fetchActivity = useCallback(async (append = false) => {
+    setActivityLoading(true);
     try {
       const params = new URLSearchParams();
       if (userFilter) params.set('userId', userFilter);
@@ -274,17 +275,35 @@ export default function AdminPage({ onLoadRun }: AdminPageProps) {
         params.set('startDate', dateRange.startDate);
         if (dateRange.endDate) params.set('endDate', dateRange.endDate);
       }
-      params.set('limit', '200');
+      params.set('limit', '100');
+      if (append && nextToken) params.set('nextToken', nextToken);
       const res = await authedFetch(`/api/admin/activity?${params}`);
       if (!res.ok) throw new Error(`Failed (${res.status})`);
-      const data = await res.json();
-      setActivity(data.records);
+      const data = await res.json() as { records: ActivityRecord[]; nextToken?: string };
+      if (append) {
+        setActivity(prev => [...prev, ...data.records]);
+      } else {
+        setActivity(data.records);
+      }
+      setNextToken(data.nextToken);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed');
     } finally {
-      setLoading(false);
+      setActivityLoading(false);
     }
-  }, [userFilter, dateRange]);
+  }, [userFilter, dateRange, nextToken]);
+
+  const fetchFiltered = useCallback(() => {
+    setNextToken(undefined);
+    fetchActivity(false);
+  }, [fetchActivity]);
+
+  // Auto-fetch activity when switching to the Activity Log tab
+  useEffect(() => {
+    if (activeTab === 'activity' && activity.length === 0 && !activityLoading) {
+      fetchActivity(false);
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Switch to the Runs tab and optionally trigger a load */
   const handleSwitchToRuns = useCallback((runId: string) => {
@@ -393,14 +412,20 @@ export default function AdminPage({ onLoadRun }: AdminPageProps) {
                           applyButtonLabel: 'Apply',
                         }}
                       />
-                      <Button onClick={fetchFiltered} loading={loading}>Search</Button>
+                      <Button onClick={fetchFiltered} loading={activityLoading}>Search</Button>
                     </ColumnLayout>
                   </Container>
 
                   {/* Activity Table */}
                   <Table
-                    header={<Header variant="h2" counter={`(${activity.length})`}>Activity Log</Header>}
-                    loading={loading}
+                    header={
+                      <Header variant="h2" counter={`(${activity.length}${nextToken ? '+' : ''})`}
+                        actions={<Button iconName="refresh" onClick={() => fetchActivity(false)} loading={activityLoading}>Refresh</Button>}
+                      >
+                        Activity Log
+                      </Header>
+                    }
+                    loading={activityLoading && activity.length === 0}
                     loadingText="Loading activity..."
                     items={activity}
                     selectionType="single"
@@ -458,6 +483,15 @@ export default function AdminPage({ onLoadRun }: AdminPageProps) {
                     stripedRows
                     stickyHeader
                   />
+
+                  {/* Load more button */}
+                  {nextToken && (
+                    <Box textAlign="center" padding="s">
+                      <Button onClick={() => fetchActivity(true)} loading={activityLoading} variant="normal">
+                        Load more activity...
+                      </Button>
+                    </Box>
+                  )}
 
                   {/* Activity detail panel */}
                   {selectedActivity && (
