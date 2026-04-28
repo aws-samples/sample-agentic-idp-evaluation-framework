@@ -4,31 +4,32 @@ import { BrowserRouter } from 'react-router-dom';
 import '@cloudscape-design/global-styles/index.css';
 import App from './App';
 
-// ─── Midway auth pre-check ──────────────────────────────────────────────────
-// Run BEFORE React renders so the app never flashes before the Midway redirect.
-// Wrapped in an async IIFE to avoid top-level await (esbuild es2020 target).
-// Computed path + @vite-ignore prevents static resolution at compile time so
-// the build succeeds without midway.ts (public distribution).
 (async () => {
-  if (import.meta.env.VITE_AUTH_PROVIDER !== 'midway') return;
-  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (isLocalDev) return;
-  try {
-    const midwayPath = './services/midway' + '';
-    const midway = await import(/* @vite-ignore */ midwayPath) as
-      { handleOidcCallback: () => boolean; hasValidToken: () => boolean; redirectToMidway: () => void };
-    midway.handleOidcCallback();
-    if (!midway.hasValidToken()) {
-      midway.redirectToMidway();
+  // ─── Midway auth pre-check ────────────────────────────────────────────────
+  // Must complete BEFORE React renders so the app never flashes anonymous UI
+  // before redirecting to Midway. Wrapped in the same async IIFE that renders
+  // React so we can `await` without top-level await (esbuild es2020 target).
+  if (import.meta.env.VITE_AUTH_PROVIDER === 'midway') {
+    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalDev) {
+      try {
+        const midwayPath = './services/midway' + '';
+        const midway = await import(/* @vite-ignore */ midwayPath) as
+          { handleOidcCallback: () => boolean; hasValidToken: () => boolean; redirectToMidway: () => void };
+        midway.handleOidcCallback();
+        if (!midway.hasValidToken()) {
+          midway.redirectToMidway();
+          return; // stop — page will reload after Midway redirect
+        }
+      } catch {
+        console.error('Midway auth module not available in this distribution');
+      }
     }
-  } catch {
-    console.error('Midway auth module not available in this distribution');
   }
-})();
 
-// Chat markdown styles
-const chatStyles = document.createElement('style');
-chatStyles.textContent = `
+  // ─── Chat / docs styles ───────────────────────────────────────────────────
+  const chatStyles = document.createElement('style');
+  chatStyles.textContent = `
 .chat-markdown { word-break: break-word; }
 .chat-markdown p { margin: 0 0 8px 0; }
 .chat-markdown p:last-child { margin-bottom: 0; }
@@ -99,21 +100,22 @@ chatStyles.textContent = `
 .awsui-dark-mode .docs-markdown blockquote { border-left-color: #539fe5; background: rgba(83,159,229,0.08); }
 .awsui-dark-mode .docs-markdown hr { border-top-color: rgba(255,255,255,0.14); }
 `;
-document.head.appendChild(chatStyles);
+  document.head.appendChild(chatStyles);
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>,
-);
+  // ─── Render React ─────────────────────────────────────────────────────────
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </React.StrictMode>,
+  );
 
-// Fade out the HTML splash once React has mounted real content. The tiny delay
-// gives the Cloudscape first paint a beat to finish so the handoff is seamless.
-requestAnimationFrame(() => {
-  const splash = document.getElementById('app-splash');
-  if (!splash) return;
-  splash.classList.add('hidden');
-  setTimeout(() => splash.remove(), 250);
-});
+  // Fade out the HTML splash once React has mounted real content.
+  requestAnimationFrame(() => {
+    const splash = document.getElementById('app-splash');
+    if (!splash) return;
+    splash.classList.add('hidden');
+    setTimeout(() => splash.remove(), 250);
+  });
+})();
