@@ -116,7 +116,7 @@ router.post('/', async (req, res) => {
       return !!PROCESSOR_FACTORY[m];
     });
 
-    const userAlias = (req as any).midwayUser?.alias ?? 'anonymous';
+    const userAlias = (req as any).authUser?.alias ?? 'anonymous';
     const previewStart = Date.now();
     console.log(`[Preview] docId=${body.documentId} pages=${pageCount} caps=${body.capabilities.join(',')} methods=${validMethods.join(',')}`);
     trackActivity(userAlias, 'preview_start', {

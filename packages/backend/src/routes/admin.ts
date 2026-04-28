@@ -2,25 +2,24 @@ import { Router } from 'express';
 import { config } from '../config/aws.js';
 import { queryActivity, getActivityStats } from '../services/activity-tracker.js';
 import { getFeedbackSummary } from '../services/feedback.js';
-import type { MidwayUser } from '../middleware/midway.js';
+import type { AuthUser } from '../middleware/auth.js';
 
 const router = Router();
 
 // Admin-only middleware.
 //
-// Defense-in-depth: refuse to grant admin when auth is disabled (AUTH_PROVIDER=none
-// or MIDWAY_DISABLED=true), even if an alias happens to match `adminUsers`. This
-// prevents a misconfigured public deployment from handing admin to anonymous users.
+// Defense-in-depth: refuse to grant admin when auth is disabled (AUTH_PROVIDER=none),
+// even if an alias happens to match `adminUsers`. This prevents a misconfigured
+// public deployment from handing admin to anonymous users.
 function requireAdmin(req: any, res: any, next: any) {
-  const effectiveProvider = process.env.MIDWAY_DISABLED === 'true' ? 'none' : config.authProvider;
-  if (effectiveProvider === 'none') {
+  if (config.authProvider === 'none') {
     res.status(403).json({
       error: 'Admin access required',
       message: 'Admin endpoints are disabled when AUTH_PROVIDER=none.',
     });
     return;
   }
-  const user = req.midwayUser as MidwayUser | undefined;
+  const user = req.authUser as AuthUser | undefined;
   if (!user || config.adminUsers.length === 0 || !config.adminUsers.includes(user.alias)) {
     res.status(403).json({ error: 'Admin access required' });
     return;

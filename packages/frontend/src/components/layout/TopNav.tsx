@@ -1,6 +1,5 @@
 import TopNavigation from '@cloudscape-design/components/top-navigation';
 import type { AuthUser } from '../../services/api';
-import { clearToken } from '../../services/midway';
 
 interface TopNavProps {
   user: AuthUser | null;
@@ -10,34 +9,15 @@ interface TopNavProps {
 
 const APP_TITLE = import.meta.env.VITE_APP_TITLE || 'ONE IDP Framework';
 
-// External links (GitLab, Slack) are safe on AWS-internal hostnames
-// (Midway-protected) and local dev. They stay hidden on public deployments.
-// Decision is at runtime (hostname) rather than build-time so one artifact
-// serves both internal and public cognito-auth deploys.
-function isInternalHost(): boolean {
-  if (typeof window === 'undefined') return false;
-  const h = window.location.hostname;
-  return (
-    h === 'localhost' ||
-    h === '127.0.0.1' ||
-    h.endsWith('.people.aws.dev') ||
-    h.endsWith('.amazon.com') ||
-    h.endsWith('.aws.dev')
-  );
-}
-const SHOW_LINKS =
-  import.meta.env.DEV ||
-  import.meta.env.VITE_SHOW_LINKS === 'true' ||
-  isInternalHost();
+// External links are only shown when explicitly opted in via VITE_SHOW_LINKS=true.
+const SHOW_LINKS = import.meta.env.VITE_SHOW_LINKS === 'true';
 
-// Defaults point at the internal GitLab + Slack channel. Override via env if
-// you fork the deployment.
 const REPO_URL = SHOW_LINKS
-  ? (import.meta.env.VITE_REPO_URL || 'https://gitlab.aws.dev/sanghwa/one-idp')
+  ? (import.meta.env.VITE_REPO_URL || 'https://github.com/aws-samples/sample-agentic-idp-evaluation-framework')
   : '';
-const REPO_LABEL = import.meta.env.VITE_REPO_LABEL || 'GitLab';
+const REPO_LABEL = import.meta.env.VITE_REPO_LABEL || 'GitHub';
 const CHAT_URL = SHOW_LINKS
-  ? (import.meta.env.VITE_CHAT_URL || 'https://amazon.enterprise.slack.com/archives/C0ATLG1TX1U')
+  ? (import.meta.env.VITE_CHAT_URL || '')
   : '';
 const CHAT_LABEL = import.meta.env.VITE_CHAT_LABEL || 'Slack';
 
@@ -90,7 +70,6 @@ export default function TopNav({ user, darkMode, onToggleDarkMode }: TopNavProps
                 ],
                 onItemClick: ({ detail }: { detail: { id: string } }) => {
                   if (detail.id === 'signout') {
-                    clearToken();
                     window.location.reload();
                   }
                 },

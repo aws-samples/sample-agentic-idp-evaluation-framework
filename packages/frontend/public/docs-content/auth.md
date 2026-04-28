@@ -1,16 +1,15 @@
 ---
 title: Authentication
-description: Pluggable auth — none, midway, or cognito.
+description: Pluggable auth — none or cognito.
 ---
 
-ONE IDP ships with three pluggable auth backends. The choice is controlled by a single environment variable, `AUTH_PROVIDER`. Everything else is middleware.
+ONE IDP ships with two pluggable auth backends. The choice is controlled by a single environment variable, `AUTH_PROVIDER`. Everything else is middleware.
 
-## The three modes
+## The two modes
 
 | Mode | `AUTH_PROVIDER` | Use case | Admin endpoints |
 |---|---|---|---|
 | **Demo** | `none` | Local dev, customer demo with no login. | Always `403`. |
-| **Midway** | `midway` | AWS-internal deployments behind a Midway-terminating edge. | Granted iff alias ∈ `ADMIN_USERS`. |
 | **Cognito** | `cognito` | Public/customer deployments with real JWT validation. | Granted iff `cognito:username`/`username` ∈ `ADMIN_USERS`. |
 
 ## How `none` mode works
@@ -19,14 +18,6 @@ ONE IDP ships with three pluggable auth backends. The choice is controlled by a 
 - No token validation, no cookie parsing.
 - **Production safeguard**: `assertSafeAuthConfig()` runs at boot and **throws** when `NODE_ENV=production` + `AUTH_PROVIDER=none` unless `ALLOW_UNAUTHENTICATED=true` is explicitly set.
 - Admin endpoints always deny in this mode, even if your alias looks like it should match `ADMIN_USERS` — the `requireAdmin` middleware refuses as a defense-in-depth.
-
-## How `midway` mode works
-
-- Validates the `midway-id-token` cookie (JWT payload) **or** the `x-midway-user` header.
-- The `x-midway-user` header is only trustworthy when the request came through a Midway-terminating edge (CloudFront in the live deployment) that strips this header on ingress. This trust boundary is documented inline in `packages/backend/src/middleware/midway.ts`.
-- Legacy alias: `MIDWAY_DISABLED=true` behaves like `AUTH_PROVIDER=none`.
-
-For AWS-internal use only. External customers should use Cognito.
 
 ## How `cognito` mode works
 
@@ -69,7 +60,7 @@ See `packages/backend/src/middleware/rate-limit.ts` for the exact keying.
 Internet
    │
    ▼
-CloudFront  ◄──── strips inbound x-midway-user, x-forwarded-*, etc. (Midway mode)
+CloudFront  ◄──── HTTPS termination, origin routing
    │
    ▼  (HTTPS + TLS)
 App Runner  ◄──── auth middleware runs here, not at the edge
@@ -77,5 +68,3 @@ App Runner  ◄──── auth middleware runs here, not at the edge
    ▼
 Strands agent on AgentCore  ◄──── invoked with SigV4 by App Runner, not by the browser
 ```
-
-Never point the browser at App Runner directly in Midway mode — `x-midway-user` becomes user-supplied and auth breaks.

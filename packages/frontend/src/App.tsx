@@ -10,7 +10,6 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import HomePage from './pages/HomePage';
 import type { AuthUser } from './services/api';
 import { authedFetch } from './services/api';
-import { initMidwayAuth, getStoredToken, getUserFromToken, hasValidToken } from './services/midway';
 import type { PreviewResponse } from './hooks/usePreview';
 import FeedbackModal from './components/feedback/FeedbackModal';
 
@@ -38,7 +37,7 @@ const STEPS = [
   { href: '/architecture', text: 'Architecture & Code' },
 ];
 
-const ADMIN_USERS = ['sanghwa'];
+const ADMIN_USERS = (import.meta.env.VITE_ADMIN_USERS || '').split(',').filter(Boolean);
 
 // Persist state in sessionStorage so it survives navigation and page refreshes
 function loadSession<T>(key: string, fallback: T): T {
@@ -68,12 +67,23 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('idp-dark-mode') === 'true');
 
   useEffect(() => {
-    // Midway OIDC implicit flow authentication
-    const midwayUser = initMidwayAuth();
-    if (midwayUser) {
-      setUser(midwayUser);
-    }
-    // If initMidwayAuth returns null, it's redirecting to Midway — page will reload
+    // Unauthenticated / demo mode — assign a default anonymous user.
+    // Cognito flow: the backend validates the JWT; the frontend just needs an alias
+    // for UI display. A real Cognito integration would fetch /api/auth/me here.
+    (async () => {
+      try {
+        const res = await authedFetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json() as AuthUser;
+          setUser(data);
+        } else {
+          // Unauthenticated mode — use anonymous
+          setUser({ alias: 'anonymous', email: '' });
+        }
+      } catch {
+        setUser({ alias: 'anonymous', email: '' });
+      }
+    })();
   }, []);
 
   // Persist state to sessionStorage on change

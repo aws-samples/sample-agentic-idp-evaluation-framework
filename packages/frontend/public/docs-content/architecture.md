@@ -24,7 +24,7 @@ Build order: `shared → backend + frontend + docs` (the three after `shared` ar
 
 ## Live deployment (default)
 
-The reference deployment at `idp.sanghwa.people.aws.dev` looks like this:
+The reference deployment at `your-domain.example.com` looks like this:
 
 ```
                      ┌──────────────────────┐
@@ -74,7 +74,7 @@ Browser  ──HTTPS──►  CloudFront  ──path split──►  S3 /docs  
                                               │
                                               └── App Runner /api/*
                                                         │
-                                                        ├─ auth middleware (midway|cognito|none)
+                                                        ├─ auth middleware (cognito|none)
                                                         ├─ rate limit
                                                         └─ routes:
                                                             /api/upload         → multer → S3
@@ -121,7 +121,7 @@ Lives in `infrastructure-cdk/`. Uses the official `aws-cdk-lib/aws-bedrockagentc
 ```bash
 cd infrastructure-cdk
 npm install
-npx cdk deploy -c projectName=one-idp -c environment=dev -c authProvider=midway -c bdaProfileArn="..."
+npx cdk deploy -c projectName=one-idp -c environment=dev -c authProvider=cognito -c bdaProfileArn="..."
 ```
 
 ## Environment variables
@@ -131,7 +131,7 @@ Backend (App Runner):
 | Var | Default | Purpose |
 |---|---|---|
 | `AWS_REGION` | `us-west-2` | Primary region. |
-| `AUTH_PROVIDER` | `none` (demo) / `midway` (live) / `cognito` | Auth backend. |
+| `AUTH_PROVIDER` | `none` (demo) / `cognito` | Auth backend. |
 | `ALLOW_UNAUTHENTICATED` | `false` | Must be `true` to run `AUTH_PROVIDER=none` in `NODE_ENV=production`. |
 | `S3_BUCKET` | `one-idp-uploads-dev` | Input bucket. |
 | `S3_OUTPUT_PREFIX` | `bda-output/` | BDA output prefix. |
@@ -139,6 +139,6 @@ Backend (App Runner):
 | `BDA_PROJECT_ARN` | `public-default` | Optional custom BDA project. |
 | `CLAUDE_MODEL_ID` | `us.anthropic.claude-sonnet-4-6` | Default model for architecture + code gen. |
 | `AGENTCORE_RUNTIME_ARN` | — | Preferred path for conversation endpoint. |
-| `ADMIN_USERS` | `sanghwa` | Comma-separated aliases with admin access. |
+| `ADMIN_USERS` | `your-alias` | Comma-separated aliases with admin access. |
 
 See [Deploy](/deploy) for the full procedure, and [Authentication](/auth) for the auth matrix.

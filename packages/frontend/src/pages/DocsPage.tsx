@@ -45,7 +45,7 @@ const DOCS_INDEX: DocSection[] = [
     items: [
       { slug: 'architecture', title: 'System architecture', description: 'How the platform is deployed on AWS.' },
       { slug: 'deploy', title: 'Deploying your own instance', description: 'Terraform and CDK paths.' },
-      { slug: 'auth', title: 'Authentication', description: 'Pluggable auth — none, midway, cognito.' },
+      { slug: 'auth', title: 'Authentication', description: 'Pluggable auth — none or cognito.' },
       { slug: 'security', title: 'Security posture', description: 'Hardening applied and trust boundaries.' },
     ],
   },

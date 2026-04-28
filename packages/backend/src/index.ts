@@ -8,6 +8,7 @@ dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
 import express from 'express';
 import { corsMiddleware } from './middleware/cors.js';
+import { cloudfrontSecretMiddleware } from './middleware/cloudfront-secret.js';
 import { authMiddleware, authUserHeader, assertSafeAuthConfig } from './middleware/auth.js';
 import { errorHandler } from './middleware/error.js';
 import { processRateLimit, apiRateLimit } from './middleware/rate-limit.js';
@@ -33,11 +34,15 @@ const app = express();
 app.use(corsMiddleware);
 app.use(express.json({ limit: '50mb' }));
 
+// CloudFront origin validation (T2.1): reject requests that bypass the CDN in production.
+// Must come before auth so direct-to-origin requests are blocked early.
+app.use(cloudfrontSecretMiddleware);
+
 // Health check before auth (App Runner / ALB health checks need unauthenticated access)
 app.use('/api/health', healthRouter);
 
-// Authentication (pluggable: midway | cognito | none)
-// Configure via AUTH_PROVIDER env var. `MIDWAY_DISABLED=true` forces `none`.
+// Authentication (pluggable: cognito | none)
+// Configure via AUTH_PROVIDER env var.
 assertSafeAuthConfig();
 app.use('/api', authMiddleware);
 app.use('/api', authUserHeader);
@@ -177,9 +182,8 @@ app.listen(config.port, () => {
   if (!config.claudeModelId) warnings.push('CLAUDE_MODEL_ID not set');
   if (!config.bdaProfileArn) warnings.push('BDA_PROFILE_ARN not set (BDA Standard unavailable)');
   if (!config.bdaProjectArn) warnings.push('BDA_PROJECT_ARN not set (BDA Custom unavailable)');
-  const effectiveProvider = process.env.MIDWAY_DISABLED === 'true' ? 'none' : config.authProvider;
-  if (effectiveProvider === 'none') warnings.push(`Auth DISABLED (AUTH_PROVIDER=none) — demo mode only`);
-  else warnings.push(`Auth provider: ${effectiveProvider}`);
+  if (config.authProvider === 'none') warnings.push(`Auth DISABLED (AUTH_PROVIDER=none) — demo mode only`);
+  else warnings.push(`Auth provider: ${config.authProvider}`);
 
   if (warnings.length > 0) {
     console.warn('⚠ Environment warnings:');

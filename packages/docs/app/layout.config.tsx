@@ -6,6 +6,6 @@ export const baseOptions: BaseLayoutProps = {
   },
   links: [
     { text: 'App', url: '/', external: true },
-    { text: 'GitLab', url: 'https://gitlab.aws.dev/sanghwa/one-idp', external: true },
+    { text: 'GitHub', url: 'https://github.com/aws-samples/sample-agentic-idp-evaluation-framework', external: true },
   ],
 };

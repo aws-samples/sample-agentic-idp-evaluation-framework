@@ -48,10 +48,10 @@ router.get('/detailed', async (_req, res) => {
     ? { status: 'ok', message: 'BDA_PROJECT_ARN configured' }
     : { status: 'warning', message: 'BDA_PROJECT_ARN not set (BDA Custom unavailable)' };
 
-  // Midway auth
-  checks.auth = process.env.MIDWAY_DISABLED === 'true'
-    ? { status: 'warning', message: 'Midway disabled (dev mode)' }
-    : { status: 'ok', message: 'Midway authentication enabled' };
+  // Auth provider
+  checks.auth = config.authProvider === 'none'
+    ? { status: 'warning', message: 'Auth disabled (AUTH_PROVIDER=none)' }
+    : { status: 'ok', message: `Auth provider: ${config.authProvider}` };
 
   // Count status
   const errorCount = Object.values(checks).filter((c) => c.status === 'error').length;

@@ -3,7 +3,6 @@ import type { UploadResponse } from '@idp/shared';
 import { getDocumentType } from '@idp/shared';
 import { upload } from '../middleware/upload.js';
 import { uploadDocument, getPresignedUrl } from '../services/s3.js';
-import type { MidwayUser } from '../middleware/midway.js';
 import { trackActivity } from '../services/activity-tracker.js';
 
 const router = Router();
@@ -35,7 +34,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       return;
     }
 
-    const userAlias = (req as any).midwayUser?.alias as string | undefined;
+    const userAlias = (req as any).authUser?.alias as string | undefined;
     // multer encodes originalname as Latin-1; decode to UTF-8 for Korean/CJK filenames
     const fileName = Buffer.from(req.file.originalname, 'latin1').toString('utf-8');
     const { documentId, s3Uri } = await uploadDocument(

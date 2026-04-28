@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import type { MidwayUser } from '../middleware/midway.js';
+import type { AuthUser } from '../middleware/auth.js';
 import { getFeedbackStatus, submitFeedback } from '../services/feedback.js';
 
 const router = Router();
 
 function getUserAlias(req: any): string | null {
-  const user = req.midwayUser as MidwayUser | undefined;
+  const user = req.authUser as AuthUser | undefined;
   return user?.alias ?? null;
 }
 

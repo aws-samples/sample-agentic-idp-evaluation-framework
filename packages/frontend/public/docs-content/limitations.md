@@ -60,8 +60,7 @@ For very long documents, Haiku's smaller window can cause truncation. The `calcu
 ## Auth quirks
 
 - `AUTH_PROVIDER=none` blocks admin endpoints **always**, even if you add your alias to `ADMIN_USERS`.
-- `AUTH_PROVIDER=midway` requires Midway-aware edge termination — don't point browsers directly at App Runner in Midway mode.
-- `mwinit` cookies don't work — the app uses the Midway OIDC implicit flow, not session cookies. For CLI testing, hit the App Runner URL with an `x-midway-user: <alias>` header (only works because App Runner trusts the header from internal networks — do not replicate in customer deployments).
+- For CLI testing with `AUTH_PROVIDER=cognito`, obtain a valid Cognito JWT and pass it as `Authorization: Bearer <token>`.
 
 ## Rate limiting
 

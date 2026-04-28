@@ -1,5 +1,4 @@
 import type { UploadResponse } from '@idp/shared';
-import { redirectToMidway } from './midway.js';
 
 const BASE = '/api';
 
@@ -8,14 +7,9 @@ export interface AuthUser {
   email: string;
 }
 
-/** Fetch wrapper that auto-redirects to Midway on 401 */
+/** Fetch wrapper that returns the response as-is (Cognito Bearer token can be added here) */
 export async function authedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const res = await fetch(input, init);
-  if (res.status === 401 && window.location.hostname !== 'localhost') {
-    redirectToMidway();
-    return new Promise(() => {}); // page is redirecting
-  }
-  return res;
+  return fetch(input, init);
 }
 
 export async function getCurrentUser(): Promise<AuthUser> {

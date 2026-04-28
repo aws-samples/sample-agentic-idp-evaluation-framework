@@ -45,3 +45,13 @@ packages/backend/.local-uploads/
 # drawio backups / autosaves
 .$*.drawio.bkp
 *.drawio.bkp
+
+# Internal / PCSR exclusions
+CLAUDE.md
+.omc/
+.claude/
+.local-uploads/
+reference/
+infrastructure/tfplan
+infrastructure/terraform.tfvars
+.$architecture.drawio.bkp

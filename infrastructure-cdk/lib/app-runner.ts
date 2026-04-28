@@ -18,7 +18,7 @@ export interface AppRunnerProps {
   readonly bdaProjectArn: string;
   readonly claudeModelId: string;
   readonly novaModelId: string;
-  readonly authProvider: 'none' | 'midway' | 'cognito';
+  readonly authProvider: 'none' | 'cognito';
   readonly adminUsers: string;
   readonly cognitoUserPoolId: string;
   readonly cognitoClientId: string;
@@ -118,12 +118,10 @@ export class AppRunnerConstruct extends Construct {
       CLAUDE_MODEL_ID: props.claudeModelId,
       NOVA_MODEL_ID: props.novaModelId,
       SITE_URL: props.siteUrl,
-      // MIDWAY_DISABLED kept for back-compat with the original deployment.
-      MIDWAY_DISABLED: props.authProvider === 'midway' ? 'false' : 'true',
+      AUTH_PROVIDER: props.authProvider,
       AGENTCORE_RUNTIME_ARN: props.agentRuntimeArn,
       ACTIVITY_TABLE: props.activityTable.tableName,
     };
-    if (props.authProvider !== 'midway') runtimeEnv.AUTH_PROVIDER = props.authProvider;
     if (props.adminUsers) runtimeEnv.ADMIN_USERS = props.adminUsers;
     if (props.cognitoUserPoolId) runtimeEnv.COGNITO_USER_POOL_ID = props.cognitoUserPoolId;
     if (props.cognitoClientId) runtimeEnv.COGNITO_CLIENT_ID = props.cognitoClientId;

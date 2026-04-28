@@ -72,7 +72,6 @@ export async function cognitoAuth(req: Request, res: Response, next: NextFunctio
 
     const user = toUser(payload as Record<string, unknown>);
     (req as unknown as { authUser: AuthUser }).authUser = user;
-    (req as unknown as { midwayUser: AuthUser }).midwayUser = user;
     next();
   } catch (err) {
     res.status(401).json({

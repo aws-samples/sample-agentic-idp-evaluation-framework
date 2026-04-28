@@ -3,9 +3,6 @@
 # Provide var.domain_name and var.route53_zone_id to enable HTTPS via
 # a custom domain. The hosted zone must already exist in Route53 — this
 # module does not create it.
-#
-# AWS internal note: for *.people.aws.dev, hosted zones are pre-created
-# per alias; supply the zone ID via route53_zone_id.
 
 locals {
   zone_id = var.route53_zone_id

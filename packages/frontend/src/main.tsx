@@ -3,23 +3,6 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import '@cloudscape-design/global-styles/index.css';
 import App from './App';
-import { hasValidToken, handleOidcCallback, redirectToMidway } from './services/midway';
-
-// ─── Auth pre-check ──────────────────────────────────────────────────────────
-// Run BEFORE React renders so the app never flashes before the Midway redirect.
-// Local dev (localhost / 127.0.0.1) skips this path entirely.
-const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-if (!isLocalDev) {
-  // If we just came back from Midway with a token in the URL, capture it first.
-  handleOidcCallback();
-  if (!hasValidToken()) {
-    // No valid token — redirect immediately. Never render the app on this tab.
-    redirectToMidway();
-    // Stop evaluation so React doesn't mount while the browser is mid-navigation.
-    // Users see the professional splash baked into index.html instead.
-    throw new Error('redirecting to Midway');
-  }
-}
 
 // Chat markdown styles
 const chatStyles = document.createElement('style');

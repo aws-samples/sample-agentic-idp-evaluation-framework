@@ -19,7 +19,7 @@ CDK stack (`infrastructure-cdk/`); the two produce equivalent topology.
         │                 App Runner (Web tier)                  │
         │   Express HTTP API — auth, upload, orchestration       │
         │   Pluggable auth via AUTH_PROVIDER:                    │
-        │      none | midway | cognito                           │
+        │      none | cognito                                     │
         │                                                        │
         │   Proxies agent calls via SigV4                        │
         │       ▼                                                │
@@ -103,8 +103,7 @@ Providers:
 | `AUTH_PROVIDER` | Behavior |
 | --- | --- |
 | `none` | Demo mode. Refuses to boot in `NODE_ENV=production` unless `ALLOW_UNAUTHENTICATED=true`. |
-| `midway` | AWS internal. Uses the Midway cookie / `x-midway-user` header set by the Midway-aware CloudFront/ALB. |
-| `cognito` | Stub. Implement JWT verification against your user pool in `middleware/auth-cognito.ts`. |
+| `cognito` | Real JWT verifier against your Cognito user pool. Configure `COGNITO_USER_POOL_ID` and optionally `COGNITO_CLIENT_ID`. See `middleware/auth-cognito.ts`. |
 
 ## Data plane
 

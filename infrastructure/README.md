@@ -58,7 +58,7 @@ terraform apply tfplan
 | `nova_model_id` | Bedrock Nova model ID | `us.amazon.nova-2-lite-v1:0` |
 | `bda_profile_arn` | BDA standard profile ARN | `""` |
 | `bda_project_arn` | BDA custom project ARN (optional) | `""` |
-| `auth_provider` | `none` \| `midway` \| `cognito` | `none` |
+| `auth_provider` | `none` \| `cognito` | `none` |
 | `cognito_user_pool_id` | Required when `auth_provider = cognito` | `""` |
 | `cognito_client_id`   | Required when `auth_provider = cognito` | `""` |
 | `admin_users` | Comma-separated admin aliases | `""` |

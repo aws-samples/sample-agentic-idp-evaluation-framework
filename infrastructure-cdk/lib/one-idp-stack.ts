@@ -18,7 +18,7 @@ export interface OneIdpStackProps extends cdk.StackProps {
   readonly ecrImageTag: string;
   readonly claudeModelId: string;
   readonly novaModelId: string;
-  readonly authProvider: 'none' | 'midway' | 'cognito';
+  readonly authProvider: 'none' | 'cognito';
   readonly adminUsers: string;
   readonly cognitoUserPoolId?: string;
   readonly cognitoClientId?: string;

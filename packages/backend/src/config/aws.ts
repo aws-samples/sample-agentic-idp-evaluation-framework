@@ -32,6 +32,6 @@ export const config = {
   agentRuntimeArn: process.env.AGENTCORE_RUNTIME_ARN ?? '',
   activityTable: process.env.ACTIVITY_TABLE ?? 'one-idp-activity',
   adminUsers: (process.env.ADMIN_USERS ?? '').split(',').map((u) => u.trim()).filter(Boolean),
-  authProvider: (process.env.AUTH_PROVIDER ?? 'none') as 'midway' | 'cognito' | 'none',
+  authProvider: (process.env.AUTH_PROVIDER ?? 'none') as 'cognito' | 'none',
   nodeEnv: process.env.NODE_ENV ?? 'development',
 };

@@ -13,7 +13,7 @@ const AGENTCORE_TIMEOUT_MS = 10_000;
 router.post('/', async (req, res) => {
   const body = req.body as ConversationRequest;
 
-  const userAlias = (req as any).midwayUser?.alias ?? 'anonymous';
+  const userAlias = (req as any).authUser?.alias ?? 'anonymous';
   trackActivity(userAlias, body.message === '__init__' ? 'conversation_start' : 'conversation_message', {
     documentId: body.documentId,
     s3Uri: body.s3Uri,

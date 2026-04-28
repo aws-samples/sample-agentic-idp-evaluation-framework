@@ -9,7 +9,7 @@ interface RateLimitStore {
  * For production use a Redis/Valkey-backed solution or the edge WAF.
  *
  * Keying: when the request is authenticated (authMiddleware populated
- * `authUser`/`midwayUser`), we key by the user alias so a whole team behind
+ * `authUser`), we key by the user alias so a whole team behind
  * one corporate/NAT/CloudFront egress IP doesn't share a single bucket.
  * Fall back to the forwarded IP when no user is present.
  */
@@ -24,7 +24,7 @@ export function rateLimit(maxRequests: number, windowMs: number): RequestHandler
   }, 60_000).unref();
 
   return (req, res, next) => {
-    const user = (req as any).authUser ?? (req as any).midwayUser;
+    const user = (req as any).authUser;
     const alias: string | undefined = user?.alias;
     const forwarded = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
     const ip = forwarded ?? req.ip ?? req.socket.remoteAddress ?? 'unknown';

@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import type { MidwayUser } from '../middleware/midway.js';
+import type { AuthUser } from '../middleware/auth.js';
 
 const router = Router();
 
 router.get('/me', (req, res) => {
-  const user = (req as any).midwayUser as MidwayUser | undefined;
+  const user = (req as any).authUser as AuthUser | undefined;
   if (!user) {
     res.status(401).json({ error: 'Not authenticated' });
     return;

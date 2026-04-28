@@ -31,10 +31,7 @@ resource "aws_apprunner_service" "backend" {
             CLAUDE_MODEL_ID  = var.claude_model_id
             NOVA_MODEL_ID    = var.nova_model_id
             SITE_URL         = var.domain_name != "" ? "https://${var.domain_name}" : ""
-            # AUTH_PROVIDER is the source of truth for the pluggable dispatcher;
-            # MIDWAY_DISABLED is kept purely for legacy back-compat.
             AUTH_PROVIDER         = var.auth_provider
-            MIDWAY_DISABLED       = var.auth_provider == "midway" ? "false" : "true"
             AGENTCORE_RUNTIME_ARN = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn
             ACTIVITY_TABLE        = "${var.project_name}-activity-${var.environment}"
           },
