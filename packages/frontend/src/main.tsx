@@ -4,6 +4,31 @@ import { BrowserRouter } from 'react-router-dom';
 import '@cloudscape-design/global-styles/index.css';
 import App from './App';
 
+// ─── Midway auth pre-check ──────────────────────────────────────────────────
+// Run BEFORE React renders so the app never flashes before the Midway redirect.
+// Computed path + @vite-ignore prevents static resolution at compile time so
+// the build succeeds without midway.ts (public distribution).
+// Local dev (localhost / 127.0.0.1) skips this path entirely.
+if (import.meta.env.VITE_AUTH_PROVIDER === 'midway') {
+  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (!isLocalDev) {
+    try {
+      const midwayPath = './services/midway' + '';
+      const midway = await import(/* @vite-ignore */ midwayPath) as
+        { handleOidcCallback: () => boolean; hasValidToken: () => boolean; redirectToMidway: () => void };
+      midway.handleOidcCallback();
+      if (!midway.hasValidToken()) {
+        midway.redirectToMidway();
+        throw new Error('redirecting to Midway');
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message === 'redirecting to Midway') throw e;
+      // Midway module not available — continue without pre-check
+      console.error('Midway auth module not available in this distribution');
+    }
+  }
+}
+
 // Chat markdown styles
 const chatStyles = document.createElement('style');
 chatStyles.textContent = `

@@ -55,3 +55,7 @@ reference/
 infrastructure/tfplan
 infrastructure/terraform.tfvars
 .$architecture.drawio.bkp
+
+# Midway auth module — internal-only, not included in public distribution
+packages/backend/src/middleware/midway.ts
+packages/frontend/src/services/midway.ts

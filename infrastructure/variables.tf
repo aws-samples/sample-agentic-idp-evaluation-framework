@@ -65,13 +65,13 @@ variable "nova_model_id" {
 }
 
 variable "auth_provider" {
-  description = "Authentication provider: none | cognito. Default is 'none' for demo use; switch to 'cognito' for production."
+  description = "Authentication provider: none | cognito | midway. Default is 'none' for demo use; switch to 'cognito' for production or 'midway' for AWS internal deployments."
   type        = string
   default     = "none"
 
   validation {
-    condition     = contains(["none", "cognito"], var.auth_provider)
-    error_message = "auth_provider must be one of: none, cognito."
+    condition     = contains(["none", "cognito", "midway"], var.auth_provider)
+    error_message = "auth_provider must be one of: none, cognito, midway."
   }
 }
 

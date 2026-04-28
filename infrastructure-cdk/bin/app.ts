@@ -21,7 +21,7 @@ new OneIdpStack(app, `${projectName}-${environment}`, {
   ecrImageTag: app.node.tryGetContext('ecrImageTag') ?? 'latest',
   claudeModelId: app.node.tryGetContext('claudeModelId') ?? 'us.anthropic.claude-sonnet-4-6',
   novaModelId: app.node.tryGetContext('novaModelId') ?? 'us.amazon.nova-2-lite-v1:0',
-  authProvider: (app.node.tryGetContext('authProvider') ?? 'none') as 'none' | 'cognito',
+  authProvider: (app.node.tryGetContext('authProvider') ?? 'none') as 'none' | 'cognito' | 'midway',
   adminUsers: app.node.tryGetContext('adminUsers') ?? '',
   cognitoUserPoolId: app.node.tryGetContext('cognitoUserPoolId') ?? '',
   cognitoClientId: app.node.tryGetContext('cognitoClientId') ?? '',

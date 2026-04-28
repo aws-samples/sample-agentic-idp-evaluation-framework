@@ -67,17 +67,33 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('idp-dark-mode') === 'true');
 
   useEffect(() => {
-    // Unauthenticated / demo mode — assign a default anonymous user.
-    // Cognito flow: the backend validates the JWT; the frontend just needs an alias
-    // for UI display. A real Cognito integration would fetch /api/auth/me here.
     (async () => {
+      // Midway OIDC implicit flow — dynamic import so the app compiles
+      // without the midway module (public distribution).
+      // Computed path prevents static resolution at compile time.
+      if (import.meta.env.VITE_AUTH_PROVIDER === 'midway') {
+        try {
+          const midwayPath = './services/midway' + '';
+          const midway = await import(/* @vite-ignore */ midwayPath) as
+            { initMidwayAuth: () => { alias: string; email: string } | null };
+          const midwayUser = midway.initMidwayAuth();
+          if (midwayUser) {
+            setUser(midwayUser);
+          }
+          // If initMidwayAuth returns null, it's redirecting to Midway — page will reload
+          return;
+        } catch {
+          console.error('Midway auth module not available in this distribution');
+        }
+      }
+
+      // Cognito / none — fetch user from backend
       try {
         const res = await authedFetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json() as AuthUser;
           setUser(data);
         } else {
-          // Unauthenticated mode — use anonymous
           setUser({ alias: 'anonymous', email: '' });
         }
       } catch {
