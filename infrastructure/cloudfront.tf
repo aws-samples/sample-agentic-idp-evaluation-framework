@@ -62,7 +62,7 @@ resource "aws_cloudfront_origin_access_control" "static_assets" {
   signing_protocol                  = "sigv4"
 }
 
-# Secret header to verify CloudFront → App Runner origin requests
+# Secret header to verify CloudFront → ALB origin requests
 resource "random_password" "cloudfront_secret" {
   length  = 32
   special = false
@@ -89,16 +89,16 @@ resource "aws_cloudfront_distribution" "main" {
     origin_id                = "S3-static"
   }
 
-  # App Runner Origin for API (Express REST server)
-  # App Runner → AgentCore (IAM auth) for agent invocations
+  # ECS Fargate Origin for API (Express REST server via ALB)
+  # ECS → AgentCore (IAM auth) for agent invocations
   origin {
-    domain_name = aws_apprunner_service.backend.service_url
-    origin_id   = "AppRunner-API"
+    domain_name = aws_lb.backend.dns_name
+    origin_id   = "ALB-API"
 
     custom_origin_config {
       http_port              = 80
       https_port             = 443
-      origin_protocol_policy = "https-only"
+      origin_protocol_policy = "http-only"
       origin_ssl_protocols   = ["TLSv1.2"]
       # Long-lived SSE responses from the backend need a generous read timeout.
       # These match the original deployment's tuned values.
@@ -123,16 +123,16 @@ resource "aws_cloudfront_distribution" "main" {
   default_root_object = "index.html"
   price_class         = "PriceClass_100"
 
-  # API behavior - forward to App Runner
+  # API behavior - forward to ECS Fargate via ALB
   ordered_cache_behavior {
     path_pattern     = "/api/*"
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "AppRunner-API"
+    target_origin_id = "ALB-API"
 
     forwarded_values {
       query_string = true
-      # Forward specific headers (NOT Host — App Runner rejects foreign Host headers)
+      # Forward specific headers (NOT Host — ALB uses its own Host header)
       headers = [
         "Authorization",
         "Content-Type",

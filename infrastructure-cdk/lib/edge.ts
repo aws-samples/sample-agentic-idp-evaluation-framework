@@ -11,7 +11,7 @@ export interface EdgeProps {
   readonly projectName: string;
   readonly environment: string;
   readonly staticAssetsBucket: s3.IBucket;
-  readonly appRunnerServiceUrl: string;
+  readonly backendServiceUrl: string;
   readonly domainName?: string;
   readonly route53ZoneId?: string;
 }
@@ -21,7 +21,9 @@ export interface EdgeProps {
  *
  * Two origins:
  *   - S3 static assets (SPA)    — default behavior
- *   - App Runner API            — /api/* behavior, no caching
+ *   - ECS/ALB API               — /api/* behavior, no caching
+ *
+ * CloudFront terminates TLS; the ALB origin uses HTTP-only.
  *
  * For custom domains, `domainName` + `route53ZoneId` must both be set.
  * ACM certificates for CloudFront must live in us-east-1; pass one via
@@ -37,8 +39,8 @@ export class EdgeConstruct extends Construct {
       originAccessLevels: [cloudfront.AccessLevel.READ],
     });
 
-    const apiOrigin = new origins.HttpOrigin(props.appRunnerServiceUrl, {
-      protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+    const apiOrigin = new origins.HttpOrigin(props.backendServiceUrl, {
+      protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
     });
 
     let viewerCert: acm.ICertificate | undefined;

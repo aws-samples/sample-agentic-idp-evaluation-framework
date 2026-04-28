@@ -48,9 +48,19 @@ output "agentcore_endpoint" {
   value       = "https://bedrock-agentcore.${var.aws_region}.amazonaws.com/runtimes/${urlencode(aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn)}/invocations"
 }
 
-output "apprunner_service_url" {
-  description = "App Runner service URL (backend API)"
-  value       = "https://${aws_apprunner_service.backend.service_url}"
+output "backend_url" {
+  description = "ALB DNS name (backend API via ECS Fargate)"
+  value       = "http://${aws_lb.backend.dns_name}"
+}
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name"
+  value       = aws_ecs_cluster.main.name
+}
+
+output "ecs_service_name" {
+  description = "ECS service name"
+  value       = aws_ecs_service.backend.name
 }
 
 output "cloudfront_domain" {

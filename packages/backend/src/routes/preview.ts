@@ -13,7 +13,8 @@ import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNo
 import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
 import { config } from '../config/aws.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
-import { trackActivity } from '../services/activity-tracker.js';
+import { trackActivity, trackRunResults } from '../services/activity-tracker.js';
+import { randomUUID } from 'crypto';
 
 interface PreviewRequest {
   documentId: string;
@@ -117,8 +118,9 @@ router.post('/', async (req, res) => {
     });
 
     const userAlias = (req as any).authUser?.alias ?? 'anonymous';
+    const runId = randomUUID();
     const previewStart = Date.now();
-    console.log(`[Preview] docId=${body.documentId} pages=${pageCount} caps=${body.capabilities.join(',')} methods=${validMethods.join(',')}`);
+    console.log(`[Preview] docId=${body.documentId} runId=${runId} pages=${pageCount} caps=${body.capabilities.join(',')} methods=${validMethods.join(',')}`);
     trackActivity(userAlias, 'preview_start', {
       documentId: body.documentId,
       s3Uri: body.s3Uri,
@@ -129,9 +131,13 @@ router.post('/', async (req, res) => {
     initSSE(res);
     const keepalive = startKeepalive(res);
 
+    // Collect results for run tracking
+    const collectedResults: unknown[] = [];
+
     // Emit method list upfront
     emitSSE(res, {
       type: 'preview_start',
+      runId,
       documentId: body.documentId,
       capabilities: body.capabilities,
       methods: validMethods.map((m) => ({
@@ -154,6 +160,15 @@ router.post('/', async (req, res) => {
           const result = await processor.process(res, input);
           const info = METHOD_INFO[method];
           console.log(`[Preview] ${method} ${result.status} ${Date.now() - methodStart}ms cost=$${result.metrics.cost.toFixed(4)}`);
+          const methodResult = {
+            method,
+            status: result.status,
+            results: result.results,
+            metrics: result.metrics,
+            rawOutput: result.rawOutput,
+            ...(result.error ? { error: result.error } : {}),
+          };
+          collectedResults.push(methodResult);
           emitSSE(res, {
             type: 'method_result',
             method,
@@ -187,7 +202,27 @@ router.post('/', async (req, res) => {
     );
 
     console.log(`[Preview] docId=${body.documentId} completed ${validMethods.length} methods in ${Date.now() - previewStart}ms`);
-    emitSSE(res, { type: 'preview_done' });
+
+    // Save run results for the "Recent Runs" feature (non-blocking)
+    const ext2 = (fileName.match(/\.(\w+)$/)?.[1] ?? '').toLowerCase();
+    trackRunResults(userAlias, {
+      runId,
+      documentId: body.documentId,
+      documentName: fileName,
+      s3Uri: body.s3Uri,
+      capabilities: body.capabilities,
+      methods: validMethods,
+      results: collectedResults,
+      comparison: null, // Preview does not produce a comparison
+      source: 'preview',
+      status: collectedResults.length > 0 ? 'complete' : 'error',
+      fileSize: docBuffer.length,
+      pageCount,
+      fileType: ext2 || undefined,
+      documentLanguages: documentLanguages.length > 0 ? documentLanguages : undefined,
+    });
+
+    emitSSE(res, { type: 'preview_done', runId });
     endSSE(res, keepalive);
   } catch (err) {
     console.error('[Preview Error]', err);

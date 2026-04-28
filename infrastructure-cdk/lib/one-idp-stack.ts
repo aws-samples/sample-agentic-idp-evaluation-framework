@@ -3,7 +3,7 @@ import { Construct } from 'constructs';
 import { StorageConstruct } from './storage';
 import { EcrConstruct } from './ecr';
 import { AgentRuntimeConstruct } from './agent-runtime';
-import { AppRunnerConstruct } from './app-runner';
+import { EcsBackendConstruct } from './ecs-backend';
 import { EdgeConstruct } from './edge';
 import { ActivityTableConstruct } from './activity-table';
 import { GuardrailConstruct } from './guardrail';
@@ -30,7 +30,7 @@ export interface OneIdpStackProps extends cdk.StackProps {
 
 /**
  * Root stack. Splits concerns into three tiers:
- *   - web tier  (AppRunnerConstruct)      — Express HTTP API, App Runner managed
+ *   - web tier  (EcsBackendConstruct)     — Express HTTP API, ECS Fargate + ALB
  *   - agent tier (AgentRuntimeConstruct)  — Bedrock AgentCore runtime (separate from web)
  *   - edge tier (EdgeConstruct)           — CloudFront + optional Route53 + ACM
  *
@@ -91,7 +91,7 @@ export class OneIdpStack extends cdk.Stack {
         ? `arn:aws:bedrock:${this.region}:${this.account}:guardrail/${props.bedrockGuardrailId}`
         : undefined);
 
-    const api = new AppRunnerConstruct(this, 'Api', {
+    const api = new EcsBackendConstruct(this, 'Api', {
       projectName: props.projectName,
       environment: props.environment,
       region: this.region,
@@ -118,7 +118,7 @@ export class OneIdpStack extends cdk.Stack {
       projectName: props.projectName,
       environment: props.environment,
       staticAssetsBucket: storage.staticAssetsBucket,
-      appRunnerServiceUrl: api.serviceUrl,
+      backendServiceUrl: api.serviceUrl,
       domainName: props.domainName,
       route53ZoneId: props.route53ZoneId,
     });
@@ -127,7 +127,7 @@ export class OneIdpStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'StaticAssetsBucket', { value: storage.staticAssetsBucket.bucketName });
     new cdk.CfnOutput(this, 'EcrRepositoryUri', { value: ecr.repository.repositoryUri });
     new cdk.CfnOutput(this, 'AgentRuntimeArn', { value: agent.runtimeArn });
-    new cdk.CfnOutput(this, 'AppRunnerServiceUrl', { value: `https://${api.serviceUrl}` });
+    new cdk.CfnOutput(this, 'BackendServiceUrl', { value: `http://${api.serviceUrl}` });
     new cdk.CfnOutput(this, 'CloudFrontDomain', { value: edge.distributionDomain });
     new cdk.CfnOutput(this, 'SiteUrl', {
       value: props.domainName ? `https://${props.domainName}` : `https://${edge.distributionDomain}`,

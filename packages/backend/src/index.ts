@@ -27,6 +27,7 @@ import pipelineChatRouter from './routes/pipeline-chat.js';
 import previewRouter from './routes/preview.js';
 import adminRouter from './routes/admin.js';
 import feedbackRouter from './routes/feedback.js';
+import runsRouter from './routes/runs.js';
 
 const app = express();
 
@@ -136,6 +137,7 @@ app.use('/api/pipeline', pipelineRouter);
 app.use('/api/pipeline/smart', pipelineSmartRouter);
 app.use('/api/pipeline/chat', pipelineChatRouter);
 app.use('/api/preview', previewRouter);
+app.use('/api/runs', runsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/feedback', feedbackRouter);
 

@@ -36,6 +36,8 @@ import {
 } from '../processors/textract-llm.js';
 import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
 import { combineUpstreamText } from '../services/pipeline-text-extractor.js';
+import { trackRunResults } from '../services/activity-tracker.js';
+import { randomUUID } from 'crypto';
 
 const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Record<string, () => ProcessorBase> = {
   'bda-standard': () => new BdaStandardProcessor(),
@@ -116,6 +118,8 @@ router.post('/execute', async (req, res) => {
 
   try {
     const { pipelineId, documentId, s3Uri, pipeline } = body;
+    const runId = randomUUID();
+    const userAlias = (req as any).authUser?.alias ?? 'anonymous';
 
     // Validate request
     if (!pipelineId || !documentId || !s3Uri || !pipeline) {
@@ -349,10 +353,31 @@ router.post('/execute', async (req, res) => {
 
     const comparison = buildComparison(processorResults);
 
+    // Save run results for the "Recent Runs" feature (non-blocking)
+    const ext2 = (fileName.match(/\.(\w+)$/)?.[1] ?? '').toLowerCase();
+    trackRunResults(userAlias, {
+      runId,
+      documentId,
+      documentName: fileName,
+      s3Uri,
+      capabilities,
+      methods: processorResults.map((r) => r.method),
+      results: processorResults,
+      comparison,
+      source: 'pipeline',
+      status: processorResults.length > 0 ? 'complete' : 'error',
+      fileSize: documentBuffer.length,
+      pageCount,
+      fileType: ext2 || undefined,
+      documentLanguages: documentLanguages.length > 0 ? documentLanguages : undefined,
+      pipelineDefinition: pipeline,
+    });
+
     // Emit pipeline complete with full results + comparison
     const totalLatencyMs = Date.now() - startTime;
     emitSSE(res, {
       type: 'pipeline_complete',
+      runId,
       results: allResults,
       processorResults,
       comparison,

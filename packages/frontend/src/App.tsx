@@ -18,6 +18,7 @@ const ConversationPage = lazy(() => import('./pages/ConversationPage'));
 const PipelinePage = lazy(() => import('./pages/PipelinePage'));
 const ProcessingPage = lazy(() => import('./pages/ProcessingPage'));
 const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage'));
+const RecentRunsPage = lazy(() => import('./pages/RecentRunsPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const SurveyResultsPage = lazy(() => import('./pages/SurveyResultsPage'));
 const DocsPage = lazy(() => import('./pages/DocsPage'));
@@ -35,6 +36,7 @@ const STEPS = [
   { href: '/conversation', text: 'Analyze & Preview' },
   { href: '/pipeline', text: 'Pipeline' },
   { href: '/architecture', text: 'Architecture & Code' },
+  { href: '/runs', text: 'Recent Runs' },
 ];
 
 const ADMIN_USERS = (import.meta.env.VITE_ADMIN_USERS || '').split(',').filter(Boolean);
@@ -221,6 +223,76 @@ export default function App() {
     setDarkMode((prev) => !prev);
   }, []);
 
+  const handleLoadRun = useCallback(async (runId: string) => {
+    try {
+      const res = await authedFetch(`/api/runs/${runId}`);
+      if (!res.ok) throw new Error('Failed to load run');
+      const run = await res.json() as {
+        documentId: string;
+        documentName: string;
+        s3Uri?: string;
+        fileSize?: number;
+        pageCount?: number;
+        capabilities: string[];
+        documentLanguages?: string[];
+        results: any[];
+        comparison: any;
+        source: string;
+        pipelineDefinition?: any;
+        selectedPipelineMethod?: string;
+        preferredMethod?: string;
+      };
+
+      // Restore document state
+      setDocument({
+        documentId: run.documentId,
+        s3Uri: run.s3Uri ?? '',
+        fileName: run.documentName,
+        fileSize: run.fileSize ?? 0,
+        pageCount: run.pageCount ?? 0,
+        previewUrl: '',
+      });
+
+      // Restore capabilities
+      setSelectedCapabilities(run.capabilities as Capability[]);
+
+      // Restore document languages
+      if (run.documentLanguages) {
+        setDocumentLanguages(run.documentLanguages);
+      }
+
+      // Restore processing results
+      setProcessingResults(run.results as ProcessorResult[]);
+
+      // Restore comparison if present
+      if (run.comparison) {
+        setComparison(run.comparison as ComparisonResult);
+      }
+
+      // Restore pipeline state
+      if (run.pipelineDefinition) {
+        setExecutedPipeline(run.pipelineDefinition as PipelineDefinition);
+      }
+      if (run.selectedPipelineMethod) {
+        setSelectedPipelineMethod(run.selectedPipelineMethod);
+      }
+
+      // Restore preferred method
+      if (run.preferredMethod) {
+        setPreferredMethod(run.preferredMethod);
+      }
+
+      // Navigate to architecture view if we have comparison, otherwise pipeline
+      if (run.comparison) {
+        navigate('/architecture');
+      } else {
+        navigate('/conversation');
+      }
+    } catch (err) {
+      console.error('[LoadRun] Failed:', err);
+    }
+  }, [navigate]);
+
   // Docs pages have their own layout (left sidebar, no Cloudscape chrome).
   // Render them standalone so /docs never shares the app's stepper navigation.
   if (location.pathname === '/docs' || location.pathname.startsWith('/docs/')) {
@@ -299,8 +371,12 @@ export default function App() {
                     />
                   }
                 />
+                <Route
+                  path="/runs"
+                  element={<RecentRunsPage onLoadRun={handleLoadRun} isAdmin={isAdmin} />}
+                />
                 {isAdmin && (
-                  <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/admin" element={<AdminPage onLoadRun={handleLoadRun} />} />
                 )}
                 {isAdmin && (
                   <Route path="/survey-results" element={<SurveyResultsPage />} />

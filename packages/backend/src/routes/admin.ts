@@ -12,7 +12,7 @@ const router = Router();
 // even if an alias happens to match `adminUsers`. This prevents a misconfigured
 // public deployment from handing admin to anonymous users.
 function requireAdmin(req: any, res: any, next: any) {
-  if (config.authProvider === 'none') {
+  if (config.authProvider === 'none' && !process.env.ALLOW_UNAUTHENTICATED) {
     res.status(403).json({
       error: 'Admin access required',
       message: 'Admin endpoints are disabled when AUTH_PROVIDER=none.',

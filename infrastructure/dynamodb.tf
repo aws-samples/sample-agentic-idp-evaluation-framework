@@ -60,9 +60,9 @@ resource "aws_dynamodb_table" "activity" {
   }
 }
 
-resource "aws_iam_role_policy" "apprunner_dynamodb" {
+resource "aws_iam_role_policy" "ecs_dynamodb" {
   name = "DynamoDBActivity"
-  role = aws_iam_role.apprunner_instance.id
+  role = aws_iam_role.ecs_task.id
 
   # Mirrors the policy applied out-of-band on the original deployment exactly,
   # so terraform apply can take ownership without changing live permissions.

@@ -52,10 +52,13 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  // provider === "none"
+  // provider === "none" — use DEV_USER_ALIAS env var if set, otherwise 'local-user'.
+  // Do NOT fall back to process.env.USER (OS username) because that can
+  // accidentally match ADMIN_USERS and grant admin access in demo mode.
+  const alias = process.env.DEV_USER_ALIAS || 'local-user';
   const user: AuthUser = {
-    alias: process.env.USER ?? 'anonymous',
-    email: `${process.env.USER ?? 'anonymous'}@example.com`,
+    alias,
+    email: `${alias}@localhost`,
     authenticated: true,
   };
   (req as unknown as { authUser: AuthUser }).authUser = user;
