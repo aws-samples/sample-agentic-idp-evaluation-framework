@@ -36,7 +36,7 @@
         <mxCell id="title_sub" parent="1" style="text;html=1;fontSize=14;align=left;verticalAlign=middle;fontFamily=Amazon Ember;fontColor=#52525B;labelBackgroundColor=#FFFFFF;" value="Intelligent Document Processing · Evaluation &amp; Delivery Platform" vertex="1">
           <mxGeometry height="20" width="640" x="64" y="114" as="geometry" />
         </mxCell>
-        <mxCell id="title_url" parent="1" style="text;html=1;fontSize=11;align=left;fontFamily=Amazon Ember Mono;fontColor=#A1A1AA;labelBackgroundColor=#FFFFFF;" value="idp.sanghwa.people.aws.dev" vertex="1">
+        <mxCell id="title_url" parent="1" style="text;html=1;fontSize=11;align=left;fontFamily=Amazon Ember Mono;fontColor=#A1A1AA;labelBackgroundColor=#FFFFFF;" value="your-domain.example.com" vertex="1">
           <mxGeometry height="16" width="300" x="64" y="138" as="geometry" />
         </mxCell>
         <mxCell id="hr1" parent="1" style="line;strokeColor=#E4E4E7;strokeWidth=1;" value="" vertex="1">
