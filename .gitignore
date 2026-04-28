@@ -48,6 +48,7 @@ packages/backend/.local-uploads/
 
 # Internal / PCSR exclusions
 CLAUDE.md
+test-samples/
 .omc/
 .claude/
 .local-uploads/
