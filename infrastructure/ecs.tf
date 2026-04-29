@@ -95,6 +95,7 @@ resource "aws_ecs_task_definition" "backend" {
           { name = "MIDWAY_DISABLED", value = var.auth_provider == "midway" ? "false" : "true" },
           { name = "AGENTCORE_RUNTIME_ARN", value = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn },
           { name = "ACTIVITY_TABLE", value = "${var.project_name}-activity-${var.environment}" },
+          { name = "CLOUDFRONT_SECRET", value = random_password.cloudfront_secret.result },
         ],
         var.admin_users != "" ? [{ name = "ADMIN_USERS", value = var.admin_users }] : [],
         var.cognito_user_pool_id != "" ? [{ name = "COGNITO_USER_POOL_ID", value = var.cognito_user_pool_id }] : [],

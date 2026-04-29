@@ -1,12 +1,22 @@
 # ============================================================================
 # Application Load Balancer — HTTP-only, in public subnets
 # CloudFront terminates TLS from the user; CloudFront → ALB is HTTP over the
-# AWS backbone. This is the standard pattern for CloudFront + ALB samples.
+# AWS backbone.
+#
+# Security: Two layers of protection against direct ALB access:
+#   1. Security group restricts to AWS CloudFront managed prefix list
+#   2. ALB listener rules validate X-CloudFront-Secret header
 # ============================================================================
 
 # ============================================================================
-# ALB Security Group — allow inbound HTTP from anywhere (CloudFront)
+# ALB Security Group — restrict to CloudFront prefix list only
 # ============================================================================
+
+# AWS-managed prefix list for CloudFront edge locations.
+# This restricts network-layer access so only CloudFront IPs can reach the ALB.
+data "aws_ec2_managed_prefix_list" "cloudfront" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
+}
 
 resource "aws_security_group" "alb" {
   name        = "${var.project_name}-alb-${var.environment}"
@@ -14,11 +24,11 @@ resource "aws_security_group" "alb" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "HTTP from CloudFront"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "HTTP from CloudFront"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront.id]
   }
 
   egress {
@@ -91,8 +101,10 @@ resource "aws_lb_target_group" "backend" {
 }
 
 # ============================================================================
-# HTTP Listener (port 80) — forward to target group
-# CloudFront handles TLS termination; ALB receives HTTP from CloudFront.
+# HTTP Listener — validates X-CloudFront-Secret header at ALB level
+#
+# Rule 1: If X-CloudFront-Secret matches → forward to target group
+# Default: Return 403 "Access denied" (blocks direct ALB access)
 # ============================================================================
 
 # checkov:skip=CKV_AWS_2: HTTP listener is intentional — CloudFront terminates TLS, ALB is HTTP-only behind CloudFront.
@@ -102,12 +114,39 @@ resource "aws_lb_listener" "http" {
   port              = 80
   protocol          = "HTTP"
 
+  # Default action: reject requests that don't come through CloudFront
   default_action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Access denied"
+      status_code  = "403"
+    }
+  }
+
+  tags = {
+    Name = "${var.project_name}-http-listener"
+  }
+}
+
+# Forward rule: only requests with the correct X-CloudFront-Secret header
+resource "aws_lb_listener_rule" "cloudfront_verified" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 1
+
+  condition {
+    http_header {
+      http_header_name = "X-CloudFront-Secret"
+      values           = [random_password.cloudfront_secret.result]
+    }
+  }
+
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.backend.arn
   }
 
   tags = {
-    Name = "${var.project_name}-http-listener"
+    Name = "${var.project_name}-cf-verified-rule"
   }
 }
