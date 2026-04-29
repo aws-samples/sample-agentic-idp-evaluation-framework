@@ -191,7 +191,7 @@ export class TokenStreamAdapter implements StreamAdapter {
       contentBlocks.push({
         document: { name: 'document', format: 'pdf', source: { bytes: input.documentBuffer } },
       });
-    } else if (isOfficeFormat(fileName)) {
+    } else if (isOfficeFormat(fileName) && input.documentBuffer[0] === 0x50 && input.documentBuffer[1] === 0x4B) {
       const converted = await convertOfficeDocument(input.documentBuffer, fileName);
       contentBlocks.push({ text: `Document content:\n${converted.text}` });
     } else {
