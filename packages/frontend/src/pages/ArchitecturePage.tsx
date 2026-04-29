@@ -194,13 +194,6 @@ export default function ArchitecturePage({
         <Header
           variant="h1"
           description={`Production-ready code for processing ${document.fileName} with ${capabilities.length} capabilities`}
-          actions={
-            <SpaceBetween direction="horizontal" size="xs">
-              <Button iconName="download" onClick={handleDownloadZip}>
-                Download ZIP
-              </Button>
-            </SpaceBetween>
-          }
         >
           Architecture & Code Generation
         </Header>
@@ -371,6 +364,11 @@ export default function ArchitecturePage({
                 : aiCode?.cdk
                   ? 'AI-generated from real benchmark data. Every file below is deployable as-is.'
                   : 'Deterministic template generated from your benchmark data. Deployable as-is.'}
+              actions={
+                <Button iconName="download" onClick={handleDownloadZip}>
+                  Download ZIP
+                </Button>
+              }
             >
               Generated project
             </Header>
