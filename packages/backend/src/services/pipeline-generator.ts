@@ -63,13 +63,24 @@ const SPEED_RANK: Record<string, number> = {
   'bedrock-guardrails': 4,
 };
 
+const OFFICE_DOC_TYPES: ReadonlySet<string> = new Set(['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls']);
+
 function selectMethod(
   capability: Capability,
   optimizeFor: string,
   preferredMethods?: ProcessingMethod[],
   documentLanguages?: string[],
+  documentType?: string,
 ): ProcessingMethod {
   let candidates = getBestMethodsForCapability(capability);
+
+  // Filter out BDA/Textract for Office documents — they only support PDF/image
+  if (documentType && OFFICE_DOC_TYPES.has(documentType)) {
+    const officeFiltered = candidates.filter(
+      (m) => !m.startsWith('bda-') && !m.startsWith('textract-') && m !== 'bda-standard' && m !== 'bda-custom',
+    );
+    if (officeFiltered.length > 0) candidates = officeFiltered;
+  }
 
   // Filter out BDA/Textract for non-English documents
   if (documentLanguages?.length) {
@@ -267,7 +278,7 @@ export function generatePipeline(
 
   for (const capability of capabilities) {
     const explicit = methodAssignments?.[capability];
-    const method = explicit ?? selectMethod(capability, optimizeFor, preferredMethods, documentLanguages);
+    const method = explicit ?? selectMethod(capability, optimizeFor, preferredMethods, documentLanguages, documentType);
     if (!methodToCapabilities.has(method)) {
       methodToCapabilities.set(method, []);
     }
@@ -347,9 +358,8 @@ export function generatePipeline(
     }
     xPos += xStep;
 
-    // Sequential composer descriptor (not a runtime step — the executor uses
-    // edge structure to drive sequential execution; this node carries the
-    // overall composition metadata for UI display).
+    // Sequential composer — metadata-only node (hidden from canvas, visible=false).
+    // The executor reads stages from this node to orchestrate serial execution.
     const composerNodeId = generateNodeId('composer');
     nodes.push({
       id: composerNodeId,
@@ -360,11 +370,9 @@ export function generatePipeline(
         nodeType: 'sequential-composer',
         stages: [...extractMethodNodeIds, guardrailsNodeId],
       } as SequentialComposerConfig,
-      position: { x: xPos, y: yPos },
+      position: { x: -9999, y: -9999 },
     });
-    edges.push({ id: generateEdgeId(), source: guardrailsNodeId, target: composerNodeId, label: 'merge' });
-    preOutputNodeId = composerNodeId;
-    xPos += xStep;
+    preOutputNodeId = guardrailsNodeId;
   } else {
     const methodYStart = yPos - (methodToCapabilities.size * 140) / 2;
     let methodIdx = 0;

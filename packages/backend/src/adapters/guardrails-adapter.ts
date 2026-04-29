@@ -13,6 +13,7 @@ import {
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
 import { textractClient, bedrockClient, config } from '../config/aws.js';
+import { isOfficeFormat, convertOfficeDocument } from '../services/file-converter.js';
 
 // Bedrock ApplyGuardrail enforces a text cap per request. We keep a safety
 // margin under the documented 25 KB so multi-byte UTF-8 characters and
@@ -91,11 +92,16 @@ export class GuardrailsAdapter implements StreamAdapter {
       emitProgress(res, this.method, 'all', 45, `Received ${text.length} chars from upstream stage. Applying guardrail...`);
     } else {
       const isTextractSupported = /\.(pdf|jpg|jpeg|png|tiff|tif)$/i.test(fileName);
-      if (!isTextractSupported) {
+      if (!isTextractSupported && isOfficeFormat(fileName)) {
+        emitProgress(res, this.method, 'all', 0, 'Converting Office document to text...');
+        const converted = await convertOfficeDocument(input.documentBuffer, fileName);
+        text = converted.text;
+        emitProgress(res, this.method, 'all', 45, `Converted ${text.length} chars. Applying guardrail...`);
+      } else if (!isTextractSupported) {
         throw new Error(
           `Guardrails requires text input; ${fileName.split('.').pop()?.toUpperCase()} is not supported via Textract. Use a direct-LLM method first.`,
         );
-      }
+      } else {
 
       emitProgress(res, this.method, 'all', 0, 'Extracting text with Textract...');
 
@@ -117,6 +123,7 @@ export class GuardrailsAdapter implements StreamAdapter {
 
       text = this.blocksToText(blocks);
       emitProgress(res, this.method, 'all', 45, `Extracted ${text.length} chars. Applying guardrail...`);
+      }
     }
 
     // Phase 2 — ApplyGuardrail. Bedrock enforces a per-request text size

@@ -76,7 +76,7 @@ export default memo(function MethodNode({ data }: { data: MethodNodeData }) {
             {capabilities.length} capabilities:
           </Box>
           <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {capabilities.map((cap: string) => (
+            {capabilities.filter(Boolean).map((cap: string) => (
               <div key={cap} style={{ fontSize: '11px', color: '#414d5c', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 {getCapabilityIcon(cap, 13, familyColor)}
                 {cap.replace(/_/g, ' ')}

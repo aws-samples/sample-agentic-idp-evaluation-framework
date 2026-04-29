@@ -14,6 +14,7 @@ import { emitProgress } from './stream-adapter.js';
 import { bedrockClient } from '../config/aws.js';
 import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
 import { CAPABILITY_INFO } from '@idp/shared';
+import { isOfficeFormat, convertOfficeDocument } from '../services/file-converter.js';
 
 // Bedrock Converse rejects PDFs > 100 pages. For large PDFs we slice into
 // ≤CHUNK_PAGES chunks and merge results after processing.
@@ -190,6 +191,9 @@ export class TokenStreamAdapter implements StreamAdapter {
       contentBlocks.push({
         document: { name: 'document', format: 'pdf', source: { bytes: input.documentBuffer } },
       });
+    } else if (isOfficeFormat(fileName)) {
+      const converted = await convertOfficeDocument(input.documentBuffer, fileName);
+      contentBlocks.push({ text: `Document content:\n${converted.text}` });
     } else {
       const text = input.documentBuffer.toString('utf-8');
       contentBlocks.push({ text: `Document content:\n${text}` });

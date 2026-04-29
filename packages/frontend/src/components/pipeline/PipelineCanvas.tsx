@@ -47,7 +47,7 @@ export default function PipelineCanvas({
 }: PipelineCanvasProps) {
   // Build initial nodes from pipeline definition
   const initialNodes: Node[] = useMemo(() => {
-    return pipeline.nodes.map((node) => {
+    return pipeline.nodes.filter((node) => node.position.x > -9000).map((node) => {
       const state = nodeStates[node.id]?.state || 'idle';
       const progress = nodeStates[node.id]?.progress;
       const metrics = nodeStates[node.id]?.metrics;
