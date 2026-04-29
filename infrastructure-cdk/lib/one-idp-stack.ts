@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { StorageConstruct } from './storage';
 import { EcrConstruct } from './ecr';
 import { AgentRuntimeConstruct } from './agent-runtime';
@@ -91,6 +92,18 @@ export class OneIdpStack extends cdk.Stack {
         ? `arn:aws:bedrock:${this.region}:${this.account}:guardrail/${props.bedrockGuardrailId}`
         : undefined);
 
+    // CloudFront ↔ ALB shared secret (persisted in Secrets Manager so it
+    // survives redeployments — Terraform equivalent: random_password)
+    const cfSecret = new secretsmanager.Secret(this, 'CloudFrontSecret', {
+      secretName: `${props.projectName}-cf-secret-${props.environment}`,
+      description: 'Shared secret for CloudFront → ALB origin verification',
+      generateSecretString: {
+        excludePunctuation: true,
+        passwordLength: 32,
+      },
+    });
+    const cfSecretValue = cfSecret.secretValue.unsafeUnwrap();
+
     const api = new EcsBackendConstruct(this, 'Api', {
       projectName: props.projectName,
       environment: props.environment,
@@ -112,6 +125,7 @@ export class OneIdpStack extends cdk.Stack {
       bedrockGuardrailId: guardrailId,
       bedrockGuardrailVersion: guardrailVersion,
       bedrockGuardrailArn: guardrailArn,
+      cloudfrontSecret: cfSecretValue,
     });
 
     const edge = new EdgeConstruct(this, 'Edge', {
@@ -119,18 +133,31 @@ export class OneIdpStack extends cdk.Stack {
       environment: props.environment,
       staticAssetsBucket: storage.staticAssetsBucket,
       backendServiceUrl: api.serviceUrl,
+      cloudfrontSecret: cfSecretValue,
       domainName: props.domainName,
       route53ZoneId: props.route53ZoneId,
     });
 
+    // ─── Outputs ────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'UploadsBucketName', { value: storage.uploadsBucket.bucketName });
+    new cdk.CfnOutput(this, 'UploadsBucketArn', { value: storage.uploadsBucket.bucketArn });
     new cdk.CfnOutput(this, 'StaticAssetsBucket', { value: storage.staticAssetsBucket.bucketName });
     new cdk.CfnOutput(this, 'EcrRepositoryUri', { value: ecr.repository.repositoryUri });
     new cdk.CfnOutput(this, 'AgentRuntimeArn', { value: agent.runtimeArn });
+    new cdk.CfnOutput(this, 'AgentRuntimeId', { value: agent.runtimeId });
+    new cdk.CfnOutput(this, 'AgentCoreExecutionRoleArn', { value: agent.executionRole.roleArn });
     new cdk.CfnOutput(this, 'BackendServiceUrl', { value: `http://${api.serviceUrl}` });
     new cdk.CfnOutput(this, 'CloudFrontDomain', { value: edge.distributionDomain });
+    new cdk.CfnOutput(this, 'CloudFrontDistributionId', { value: edge.distributionId });
+    new cdk.CfnOutput(this, 'EcsClusterName', { value: `${props.projectName}-${props.environment}` });
+    new cdk.CfnOutput(this, 'EcsServiceName', { value: `${props.projectName}-backend-${props.environment}` });
     new cdk.CfnOutput(this, 'SiteUrl', {
       value: props.domainName ? `https://${props.domainName}` : `https://${edge.distributionDomain}`,
     });
+    if (guardrail) {
+      new cdk.CfnOutput(this, 'BedrockGuardrailId', { value: guardrail.guardrailId });
+      new cdk.CfnOutput(this, 'BedrockGuardrailArn', { value: guardrail.guardrailArn });
+      new cdk.CfnOutput(this, 'BedrockGuardrailVersion', { value: guardrail.guardrailVersion });
+    }
   }
 }

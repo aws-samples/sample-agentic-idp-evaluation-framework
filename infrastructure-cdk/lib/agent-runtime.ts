@@ -149,6 +149,7 @@ export class AgentRuntimeConstruct extends Construct {
         BDA_PROFILE_ARN: props.bdaProfileArn,
         BDA_PROJECT_ARN: props.bdaProjectArn,
         NODE_ENV: 'production',
+        PORT: '8080',
         AGENT_PORT: '8080',
         CLAUDE_MODEL_ID: props.claudeModelId,
         NOVA_MODEL_ID: props.novaModelId,

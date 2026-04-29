@@ -1,8 +1,9 @@
 import { Construct } from 'constructs';
-import { Duration } from 'aws-cdk-lib';
+import { Duration, RemovalPolicy } from 'aws-cdk-lib';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
@@ -12,6 +13,7 @@ export interface EdgeProps {
   readonly environment: string;
   readonly staticAssetsBucket: s3.IBucket;
   readonly backendServiceUrl: string;
+  readonly cloudfrontSecret: string;
   readonly domainName?: string;
   readonly route53ZoneId?: string;
 }
@@ -31,6 +33,7 @@ export interface EdgeProps {
  */
 export class EdgeConstruct extends Construct {
   readonly distributionDomain: string;
+  readonly distributionId: string;
 
   constructor(scope: Construct, id: string, props: EdgeProps) {
     super(scope, id);
@@ -41,6 +44,9 @@ export class EdgeConstruct extends Construct {
 
     const apiOrigin = new origins.HttpOrigin(props.backendServiceUrl, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+      readTimeout: Duration.seconds(60),
+      keepaliveTimeout: Duration.seconds(30),
+      customHeaders: { 'X-CloudFront-Secret': props.cloudfrontSecret },
     });
 
     let viewerCert: acm.ICertificate | undefined;
@@ -57,11 +63,28 @@ export class EdgeConstruct extends Construct {
       });
     }
 
+    // CloudFront access logs bucket
+    const cfLogsBucket = new s3.Bucket(this, 'CfLogsBucket', {
+      bucketName: `${props.projectName}-cf-logs-${props.environment}`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      objectOwnership: s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
+      removalPolicy: RemovalPolicy.RETAIN,
+      lifecycleRules: [{ id: 'expire-cf-logs', expiration: Duration.days(90) }],
+    });
+
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultRootObject: 'index.html',
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       domainNames: props.domainName ? [props.domainName] : undefined,
       certificate: viewerCert,
+      minimumProtocolVersion: props.domainName
+        ? cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021
+        : undefined,
+      enableLogging: true,
+      logBucket: cfLogsBucket,
+      logFilePrefix: 'cf/',
       defaultBehavior: {
         origin: s3Origin,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -79,13 +102,21 @@ export class EdgeConstruct extends Construct {
         },
       },
       errorResponses: [
-        // SPA fallback on 404 only. Do NOT rewrite 403 — /api/admin/* legitimately
-        // returns 403 JSON and rewriting to index.html breaks client JSON parsing.
         { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html', ttl: Duration.seconds(0) },
       ],
     });
 
+    // Grant ListBucket so missing objects return 404 (not 403), required for SPA routing
+    props.staticAssetsBucket.addToResourcePolicy(new iam.PolicyStatement({
+      sid: 'AllowCloudFrontListBucket',
+      actions: ['s3:ListBucket'],
+      principals: [new iam.ServicePrincipal('cloudfront.amazonaws.com')],
+      resources: [props.staticAssetsBucket.bucketArn],
+      conditions: { StringEquals: { 'AWS:SourceArn': distribution.distributionArn } },
+    }));
+
     this.distributionDomain = distribution.distributionDomainName;
+    this.distributionId = distribution.distributionId;
 
     if (hostedZone && props.domainName) {
       new route53.ARecord(this, 'AliasA', {

@@ -8,6 +8,7 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import { CfnListenerRule } from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 
 export interface EcsBackendProps {
   readonly projectName: string;
@@ -30,6 +31,7 @@ export interface EcsBackendProps {
   readonly bedrockGuardrailId?: string;
   readonly bedrockGuardrailVersion?: string;
   readonly bedrockGuardrailArn?: string;
+  readonly cloudfrontSecret: string;
 }
 
 /**
@@ -61,13 +63,27 @@ export class EcsBackendConstruct extends Construct {
       ],
     });
 
+    // ─── ALB Security Group — restrict to CloudFront prefix list ──────
+    const cfPrefixListId = ec2.PrefixList.fromLookup(this, 'CfPrefixList', {
+      prefixListName: 'com.amazonaws.global.cloudfront.origin-facing',
+    }).prefixListId;
+    const albSg = new ec2.SecurityGroup(this, 'AlbSg', {
+      vpc,
+      securityGroupName: `${props.projectName}-alb-${props.environment}`,
+      description: 'Allow inbound HTTP (port 80) from CloudFront',
+      allowAllOutbound: true,
+    });
+    albSg.addIngressRule(ec2.Peer.prefixList(cfPrefixListId), ec2.Port.tcp(80), 'HTTP from CloudFront');
+
     // ─── ALB ────────────────────────────────────────────────────────────
     const alb = new elbv2.ApplicationLoadBalancer(this, 'Alb', {
       loadBalancerName: `${props.projectName}-${props.environment}`,
       vpc,
       internetFacing: true,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      idleTimeout: Duration.seconds(120), // SSE streaming needs longer timeout
+      idleTimeout: Duration.seconds(120),
+      securityGroup: albSg,
+      dropInvalidHeaderFields: true,
     });
 
     // ─── ECS Cluster ────────────────────────────────────────────────────
@@ -179,6 +195,7 @@ export class EcsBackendConstruct extends Construct {
       MIDWAY_DISABLED: props.authProvider === 'midway' ? 'false' : 'true',
       AGENTCORE_RUNTIME_ARN: props.agentRuntimeArn,
       ACTIVITY_TABLE: props.activityTable.tableName,
+      CLOUDFRONT_SECRET: props.cloudfrontSecret,
     };
     if (props.adminUsers) runtimeEnv.ADMIN_USERS = props.adminUsers;
     if (props.cognitoUserPoolId) runtimeEnv.COGNITO_USER_POOL_ID = props.cognitoUserPoolId;
@@ -190,20 +207,20 @@ export class EcsBackendConstruct extends Construct {
 
     const logGroup = new logs.LogGroup(this, 'LogGroup', {
       logGroupName: `/ecs/${props.projectName}-backend-${props.environment}`,
-      retention: logs.RetentionDays.TWO_WEEKS,
+      retention: logs.RetentionDays.ONE_MONTH,
     });
 
     taskDef.addContainer('Backend', {
-      containerName: `${props.projectName}-backend`,
+      containerName: 'backend',
       image: ecs.ContainerImage.fromEcrRepository(props.repository, props.imageTag),
       portMappings: [{ containerPort: 3001, protocol: ecs.Protocol.TCP }],
       environment: runtimeEnv,
-      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'backend', logGroup }),
+      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecs', logGroup }),
       healthCheck: {
-        command: ['CMD-SHELL', 'curl -f http://localhost:3001/api/health || exit 1'],
+        command: ['CMD-SHELL', 'wget -qO- http://localhost:3001/api/health || exit 1'],
         interval: Duration.seconds(15),
         timeout: Duration.seconds(5),
-        retries: 3,
+        retries: 5,
         startPeriod: Duration.seconds(30),
       },
     });
@@ -213,10 +230,12 @@ export class EcsBackendConstruct extends Construct {
       serviceName: `${props.projectName}-backend-${props.environment}`,
       cluster,
       taskDefinition: taskDef,
-      desiredCount: 1,
+      desiredCount: 2,
       assignPublicIp: false,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       healthCheckGracePeriod: Duration.seconds(60),
+      circuitBreaker: { enable: true, rollback: true },
+      capacityProviderStrategies: [{ capacityProvider: 'FARGATE', weight: 1, base: 1 }],
     });
 
     // Allow inbound from ALB
@@ -241,9 +260,29 @@ export class EcsBackendConstruct extends Construct {
       deregistrationDelay: Duration.seconds(30),
     });
 
-    alb.addListener('HttpListener', {
+    const listener = alb.addListener('HttpListener', {
       port: 80,
-      defaultTargetGroups: [targetGroup],
+      defaultAction: elbv2.ListenerAction.fixedResponse(403, {
+        contentType: 'text/plain',
+        messageBody: 'Access denied',
+      }),
+    });
+
+    // Forward rule: only requests with the correct X-CloudFront-Secret header
+    new CfnListenerRule(this, 'CfVerifiedRule', {
+      listenerArn: listener.listenerArn,
+      priority: 1,
+      conditions: [{
+        field: 'http-header',
+        httpHeaderConfig: {
+          httpHeaderName: 'X-CloudFront-Secret',
+          values: [props.cloudfrontSecret],
+        },
+      }],
+      actions: [{
+        type: 'forward',
+        targetGroupArn: targetGroup.targetGroupArn,
+      }],
     });
 
     // ─── Outputs ────────────────────────────────────────────────────────
