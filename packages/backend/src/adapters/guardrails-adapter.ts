@@ -92,7 +92,7 @@ export class GuardrailsAdapter implements StreamAdapter {
       emitProgress(res, this.method, 'all', 45, `Received ${text.length} chars from upstream stage. Applying guardrail...`);
     } else {
       const isTextractSupported = /\.(pdf|jpg|jpeg|png|tiff|tif)$/i.test(fileName);
-      const isZipFile = input.documentBuffer[0] === 0x50 && input.documentBuffer[1] === 0x4B;
+      const isZipFile = input.documentBuffer.length > 4 && input.documentBuffer[0] === 0x50 && input.documentBuffer[1] === 0x4B && input.documentBuffer[2] === 0x03 && input.documentBuffer[3] === 0x04;
       if (!isTextractSupported && isOfficeFormat(fileName) && isZipFile) {
         emitProgress(res, this.method, 'all', 0, 'Converting Office document to text...');
         const converted = await convertOfficeDocument(input.documentBuffer, fileName);
