@@ -13,7 +13,7 @@ variable "environment" {
 variable "project_name" {
   description = "Project name used for resource naming"
   type        = string
-  default     = "one-idp"
+  default     = "one-idp-tf"
 }
 
 variable "ecr_image_tag" {

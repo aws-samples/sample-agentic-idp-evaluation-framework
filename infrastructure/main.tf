@@ -8,16 +8,19 @@ terraform {
     }
   }
 
-  # Default backend points at the bucket used by the original deployment so
-  # that `terraform init` with no args continues to work and no state is
-  # migrated. Override via `-backend-config` for public deployments:
+  # The default bucket name is a placeholder — S3 bucket names are globally
+  # unique, so every fresh deployment must override via `-backend-config`.
+  # Convention: derive the bucket name from your account ID so it is unique
+  # per account and easy to reason about.
+  #
+  #   ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
   #   terraform init -reconfigure \
-  #     -backend-config="bucket=<your-state-bucket>" \
-  #     -backend-config="key=one-idp/terraform.tfstate" \
+  #     -backend-config="bucket=one-idp-tfstate-${ACCOUNT_ID}" \
+  #     -backend-config="key=one-idp-tf/terraform.tfstate" \
   #     -backend-config="region=us-west-2"
   backend "s3" {
-    bucket = "one-idp-terraform-state"
-    key    = "one-idp/terraform.tfstate"
+    bucket = "one-idp-tf-terraform-state"
+    key    = "one-idp-tf/terraform.tfstate"
     region = "us-west-2"
   }
 }
@@ -27,7 +30,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "one-idp"
+      Project     = var.project_name
       Environment = var.environment
       ManagedBy   = "terraform"
     }
