@@ -52,7 +52,24 @@ export class AgentRuntimeConstruct extends Construct {
       managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('BedrockAgentCoreFullAccess')],
     });
 
-    props.repository.grantPull(this.executionRole);
+    this.executionRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'ECRImageAccess',
+        actions: [
+          'ecr:BatchGetImage',
+          'ecr:GetDownloadUrlForLayer',
+          'ecr:BatchCheckLayerAvailability',
+        ],
+        resources: [props.repository.repositoryArn],
+      }),
+    );
+    this.executionRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'ECRTokenAccess',
+        actions: ['ecr:GetAuthorizationToken'],
+        resources: ['*'],
+      }),
+    );
 
     this.executionRole.addToPolicy(
       new iam.PolicyStatement({
@@ -155,6 +172,16 @@ export class AgentRuntimeConstruct extends Construct {
         NOVA_MODEL_ID: props.novaModelId,
       },
     });
+
+    // AgentCore validates the ECR URI at creation time against the execution
+    // role's inline policy. Without an explicit dependency on the Policy
+    // resource (which inline addToPolicy creates), CloudFormation can race
+    // ahead and create the runtime before IAM has committed the policy.
+    this.runtime.node.addDependency(this.executionRole);
+    const defaultPolicy = this.executionRole.node.tryFindChild('DefaultPolicy');
+    if (defaultPolicy) {
+      this.runtime.node.addDependency(defaultPolicy);
+    }
 
     this.runtimeArn = this.runtime.attrAgentRuntimeArn;
     this.runtimeId = this.runtime.attrAgentRuntimeId;
