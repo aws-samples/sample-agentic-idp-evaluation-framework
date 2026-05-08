@@ -1,6 +1,6 @@
 aws_region    = "us-west-2"
 environment   = "dev"
-project_name  = "one-idp"
+project_name  = "one-idp-tf"
 ecr_image_tag = "latest"
 
 # Custom domain (optional; leave empty to use CloudFront default domain)

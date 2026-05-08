@@ -5,7 +5,7 @@ import { OneIdpStack } from '../lib/one-idp-stack';
 
 const app = new cdk.App();
 
-const projectName = app.node.tryGetContext('projectName') ?? process.env.PROJECT_NAME ?? 'one-idp';
+const projectName = app.node.tryGetContext('projectName') ?? process.env.PROJECT_NAME ?? 'one-idp-cdk';
 const environment = app.node.tryGetContext('environment') ?? process.env.ENVIRONMENT ?? 'dev';
 const region = app.node.tryGetContext('region') ?? process.env.CDK_DEFAULT_REGION ?? 'us-west-2';
 const account = process.env.CDK_DEFAULT_ACCOUNT;
