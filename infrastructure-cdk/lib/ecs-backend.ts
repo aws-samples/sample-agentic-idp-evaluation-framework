@@ -193,6 +193,7 @@ export class EcsBackendConstruct extends Construct {
       SITE_URL: props.siteUrl,
       AUTH_PROVIDER: props.authProvider,
       MIDWAY_DISABLED: props.authProvider === 'midway' ? 'false' : 'true',
+      ALLOW_UNAUTHENTICATED: props.authProvider === 'none' ? 'true' : 'false',
       AGENTCORE_RUNTIME_ARN: props.agentRuntimeArn,
       ACTIVITY_TABLE: props.activityTable.tableName,
       CLOUDFRONT_SECRET: props.cloudfrontSecret,
@@ -269,7 +270,7 @@ export class EcsBackendConstruct extends Construct {
     });
 
     // Forward rule: only requests with the correct X-CloudFront-Secret header
-    new CfnListenerRule(this, 'CfVerifiedRule', {
+    const cfRule = new CfnListenerRule(this, 'CfVerifiedRule', {
       listenerArn: listener.listenerArn,
       priority: 1,
       conditions: [{
@@ -284,6 +285,12 @@ export class EcsBackendConstruct extends Construct {
         targetGroupArn: targetGroup.targetGroupArn,
       }],
     });
+
+    // ECS service must not be created before the TG is associated with a
+    // listener (via the forward rule), otherwise the service rejects the
+    // targets with "target group does not have an associated load balancer".
+    service.node.addDependency(listener);
+    service.node.addDependency(cfRule);
 
     // ─── Outputs ────────────────────────────────────────────────────────
     this.serviceUrl = alb.loadBalancerDnsName;

@@ -93,6 +93,7 @@ resource "aws_ecs_task_definition" "backend" {
           { name = "SITE_URL", value = var.domain_name != "" ? "https://${var.domain_name}" : "" },
           { name = "AUTH_PROVIDER", value = var.auth_provider },
           { name = "MIDWAY_DISABLED", value = var.auth_provider == "midway" ? "false" : "true" },
+          { name = "ALLOW_UNAUTHENTICATED", value = var.auth_provider == "none" ? "true" : "false" },
           { name = "AGENTCORE_RUNTIME_ARN", value = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn },
           { name = "ACTIVITY_TABLE", value = "${var.project_name}-activity-${var.environment}" },
           { name = "CLOUDFRONT_SECRET", value = random_password.cloudfront_secret.result },
