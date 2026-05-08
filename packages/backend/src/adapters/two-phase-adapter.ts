@@ -2,9 +2,9 @@ import type { Response } from 'express';
 import type { ProcessingMethod } from '@idp/shared';
 import { METHOD_INFO } from '@idp/shared';
 import {
-  AnalyzeDocumentCommand,
-  StartDocumentAnalysisCommand,
-  GetDocumentAnalysisCommand,
+  DetectDocumentTextCommand,
+  StartDocumentTextDetectionCommand,
+  GetDocumentTextDetectionCommand,
   type Block,
 } from '@aws-sdk/client-textract';
 import {
@@ -48,10 +48,10 @@ export class TwoPhaseAdapter implements StreamAdapter {
       // Async Textract for multi-page PDFs (requires S3 input)
       blocks = await this.runAsyncTextract(res, input.s3Uri);
     } else {
-      // Sync Textract for single-page PDFs and images
-      const textractCommand = new AnalyzeDocumentCommand({
+      // Sync Textract OCR — DetectDocumentText is sufficient since the LLM
+      // handles key-value/table structuring. ~$0.0015/page vs $0.065/page.
+      const textractCommand = new DetectDocumentTextCommand({
         Document: { Bytes: input.documentBuffer },
-        FeatureTypes: ['TABLES', 'FORMS'],
       });
       const textractResponse = await textractClient.send(textractCommand);
       blocks = textractResponse.Blocks ?? [];
@@ -132,13 +132,12 @@ Return ONLY valid JSON, no markdown code blocks.`;
     const bucket = url.hostname;
     const key = decodeURIComponent(url.pathname.slice(1));
 
-    const startCmd = new StartDocumentAnalysisCommand({
+    const startCmd = new StartDocumentTextDetectionCommand({
       DocumentLocation: { S3Object: { Bucket: bucket, Name: key } },
-      FeatureTypes: ['TABLES', 'FORMS'],
     });
     const startResp = await textractClient.send(startCmd);
     const jobId = startResp.JobId;
-    if (!jobId) throw new Error('Textract StartDocumentAnalysis returned no JobId');
+    if (!jobId) throw new Error('Textract StartDocumentTextDetection returned no JobId');
 
     emitProgress(res, this.method, 'all', 10, 'Textract async job started, polling...');
 
@@ -148,7 +147,7 @@ Return ONLY valid JSON, no markdown code blocks.`;
     for (let i = 0; i < 60; i++) {
       await new Promise((r) => setTimeout(r, 3000));
 
-      const getCmd = new GetDocumentAnalysisCommand({ JobId: jobId });
+      const getCmd = new GetDocumentTextDetectionCommand({ JobId: jobId });
       const getResp = await textractClient.send(getCmd);
       status = getResp.JobStatus ?? 'FAILED';
 
@@ -159,7 +158,7 @@ Return ONLY valid JSON, no markdown code blocks.`;
         let nextToken = getResp.NextToken;
         while (nextToken) {
           const pageResp = await textractClient.send(
-            new GetDocumentAnalysisCommand({ JobId: jobId, NextToken: nextToken }),
+            new GetDocumentTextDetectionCommand({ JobId: jobId, NextToken: nextToken }),
           );
           allBlocks.push(...(pageResp.Blocks ?? []));
           nextToken = pageResp.NextToken;
