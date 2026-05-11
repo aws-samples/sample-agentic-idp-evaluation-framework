@@ -40,13 +40,21 @@ export class TwoPhaseAdapter implements StreamAdapter {
     emitProgress(res, this.method, 'all', 0, 'Running Textract OCR...');
 
     const isPDF = /\.pdf$/i.test(fileName);
-    const isMultiPage = isPDF && ((input.pageCount ?? 1) > 1 || input.documentBuffer.length > 5 * 1024 * 1024);
+    // Sync Textract rejects payloads > 5MB or multi-page PDFs.
+    // Route to async (S3-based) whenever the buffer exceeds the sync cap.
+    const isLargePayload = input.documentBuffer.length > 5 * 1024 * 1024;
+    const needsAsync = (isPDF && (input.pageCount ?? 1) > 1) || isLargePayload;
+    const hasS3 = !!input.s3Uri && !input.s3Uri.startsWith('local://');
 
     let blocks: Block[];
 
-    if (isMultiPage && input.s3Uri && !input.s3Uri.startsWith('local://')) {
-      // Async Textract for multi-page PDFs (requires S3 input)
+    if (needsAsync && hasS3) {
       blocks = await this.runAsyncTextract(res, input.s3Uri);
+    } else if (isLargePayload) {
+      // Image too large for sync but no S3 object to fall back to.
+      throw new Error(
+        `Image exceeds Textract sync 5MB limit (${Math.round(input.documentBuffer.length / 1024 / 1024)}MB). Re-upload via S3 or downscale the image.`,
+      );
     } else {
       // Sync Textract OCR — DetectDocumentText is sufficient since the LLM
       // handles key-value/table structuring. ~$0.0015/page vs $0.065/page.
