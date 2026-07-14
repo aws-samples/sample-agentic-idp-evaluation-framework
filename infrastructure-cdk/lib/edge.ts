@@ -96,14 +96,7 @@ export class EdgeConstruct extends Construct {
           origin: apiOrigin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: new cloudfront.OriginRequestPolicy(this, 'ApiOriginPolicy', {
-            originRequestPolicyName: `${props.projectName}-api-${props.environment}`,
-            headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList(
-              'Authorization', 'Content-Type', 'Accept', 'Origin', 'Referer', 'X-IDP-User',
-            ),
-            queryStringBehavior: cloudfront.OriginRequestQueryStringBehavior.all(),
-            cookieBehavior: cloudfront.OriginRequestCookieBehavior.all(),
-          }),
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
           compress: false,
         },
