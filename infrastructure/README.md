@@ -31,10 +31,13 @@ cd infrastructure
 cp terraform.tfvars.example terraform.tfvars
 $EDITOR terraform.tfvars
 
-# 2. Init. For a remote state backend, pass the bucket via -backend-config:
+# 2. Init. S3 bucket names are globally unique, so override the backend
+#    bucket via -backend-config. A common pattern is to derive it from the
+#    account ID:
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 terraform init \
-  -backend-config="bucket=<your-state-bucket>" \
-  -backend-config="key=one-idp/terraform.tfstate" \
+  -backend-config="bucket=one-idp-tfstate-${ACCOUNT_ID}" \
+  -backend-config="key=one-idp-tf/terraform.tfstate" \
   -backend-config="region=us-west-2"
 # Or remove the `backend "s3" {}` block in main.tf to use local state.
 
