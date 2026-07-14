@@ -71,6 +71,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'good' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const
     },
@@ -89,6 +90,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'excellent' as const,
     'textract-llm': 'excellent' as const
     },
@@ -107,6 +109,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'good' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'excellent' as const
     },
@@ -125,6 +128,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'excellent' as const
     },
@@ -143,6 +147,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'excellent' as const
     },
@@ -161,6 +166,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'limited' as const,
     'bda-llm': 'limited' as const,
     'claude': 'limited' as const,
+    'gpt': 'limited' as const,
     'nova': 'good' as const
     },
   },
@@ -178,6 +184,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'good' as const,
+    'gpt': 'good' as const,
     'nova': 'excellent' as const,
     'textract-llm': 'good' as const
     },
@@ -196,6 +203,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'good' as const,
     'bda-llm': 'good' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'excellent' as const
     },
   },
@@ -213,6 +221,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'good' as const,
+    'gpt': 'good' as const,
     'nova': 'excellent' as const,
     'textract-llm': 'excellent' as const
     },
@@ -231,6 +240,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'limited' as const,
     'bda-llm': 'good' as const,
     'claude': 'good' as const,
+    'gpt': 'good' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const
     },
@@ -249,6 +259,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'good' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const
     },
@@ -267,6 +278,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'good' as const,
+    'gpt': 'good' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const
     },
@@ -285,6 +297,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const
     },
@@ -303,6 +316,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'good' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const
     },
@@ -321,6 +335,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'limited' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const,
     'guardrails': 'excellent' as const
@@ -339,6 +354,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     support: {
     'bda-llm': 'good' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const,
     'guardrails': 'excellent' as const
@@ -358,6 +374,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'good' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'excellent' as const
     },
@@ -376,6 +393,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'limited' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const
     },
@@ -394,6 +412,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'good' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const
     },
@@ -412,6 +431,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'excellent' as const
     },
@@ -430,6 +450,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'good' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'good' as const
     },
@@ -448,6 +469,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
+    'gpt': 'excellent' as const,
     'nova': 'good' as const,
     'textract-llm': 'excellent' as const
     },

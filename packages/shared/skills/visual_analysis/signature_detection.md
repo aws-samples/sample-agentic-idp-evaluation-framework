@@ -13,6 +13,7 @@ support:
   bda: "limited"
   bda-llm: "good"
   claude: "good"
+  gpt: "good"
   nova: "good"
   textract-llm: "good"
 ---

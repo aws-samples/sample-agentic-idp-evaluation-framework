@@ -13,6 +13,7 @@ support:
   bda: "limited"
   bda-llm: "limited"
   claude: "limited"
+  gpt: "limited"
   nova: "good"
 ---
 

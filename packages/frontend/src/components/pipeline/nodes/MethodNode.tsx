@@ -18,6 +18,7 @@ const FAMILY_COLORS: Record<MethodFamily, string> = {
   'bda-llm': '#0891b2',
   claude: '#8b5cf6',
   nova: '#ec7211',
+  gpt: '#10a37f',
   'textract-llm': '#037f0c', embeddings: '#2563eb',
   guardrails: '#d13212',
 };

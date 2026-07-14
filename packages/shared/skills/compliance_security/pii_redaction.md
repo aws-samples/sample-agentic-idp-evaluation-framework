@@ -12,6 +12,7 @@ exampleOutput: "Same document with PII replaced by [REDACTED]"
 support:
   bda-llm: "good"
   claude: "excellent"
+  gpt: "excellent"
   nova: "good"
   textract-llm: "good"
   guardrails: "excellent"

@@ -40,6 +40,7 @@ const FAMILY_NAMES: Record<string, string> = {
   'bda-llm': 'BDA + LLM Hybrid',
   claude: 'Claude (LLM)',
   nova: 'Nova (LLM)',
+  gpt: 'OpenAI GPT (LLM)',
   'textract-llm': 'Textract + LLM',
   textract: 'Amazon Textract',
   embeddings: 'Nova Embeddings',

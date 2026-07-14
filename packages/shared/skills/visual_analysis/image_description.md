@@ -13,6 +13,7 @@ support:
   bda: "good"
   bda-llm: "good"
   claude: "excellent"
+  gpt: "excellent"
   nova: "excellent"
 ---
 

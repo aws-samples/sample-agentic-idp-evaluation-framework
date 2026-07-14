@@ -1,8 +1,6 @@
 import type { Response } from 'express';
 import type { ProcessingMethod } from '@idp/shared';
 import { METHOD_INFO } from '@idp/shared';
-import sharp from 'sharp';
-import YAML from 'yaml';
 import { PDFDocument } from 'pdf-lib';
 import {
   ConverseStreamCommand,
@@ -13,8 +11,20 @@ import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapte
 import { emitProgress } from './stream-adapter.js';
 import { bedrockClient } from '../config/aws.js';
 import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
-import { CAPABILITY_INFO } from '@idp/shared';
 import { isOfficeFormat, convertOfficeDocument } from '../services/file-converter.js';
+import {
+  IMAGE_EXTENSIONS,
+  PDF_EXTENSION,
+  getImageFormat,
+  resizeImageIfNeeded,
+  buildSystemPrompt,
+  parseResults,
+} from './extraction-shared.js';
+
+// Some newer Bedrock models (Claude Opus 4.8/4.7, Sonnet 5) REJECT the
+// `temperature` inference param ("temperature is deprecated for this model").
+// We omit temperature for those and let Bedrock use its deterministic default.
+const TEMPERATURE_UNSUPPORTED = /claude-(opus-4-[78]|sonnet-5)/;
 
 // Bedrock Converse rejects PDFs > 100 pages. For large PDFs we slice into
 // ≤CHUNK_PAGES chunks and merge results after processing.
@@ -42,70 +52,6 @@ export async function splitPdfByPages(
     if (end === total) break;
   }
   return chunks;
-}
-
-const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
-const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp)$/i;
-const PDF_EXTENSION = /\.pdf$/i;
-
-type ImageFormat = 'jpeg' | 'png' | 'gif' | 'webp';
-
-async function resizeImageIfNeeded(buffer: Buffer, format: string): Promise<Buffer> {
-  if (buffer.length <= MAX_IMAGE_BYTES) return buffer;
-  const ratio = Math.sqrt(MAX_IMAGE_BYTES / buffer.length);
-  const metadata = await sharp(buffer).metadata();
-  const newWidth = Math.round((metadata.width ?? 2000) * ratio);
-  let img = sharp(buffer).resize({ width: newWidth, withoutEnlargement: true });
-  if (format === 'jpeg' || format === 'jpg') img = img.jpeg({ quality: 80 });
-  else if (format === 'png') img = img.png({ compressionLevel: 8 });
-  else img = img.jpeg({ quality: 80 });
-  return img.toBuffer();
-}
-
-function getImageFormat(fileName: string): ImageFormat {
-  const ext = fileName.match(/\.(\w+)$/)?.[1]?.toLowerCase() ?? 'jpeg';
-  const map: Record<string, ImageFormat> = { jpg: 'jpeg', jpeg: 'jpeg', png: 'png', gif: 'gif', webp: 'webp', tiff: 'jpeg', tif: 'jpeg', bmp: 'jpeg' };
-  return map[ext] ?? 'jpeg';
-}
-
-const CAPABILITY_GUIDANCE: Record<string, string> = {
-  document_summarization: 'Write a coherent text summary of the document content. Do NOT output tables or HTML. Output plain text paragraphs.',
-  text_extraction: 'Extract all visible text preserving reading order. Output as plain text.',
-  table_extraction: 'Extract tables as HTML <table> with proper <thead>/<tbody>/<tr>/<td>. Only extract ACTUAL tables visible in the document. Do NOT invent empty tables.',
-  kv_extraction: 'Extract key-value pairs as JSON object {key: value}.',
-  image_description: 'Describe images, charts, and diagrams in the document as text.',
-  entity_extraction: 'Extract named entities (names, dates, amounts, addresses) as JSON.',
-  document_classification: 'Classify the document type (invoice, contract, form, etc.).',
-  document_splitting: 'Identify logical document boundaries and page ranges.',
-  language_detection: 'Detect all languages present in the document.',
-  pii_detection: 'Identify PII (names, SSN, phone numbers, etc.) and their locations.',
-};
-
-function buildSystemPrompt(capabilities: string[], userInstruction?: string): string {
-  const capInstructions = capabilities.map((c) => {
-    const info = CAPABILITY_INFO[c as keyof typeof CAPABILITY_INFO];
-    const fmt = info?.defaultFormat ?? 'json';
-    const guidance = CAPABILITY_GUIDANCE[c] ?? `Extract ${c.replace(/_/g, ' ')} data.`;
-    return `- ${c} (format: ${fmt}): ${guidance}`;
-  }).join('\n');
-
-  const instructionBlock = userInstruction
-    ? `\n\nUser's specific requirements (from interview):\n${userInstruction}\n\nTailor your extraction to match these requirements (language, style, detail level, etc.).`
-    : '';
-
-  return `You are a document processing AI. Extract ONLY the requested capabilities from the document.
-
-Capabilities to extract:
-${capInstructions}
-${instructionBlock}
-
-RULES:
-- Return YAML with each capability as a top-level key
-- Each capability must have: data, confidence (0-1), format ("html"|"csv"|"json"|"text")
-- ONLY extract what is asked. Do NOT add extra capabilities
-- Do NOT generate empty or placeholder data. If you cannot extract something, set confidence to 0
-- Match the output language to the document language
-- Return ONLY valid YAML. No markdown code blocks, no JSON`;
 }
 
 export class TokenStreamAdapter implements StreamAdapter {
@@ -205,19 +151,24 @@ export class TokenStreamAdapter implements StreamAdapter {
       { role: 'user', content: contentBlocks },
     ];
 
+    const inferenceConfig: { maxTokens: number; temperature?: number } = {
+      maxTokens: calculateMaxTokens(
+        input.capabilities.length,
+        input.pageCount ?? 1,
+        'yaml',
+        input.capabilities.some(isMediaCapability),
+      ),
+    };
+    // Opus 4.8/4.7 and Sonnet 5 reject `temperature`; only set it where supported.
+    if (!TEMPERATURE_UNSUPPORTED.test(this.modelId)) {
+      inferenceConfig.temperature = 0;
+    }
+
     const command = new ConverseStreamCommand({
       modelId: this.modelId,
       system: [{ text: buildSystemPrompt(input.capabilities, input.userInstruction) }],
       messages,
-      inferenceConfig: {
-        maxTokens: calculateMaxTokens(
-          input.capabilities.length,
-          input.pageCount ?? 1,
-          'yaml',
-          input.capabilities.some(isMediaCapability),
-        ),
-        temperature: 0,
-      },
+      inferenceConfig,
     });
 
     const response = await bedrockClient.send(command);
@@ -253,7 +204,7 @@ export class TokenStreamAdapter implements StreamAdapter {
       emitProgress(res, this.method, 'all', 100, 'Complete');
     }
 
-    const results = this.parseResults(fullText, input.capabilities);
+    const results = parseResults(fullText, input.capabilities);
 
     return {
       results,
@@ -316,96 +267,5 @@ export class TokenStreamAdapter implements StreamAdapter {
       out[cap] = { capability: cap, data: mergedData, confidence: avgConf, format };
     }
     return out;
-  }
-
-  private parseResults(
-    rawOutput: string,
-    capabilities: string[],
-  ): Record<string, { capability: string; data: unknown; confidence: number; format: string }> {
-    const results: Record<string, { capability: string; data: unknown; confidence: number; format: string }> = {};
-
-    let parsed: Record<string, unknown> | null = null;
-
-    // Try multiple parsing strategies
-    const yamlFenceMatch = rawOutput.match(/```(?:yaml|YAML|yml)?\s*\n([\s\S]*?)\n\s*```/);
-    const jsonFenceMatch = rawOutput.match(/```(?:json|JSON)?\s*\n([\s\S]*?)\n\s*```/);
-    const cleanStrategies = [
-      // 1. Try YAML parse first (handles truncated content gracefully)
-      { content: rawOutput.trim(), parser: 'yaml' },
-      // 2. Extract YAML from code fences
-      { content: yamlFenceMatch?.[1]?.trim() ?? '', parser: 'yaml' },
-      // 3. Strip YAML code fences
-      { content: rawOutput.replace(/^```(?:yaml|YAML|yml)?\s*\n/, '').replace(/\n\s*```\s*$/, '').trim(), parser: 'yaml' },
-      // 4. Try JSON parse (fallback for old responses)
-      { content: rawOutput.trim(), parser: 'json' },
-      // 5. Extract JSON from code fences
-      { content: jsonFenceMatch?.[1]?.trim() ?? '', parser: 'json' },
-      // 6. Strip JSON code fences
-      { content: rawOutput.replace(/^```(?:json|JSON)?\s*\n/, '').replace(/\n\s*```\s*$/, '').trim(), parser: 'json' },
-      // 7. Find first JSON object in text
-      { content: rawOutput.match(/(\{[\s\S]*\})/)?.[1]?.trim() ?? '', parser: 'json' },
-    ];
-
-    for (const { content, parser } of cleanStrategies) {
-      if (!content) continue;
-      try {
-        const candidate = parser === 'yaml' ? YAML.parse(content) : JSON.parse(content);
-        if (candidate && typeof candidate === 'object') {
-          parsed = candidate;
-          break;
-        }
-      } catch {
-        // Try next strategy
-      }
-    }
-
-    if (!parsed) {
-      // All parsing failed — return raw text per capability
-      for (const cap of capabilities) {
-        results[cap] = {
-          capability: cap,
-          data: rawOutput,
-          confidence: 0.5,
-          format: 'text',
-        };
-      }
-      return results;
-    }
-
-    for (const cap of capabilities) {
-      // Try exact key match, then underscore/space variations
-      const capData = (parsed[cap] ?? parsed[cap.replace(/_/g, ' ')] ?? parsed[cap.replace(/_/g, '-')]) as Record<string, unknown> | string | undefined;
-
-      if (capData && typeof capData === 'object' && 'data' in capData) {
-        const isSafeNull = capData.data == null && cap === 'content_moderation';
-        const defaultFmt = CAPABILITY_INFO[cap as keyof typeof CAPABILITY_INFO]?.defaultFormat ?? 'json';
-        results[cap] = {
-          capability: cap,
-          data: isSafeNull ? { safe: true, flags: [] } : capData.data,
-          confidence: (capData.confidence as number) ?? (isSafeNull ? 0.95 : 0.85),
-          format: (capData.format as string) ?? defaultFmt,
-        };
-      } else if (capData != null) {
-        // Direct data (no wrapper)
-        const format = CAPABILITY_INFO[cap as keyof typeof CAPABILITY_INFO]?.defaultFormat ?? 'json';
-        results[cap] = {
-          capability: cap,
-          data: capData,
-          confidence: 0.8,
-          format,
-        };
-      } else {
-        // Capability not found in LLM response — likely truncated output.
-        // Provide a fallback from the raw text so downstream consumers still get usable data.
-        results[cap] = {
-          capability: cap,
-          data: rawOutput.length > 0 ? rawOutput : null,
-          confidence: rawOutput.length > 0 ? 0.3 : 0,
-          format: 'text',
-        };
-      }
-    }
-
-    return results;
   }
 }

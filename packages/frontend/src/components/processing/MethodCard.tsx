@@ -33,6 +33,7 @@ export default function MethodCard({ progress, capabilities }: MethodCardProps) 
     'bda-llm': 'BDA+LLM',
     claude: 'Claude',
     nova: 'Nova',
+    gpt: 'GPT',
     'textract-llm': 'Textract+LLM',
     embeddings: 'Embeddings',
     guardrails: 'Guardrails',

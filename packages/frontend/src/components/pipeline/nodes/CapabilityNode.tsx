@@ -19,6 +19,7 @@ interface CapabilityNodeData {
 const FAMILY_COLORS: Record<string, string> = {
   claude: '#7b61ff',
   nova: '#ff9900',
+  gpt: '#10a37f',
   'textract-llm': '#0972d3',
   bda: '#037f0c',
   textract: '#0972d3',

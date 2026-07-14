@@ -12,8 +12,15 @@ export const METHODS = [
   'claude-sonnet',
   'claude-haiku',
   'claude-opus',
+  'claude-opus-4-8',
+  'claude-opus-4-7',
+  'claude-sonnet-5',
   'nova-lite',
   'nova-pro',
+  'gpt-5-6-sol',
+  'gpt-5-6-terra',
+  'gpt-5-6-luna',
+  'gpt-5-5',
   'textract-claude-sonnet',
   'textract-claude-haiku',
   'textract-nova-lite',
@@ -24,7 +31,7 @@ export const METHODS = [
 
 export type ProcessingMethod = (typeof METHODS)[number];
 
-export const METHOD_FAMILIES = ['bda', 'bda-llm', 'claude', 'nova', 'textract-llm', 'embeddings', 'guardrails'] as const;
+export const METHOD_FAMILIES = ['bda', 'bda-llm', 'claude', 'nova', 'gpt', 'textract-llm', 'embeddings', 'guardrails'] as const;
 export type MethodFamily = (typeof METHOD_FAMILIES)[number];
 
 export interface TokenPricing {
@@ -145,7 +152,43 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     tokenPricing: { inputPer1MTokens: 5.00, outputPer1MTokens: 25.00 },
     estimatedCostPerPage: 0.025,
     strengths: ['Highest accuracy', 'Best reasoning', '128k output', 'Complex analysis', 'Contract/legal', '1M context'],
+    limitations: ['Higher cost than 4.8', 'Moderate latency'],
+  },
+  'claude-opus-4-8': {
+    id: 'claude-opus-4-8',
+    family: 'claude',
+    name: 'Claude Opus 4.8',
+    shortName: 'Opus 4.8',
+    description: 'Anthropic Claude Opus 4.8 via Bedrock - the most intelligent Claude model, with adaptive reasoning',
+    modelId: 'us.anthropic.claude-opus-4-8',
+    tokenPricing: { inputPer1MTokens: 5.00, outputPer1MTokens: 25.00 },
+    estimatedCostPerPage: 0.025,
+    strengths: ['Highest accuracy', 'Adaptive reasoning', '128k output', '1M context', 'Best for complex/legal documents'],
     limitations: ['Highest cost', 'Moderate latency'],
+  },
+  'claude-opus-4-7': {
+    id: 'claude-opus-4-7',
+    family: 'claude',
+    name: 'Claude Opus 4.7',
+    shortName: 'Opus 4.7',
+    description: 'Anthropic Claude Opus 4.7 via Bedrock - frontier reasoning for complex document analysis',
+    modelId: 'us.anthropic.claude-opus-4-7',
+    tokenPricing: { inputPer1MTokens: 5.00, outputPer1MTokens: 25.00 },
+    estimatedCostPerPage: 0.025,
+    strengths: ['Very high accuracy', 'Adaptive reasoning', '128k output', '1M context', 'Strong on contracts'],
+    limitations: ['High cost', 'Moderate latency'],
+  },
+  'claude-sonnet-5': {
+    id: 'claude-sonnet-5',
+    family: 'claude',
+    name: 'Claude Sonnet 5',
+    shortName: 'Sonnet 5',
+    description: 'Anthropic Claude Sonnet 5 via Bedrock - near-Opus intelligence at Sonnet pricing',
+    modelId: 'us.anthropic.claude-sonnet-5',
+    tokenPricing: { inputPer1MTokens: 3.00, outputPer1MTokens: 15.00 },
+    estimatedCostPerPage: 0.015,
+    strengths: ['Near-Opus accuracy at Sonnet cost', 'Adaptive reasoning', '128k output', '1M context', 'Fast'],
+    limitations: ['Higher cost than Haiku/Nova', 'No native bounding boxes'],
   },
 
   // ─── Nova ───────────────────────────────────────────────────────────────────
@@ -172,6 +215,61 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     estimatedCostPerPage: 0.008,
     strengths: ['Native bounding boxes', 'Higher accuracy', 'Strong multimodal'],
     limitations: ['Gated Preview (no GA SLA)', 'Limited regional support', 'Quota limits (100 RPM)'],
+  },
+
+  // ─── OpenAI GPT (via Amazon Bedrock Mantle, OpenAI Responses API) ─────────────
+  // Frontier OpenAI models are NOT in the Bedrock Converse catalog; they are
+  // served via the Bedrock Mantle Responses endpoint
+  // (bedrock-mantle.<region>.api.aws/openai/v1) with AWS SigV4 auth. modelId is
+  // the Bedrock model id (openai.gpt-5.6-*). Pricing matches OpenAI list rates.
+  // These models read PDFs and images natively (input_file / input_image).
+  'gpt-5-6-sol': {
+    id: 'gpt-5-6-sol',
+    family: 'gpt',
+    name: 'GPT-5.6 Sol (Flagship)',
+    shortName: 'GPT-5.6 Sol',
+    description: 'OpenAI GPT-5.6 Sol via Amazon Bedrock - flagship tier with the strongest reasoning',
+    modelId: 'openai.gpt-5.6-sol',
+    tokenPricing: { inputPer1MTokens: 5.00, outputPer1MTokens: 30.00 },
+    estimatedCostPerPage: 0.03,
+    strengths: ['Frontier GPT reasoning', 'Native PDF + image understanding', '1M context', '128k output'],
+    limitations: ['Highest GPT cost', 'Served from us-east-2 (Mantle)'],
+  },
+  'gpt-5-6-terra': {
+    id: 'gpt-5-6-terra',
+    family: 'gpt',
+    name: 'GPT-5.6 Terra (Balanced)',
+    shortName: 'GPT-5.6 Terra',
+    description: 'OpenAI GPT-5.6 Terra via Amazon Bedrock - balanced speed/quality/cost tier',
+    modelId: 'openai.gpt-5.6-terra',
+    tokenPricing: { inputPer1MTokens: 2.50, outputPer1MTokens: 15.00 },
+    estimatedCostPerPage: 0.017,
+    strengths: ['Strong GPT reasoning', 'Native PDF + image understanding', 'Balanced cost', '1M context'],
+    limitations: ['Served from us-east-2 (Mantle)'],
+  },
+  'gpt-5-6-luna': {
+    id: 'gpt-5-6-luna',
+    family: 'gpt',
+    name: 'GPT-5.6 Luna (Fast)',
+    shortName: 'GPT-5.6 Luna',
+    description: 'OpenAI GPT-5.6 Luna via Amazon Bedrock - fastest, most cost-effective GPT-5.6 tier',
+    modelId: 'openai.gpt-5.6-luna',
+    tokenPricing: { inputPer1MTokens: 1.00, outputPer1MTokens: 6.00 },
+    estimatedCostPerPage: 0.007,
+    strengths: ['Lowest GPT cost', 'Fast', 'Native PDF + image understanding', '1M context'],
+    limitations: ['Smaller/faster tier', 'Served from us-east-2 (Mantle)'],
+  },
+  'gpt-5-5': {
+    id: 'gpt-5-5',
+    family: 'gpt',
+    name: 'GPT-5.5',
+    shortName: 'GPT-5.5',
+    description: 'OpenAI GPT-5.5 via Amazon Bedrock - previous frontier generation with reasoning',
+    modelId: 'openai.gpt-5.5',
+    tokenPricing: { inputPer1MTokens: 5.00, outputPer1MTokens: 30.00 },
+    estimatedCostPerPage: 0.03,
+    strengths: ['Frontier GPT reasoning', 'Native PDF + image understanding', '1M context', '128k output'],
+    limitations: ['Higher cost', 'Served from us-east-2 (Mantle)'],
   },
 
   // ─── Textract + LLM ────────────────────────────────────────────────────────

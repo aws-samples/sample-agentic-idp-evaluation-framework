@@ -16,3 +16,18 @@ export class ClaudeOpusProcessor extends ProcessorBase {
   readonly method: ProcessingMethod = 'claude-opus';
   readonly adapter = new TokenStreamAdapter('claude-opus');
 }
+
+export class ClaudeOpus48Processor extends ProcessorBase {
+  readonly method: ProcessingMethod = 'claude-opus-4-8';
+  readonly adapter = new TokenStreamAdapter('claude-opus-4-8');
+}
+
+export class ClaudeOpus47Processor extends ProcessorBase {
+  readonly method: ProcessingMethod = 'claude-opus-4-7';
+  readonly adapter = new TokenStreamAdapter('claude-opus-4-7');
+}
+
+export class ClaudeSonnet5Processor extends ProcessorBase {
+  readonly method: ProcessingMethod = 'claude-sonnet-5';
+  readonly adapter = new TokenStreamAdapter('claude-sonnet-5');
+}

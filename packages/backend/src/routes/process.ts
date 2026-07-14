@@ -8,8 +8,9 @@ import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
 import { BdaStandardProcessor, BdaCustomProcessor } from '../processors/bda-processor.js';
 import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor } from '../processors/bda-llm.js';
-import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor } from '../processors/claude-direct.js';
+import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor, ClaudeOpus48Processor, ClaudeOpus47Processor, ClaudeSonnet5Processor } from '../processors/claude-direct.js';
 import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
+import { Gpt56SolProcessor, Gpt56TerraProcessor, Gpt56LunaProcessor, Gpt55Processor } from '../processors/gpt-direct.js';
 import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor, TextractNovaProProcessor } from '../processors/textract-llm.js';
 import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
 import { config } from '../config/aws.js';
@@ -23,8 +24,15 @@ const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Re
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
   'claude-haiku': () => new ClaudeHaikuProcessor(),
   'claude-opus': () => new ClaudeOpusProcessor(),
+  'claude-opus-4-8': () => new ClaudeOpus48Processor(),
+  'claude-opus-4-7': () => new ClaudeOpus47Processor(),
+  'claude-sonnet-5': () => new ClaudeSonnet5Processor(),
   'nova-lite': () => new NovaLiteProcessor(),
   'nova-pro': () => new NovaProProcessor(),
+  'gpt-5-6-sol': () => new Gpt56SolProcessor(),
+  'gpt-5-6-terra': () => new Gpt56TerraProcessor(),
+  'gpt-5-6-luna': () => new Gpt56LunaProcessor(),
+  'gpt-5-5': () => new Gpt55Processor(),
   'textract-claude-sonnet': () => new TextractClaudeSonnetProcessor(),
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
   'textract-nova-lite': () => new TextractNovaLiteProcessor(),
