@@ -16,7 +16,7 @@
     "@cloudscape-design/global-styles": "^1.0.0",
     "@idp/shared": "*",
     "@xyflow/react": "^12.10.1",
-    "dompurify": "^3.2.0",
+    "dompurify": "^3.4.11",
     "jszip": "^3.10.1",
     "lucide-react": "^0.577.0",
     "marked": "^17.0.4",
