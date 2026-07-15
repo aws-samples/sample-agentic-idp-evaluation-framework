@@ -295,6 +295,16 @@ resource "aws_iam_role_policy" "ecs_bedrock" {
         ]
         Resource = "*"
       },
+      # OpenAI GPT models (GPT-5.6 / 5.5) are served via the Bedrock Mantle
+      # OpenAI Responses API, which authorizes against the separate
+      # `bedrock-mantle` service action (bedrock-mantle:CreateInference), NOT
+      # bedrock:InvokeModel. Without this the GPT methods return HTTP 401
+      # "not authorized to perform: bedrock-mantle:CreateInference".
+      {
+        Effect   = "Allow"
+        Action   = ["bedrock-mantle:*"]
+        Resource = "*"
+      },
       {
         Effect = "Allow"
         Action = [
