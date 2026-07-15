@@ -113,6 +113,17 @@ export class EcsBackendConstruct extends Construct {
         resources: ['*'],
       }),
     );
+    // OpenAI GPT models (GPT-5.6 / 5.5) are served via the Bedrock Mantle
+    // OpenAI Responses API, which authorizes against the separate
+    // `bedrock-mantle` service action (bedrock-mantle:CreateInference), NOT
+    // bedrock:InvokeModel. Without this the GPT methods return HTTP 401
+    // "not authorized to perform: bedrock-mantle:CreateInference".
+    this.taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['bedrock-mantle:*'],
+        resources: ['*'],
+      }),
+    );
     this.taskRole.addToPolicy(
       new iam.PolicyStatement({
         actions: [

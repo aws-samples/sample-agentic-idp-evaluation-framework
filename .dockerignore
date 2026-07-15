@@ -1,0 +1,23 @@
+# Keep the build context hermetic: never ship host build artifacts into the
+# image. Stale dist/ and *.tsbuildinfo files make tsc skip declaration emit
+# inside the container (composite/incremental cache hit), which breaks the
+# backend build with "Could not find a declaration file for module '@idp/shared'".
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+
+# VCS / local tooling
+.git
+.gitignore
+
+# Infrastructure (not needed to build the app image)
+infrastructure
+infrastructure-cdk
+**/.terraform
+**/*.tfstate
+**/*.tfstate.*
+
+# Frontend build output / logs / editor cruft
+packages/frontend/dist
+**/*.log
+.DS_Store
