@@ -7,6 +7,7 @@ import type { UploadResponse, Capability, ProcessorResult, ComparisonResult, Pip
 import TopNav from './components/layout/TopNav';
 import SideNav from './components/layout/SideNav';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import DisclaimerBanner from './components/common/DisclaimerBanner';
 import HomePage from './pages/HomePage';
 import type { AuthUser } from './services/api';
 import { authedFetch } from './services/api';
@@ -288,12 +289,15 @@ export default function App() {
   // Render them standalone so /docs never shares the app's stepper navigation.
   if (location.pathname === '/docs' || location.pathname.startsWith('/docs/')) {
     return (
-      <Suspense fallback={<PageSpinner />}>
-        <Routes>
-          <Route path="/docs" element={<DocsPage />} />
-          <Route path="/docs/:slug" element={<DocsPage />} />
-        </Routes>
-      </Suspense>
+      <>
+        <DisclaimerBanner />
+        <Suspense fallback={<PageSpinner />}>
+          <Routes>
+            <Route path="/docs" element={<DocsPage />} />
+            <Route path="/docs/:slug" element={<DocsPage />} />
+          </Routes>
+        </Suspense>
+      </>
     );
   }
 
@@ -301,6 +305,7 @@ export default function App() {
     <>
       <TopNav user={user} darkMode={darkMode} onToggleDarkMode={handleToggleDarkMode} />
       <AppLayout
+        notifications={<DisclaimerBanner />}
         navigation={
           <SideNav activeStep={activeStep} steps={steps} />
         }

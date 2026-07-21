@@ -90,7 +90,10 @@ export default function DocumentUpload({ onUploadComplete }: DocumentUploadProps
           tokenLimit={1}
         />
         <Alert type="warning" statusIconAriaLabel="Warning">
-          Do not upload sensitive customer data or PII. When using customer documents, ensure all personally identifiable information is redacted before uploading.
+          Do not upload documents containing personally identifiable information (PII), protected
+          health information (PHI), financial records, or any sensitive or confidential data. This
+          is a shared demonstration environment — use only sample, synthetic, or fully redacted
+          documents.
         </Alert>
 
         {files.length > 0 && !uploadResult && (
