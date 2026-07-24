@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from '@cloudscape-design/components/app-layout';
 import Spinner from '@cloudscape-design/components/spinner';
@@ -123,6 +123,17 @@ export default function App() {
   const currentStepIndex = steps.findIndex((s) => s.href === location.pathname);
   const activeStep = currentStepIndex >= 0 ? currentStepIndex : 0;
 
+  // Real completion state, derived from what actually exists — not from the URL.
+  // Deep-linking to a later step must not claim earlier steps are done.
+  const completedHrefs = useMemo(() => {
+    const done = new Set<string>();
+    if (document) done.add('/');
+    if (document && selectedCapabilities.length > 0) done.add('/conversation');
+    if (processingResults.length > 0) done.add('/pipeline');
+    if (comparison) done.add('/architecture');
+    return done;
+  }, [document, selectedCapabilities, processingResults, comparison]);
+
   // Feedback survey — one-time per user, checked on login.
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [feedbackChecked, setFeedbackChecked] = useState(false);
@@ -136,8 +147,10 @@ export default function App() {
         if (!res.ok) return;
         const ct = res.headers.get('content-type') ?? '';
         if (!ct.includes('application/json')) return;
-        const data = await res.json() as { submitted: boolean };
-        if (!cancelled && !data.submitted) {
+        const data = await res.json() as { submitted: boolean; available?: boolean };
+        // `available: false` means the feedback table is not provisioned, so
+        // there is nowhere to store a response — do not prompt for one.
+        if (!cancelled && !data.submitted && data.available !== false) {
           // Show after a short delay so it doesn't hijack the initial load
           setTimeout(() => { if (!cancelled) setFeedbackVisible(true); }, 3000);
         }
@@ -307,7 +320,7 @@ export default function App() {
       <AppLayout
         notifications={<DisclaimerBanner />}
         navigation={
-          <SideNav activeStep={activeStep} steps={steps} />
+          <SideNav activeStep={activeStep} steps={steps} completedHrefs={completedHrefs} />
         }
         content={
           <ErrorBoundary>

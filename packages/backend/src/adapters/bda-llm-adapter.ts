@@ -34,7 +34,6 @@ const INPUT_TOKEN_BUDGETS: Record<string, number> = {
   'us.anthropic.claude-opus-4-8': 700_000,
   'us.anthropic.claude-opus-5': 700_000,
   'us.amazon.nova-2-lite-v1:0': 250_000,
-  'us.amazon.nova-pro-v1:0': 250_000,
 };
 
 const CHARS_PER_TOKEN = 3.5; // English-ish rough estimate

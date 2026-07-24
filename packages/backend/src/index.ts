@@ -16,6 +16,7 @@ import { config } from './config/aws.js';
 import { getLocalFilePath, getDocumentBuffer } from './services/s3.js';
 import authRouter from './routes/auth.js';
 import healthRouter from './routes/health.js';
+import methodsRouter from './routes/methods.js';
 import uploadRouter from './routes/upload.js';
 import conversationRouter from './routes/conversation.js';
 import processRouter from './routes/process.js';
@@ -140,6 +141,7 @@ app.use('/api/preview', previewRouter);
 app.use('/api/runs', runsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/feedback', feedbackRouter);
+app.use('/api/methods', methodsRouter);
 
 // Static docs serving (Fumadocs static export at packages/docs/out, basePath=/docs)
 // Mounted BEFORE the SPA fallback so /docs/* hits real HTML files instead of index.html.

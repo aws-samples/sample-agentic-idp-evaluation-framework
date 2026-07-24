@@ -46,10 +46,8 @@ const SPEED_RANK: Record<string, number> = {
   'claude-haiku': 1,
   'nova-lite': 2,
   'textract-nova-lite': 3,
-  'nova-pro': 4,
   'textract-claude-haiku': 5,
   'claude-sonnet': 6,
-  'textract-nova-pro': 7,
   'textract-claude-sonnet': 8,
   'bda-standard': 9,
   'bda-claude-haiku': 10,
@@ -70,7 +68,7 @@ const SPEED_RANK: Record<string, number> = {
   'gpt-5-6-sol': 13,
   'gpt-5-5': 13,
   // Guardrails is fast (Textract + deterministic policy eval, ~4s). Ranked
-  // between nova-pro and textract-claude-haiku.
+  // between nova-lite and textract-claude-haiku.
   'bedrock-guardrails': 4,
 };
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Capability, ProcessingMethod } from '@idp/shared';
-import { getBestMethodsForCapability, METHOD_INFO, BDA_LIMITS, TEXTRACT_LIMITS, isMethodLanguageCompatible } from '@idp/shared';
+import { getBestMethodsForCapability, METHOD_INFO } from '@idp/shared';
 import { getDocumentBuffer } from '../services/s3.js';
 import { convertOfficeDocument, isOfficeFormat } from '../services/file-converter.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
@@ -8,11 +8,11 @@ import { ProcessorBase } from '../processors/processor-base.js';
 import { BdaStandardProcessor, BdaCustomProcessor } from '../processors/bda-processor.js';
 import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor } from '../processors/bda-llm.js';
 import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor, ClaudeOpus5Processor, ClaudeOpus48Processor, ClaudeOpus47Processor, ClaudeSonnet5Processor } from '../processors/claude-direct.js';
-import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
+import { NovaLiteProcessor } from '../processors/nova-direct.js';
 import { Gpt56SolProcessor, Gpt56TerraProcessor, Gpt56LunaProcessor, Gpt55Processor } from '../processors/gpt-direct.js';
-import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor, TextractNovaProProcessor } from '../processors/textract-llm.js';
+import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor } from '../processors/textract-llm.js';
 import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
-import { config } from '../config/aws.js';
+import { getMethodAvailability } from '../services/method-availability.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { trackActivity, trackRunResults } from '../services/activity-tracker.js';
 import { randomUUID } from 'crypto';
@@ -50,7 +50,6 @@ const PROCESSOR_FACTORY: Partial<Record<ProcessingMethod, () => ProcessorBase>> 
   'claude-opus-4-7': () => new ClaudeOpus47Processor(),
   'claude-sonnet-5': () => new ClaudeSonnet5Processor(),
   'nova-lite': () => new NovaLiteProcessor(),
-  'nova-pro': () => new NovaProProcessor(),
   'gpt-5-6-sol': () => new Gpt56SolProcessor(),
   'gpt-5-6-terra': () => new Gpt56TerraProcessor(),
   'gpt-5-6-luna': () => new Gpt56LunaProcessor(),
@@ -58,7 +57,6 @@ const PROCESSOR_FACTORY: Partial<Record<ProcessingMethod, () => ProcessorBase>> 
   'textract-claude-sonnet': () => new TextractClaudeSonnetProcessor(),
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
   'textract-nova-lite': () => new TextractNovaLiteProcessor(),
-  'textract-nova-pro': () => new TextractNovaProProcessor(),
   'bedrock-guardrails': () => new BedrockGuardrailsProcessor(),
 };
 
@@ -102,32 +100,21 @@ router.post('/', async (req, res) => {
 
     const methods = getAvailableMethods(body.methods);
 
-    // Filter out methods without configured backends or incompatible document formats.
-    // Uses the canonical format lists from @idp/shared (BDA_LIMITS, TEXTRACT_LIMITS).
-    const ext = (fileName.match(/\.(\w+)$/)?.[1] ?? '').toLowerCase();
-    const normalizedExt = ext === 'jpg' ? 'jpeg' : ext === 'tif' ? 'tiff' : ext;
-    const isBdaCompatible = (BDA_LIMITS.async.supportedFormats as readonly string[]).includes(normalizedExt);
-    const isTextractCompatible = (TEXTRACT_LIMITS.analyzeDocument.supportedFormats as readonly string[]).includes(normalizedExt);
-
+    // Availability (config + format + language + capability rules) lives in one
+    // shared service so /preview, /pipeline and /process cannot disagree about
+    // whether a method is runnable.
+    const ext = fileName.match(/\.(\w+)$/)?.[1] ?? '';
     const documentLanguages = body.documentLanguages ?? [];
+    const availabilityCtx = {
+      extension: ext,
+      languages: documentLanguages,
+      capabilities: body.capabilities,
+      hasProcessor: (m: ProcessingMethod) => !!PROCESSOR_FACTORY[m],
+    };
 
-    const hasPiiCapability = body.capabilities.some((c) => c === 'pii_detection' || c === 'pii_redaction');
-
-    const validMethods = methods.filter((m) => {
-      if (m.startsWith('bda-') && m !== 'bda-custom' && !config.bdaProfileArn) return false;
-      if (m.startsWith('bda-') && !isBdaCompatible) return false;
-      if (m === 'bda-custom' && !config.bdaProjectArn) return false;
-      if (m.startsWith('textract-') && !isTextractCompatible) return false;
-      if (m === 'bedrock-guardrails') {
-        // Only include Guardrails when BEDROCK_GUARDRAIL_ID is set, at least one
-        // PII capability is requested, and Textract supports the file format.
-        if (!config.bedrockGuardrailId) return false;
-        if (!hasPiiCapability) return false;
-        if (!isTextractCompatible) return false;
-      }
-      if (documentLanguages.length && !isMethodLanguageCompatible(m, documentLanguages)) return false;
-      return !!PROCESSOR_FACTORY[m];
-    });
+    const validMethods = methods.filter(
+      (m) => getMethodAvailability(m, availabilityCtx).available,
+    );
 
     const userAlias = (req as any).authUser?.alias ?? 'anonymous';
     const runId = randomUUID();

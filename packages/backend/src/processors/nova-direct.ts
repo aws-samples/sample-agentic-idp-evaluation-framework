@@ -7,7 +7,4 @@ export class NovaLiteProcessor extends ProcessorBase {
   readonly adapter = new TokenStreamAdapter('nova-lite');
 }
 
-export class NovaProProcessor extends ProcessorBase {
-  readonly method: ProcessingMethod = 'nova-pro';
-  readonly adapter = new TokenStreamAdapter('nova-pro');
-}
+

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateMaxTokens,
+  clampToCeiling,
   isMediaCapability,
   modelMaxOutputTokens,
 } from '../services/token-budget.js';
@@ -71,36 +72,43 @@ describe('calculateMaxTokens', () => {
 });
 
 describe('per-model output ceilings', () => {
-  // Verified live against Bedrock Converse: Nova Pro rejects anything above
-  // 10000 with "The maximum tokens you requested exceeds the model limit of
-  // 10000", while every other model we route to accepts 64000. Without this
-  // clamp the raised budgets broke nova-pro / textract-nova-pro outright.
-  it('reports the Nova Pro 10000 ceiling', () => {
-    expect(modelMaxOutputTokens('us.amazon.nova-pro-v1:0')).toBe(10_000);
-  });
-
-  it('defaults to 64000 for other models', () => {
+  // Every model in the current catalog accepts 64000 output tokens, so no
+  // clamp entries are needed today. These tests pin the clamp MECHANISM, which
+  // exists because a model with a lower ceiling hard-fails with
+  // "The maximum tokens you requested exceeds the model limit of N"
+  // (Nova 1 Pro did exactly that at 10000 before it was removed).
+  it('defaults to 64000 for every model we route to', () => {
     expect(modelMaxOutputTokens('us.anthropic.claude-opus-5')).toBe(64_000);
+    expect(modelMaxOutputTokens('us.amazon.nova-2-lite-v1:0')).toBe(64_000);
     expect(modelMaxOutputTokens('openai.gpt-5.6-sol')).toBe(64_000);
     expect(modelMaxOutputTokens(undefined)).toBe(64_000);
   });
 
-  it('never exceeds the Nova Pro ceiling, even for large workloads', () => {
-    expect(calculateMaxTokens(20, 50, 'json', false, 'us.amazon.nova-pro-v1:0')).toBe(10_000);
+  it('clamps a large request down to the ceiling', () => {
+    expect(clampToCeiling(50_000, 16_384, 10_000)).toBe(10_000);
   });
 
-  it('clamps the 16384 floor down to the model ceiling', () => {
-    // The generous floor must not push nova-pro past its hard limit.
-    expect(calculateMaxTokens(1, 1, 'yaml', false, 'us.amazon.nova-pro-v1:0')).toBe(10_000);
+  it('clamps the FLOOR down to the ceiling too', () => {
+    // The generous 16384 floor must never push a constrained model past its
+    // hard limit — that is what broke Nova 1 Pro (limit 10000).
+    expect(clampToCeiling(1_000, 16_384, 10_000)).toBe(10_000);
   });
 
-  it('clamps media budgets to the model ceiling too', () => {
-    expect(calculateMaxTokens(5, 1, 'yaml', true, 'us.amazon.nova-pro-v1:0')).toBe(10_000);
+  it('raises a small request up to the floor when the ceiling allows', () => {
+    expect(clampToCeiling(1_000, 16_384, 64_000)).toBe(16_384);
   });
 
-  it('still gives Claude models the full budget', () => {
+  it('passes through a value between floor and ceiling', () => {
+    expect(clampToCeiling(24_000, 16_384, 64_000)).toBe(24_000);
+  });
+
+  it('gives Claude models the full budget', () => {
     expect(calculateMaxTokens(1, 1, 'yaml', false, 'us.anthropic.claude-opus-5')).toBe(16_384);
     expect(calculateMaxTokens(15, 10, 'json', false, 'us.anthropic.claude-opus-5')).toBe(64_000);
+  });
+
+  it('gives Nova 2 Lite the full budget', () => {
+    expect(calculateMaxTokens(5, 2, 'yaml', false, 'us.amazon.nova-2-lite-v1:0')).toBe(24_000);
   });
 });
 

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type {
+  Capability,
   PipelineGenerateRequest,
   PipelineGenerateResponse,
   PipelineDefinition,
@@ -13,8 +14,7 @@ import { buildComparison } from '../services/comparison.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { getDocumentBuffer } from '../services/s3.js';
 import { calculateCost } from '../services/pricing.js';
-import { BDA_LIMITS, TEXTRACT_LIMITS, isMethodLanguageCompatible } from '@idp/shared';
-import { config } from '../config/aws.js';
+import { getMethodAvailability } from '../services/method-availability.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
 import {
@@ -37,12 +37,11 @@ import {
   Gpt56LunaProcessor,
   Gpt55Processor,
 } from '../processors/gpt-direct.js';
-import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
+import { NovaLiteProcessor } from '../processors/nova-direct.js';
 import {
   TextractClaudeSonnetProcessor,
   TextractClaudeHaikuProcessor,
   TextractNovaLiteProcessor,
-  TextractNovaProProcessor,
 } from '../processors/textract-llm.js';
 import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
 import { combineUpstreamText } from '../services/pipeline-text-extractor.js';
@@ -69,11 +68,9 @@ const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Re
   'gpt-5-6-luna': () => new Gpt56LunaProcessor(),
   'gpt-5-5': () => new Gpt55Processor(),
   'nova-lite': () => new NovaLiteProcessor(),
-  'nova-pro': () => new NovaProProcessor(),
   'textract-claude-sonnet': () => new TextractClaudeSonnetProcessor(),
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
   'textract-nova-lite': () => new TextractNovaLiteProcessor(),
-  'textract-nova-pro': () => new TextractNovaProProcessor(),
   'bedrock-guardrails': () => new BedrockGuardrailsProcessor(),
 };
 
@@ -189,11 +186,7 @@ router.post('/execute', async (req, res) => {
       pageCount,
     };
 
-    // Filter out methods with missing config or incompatible document formats
-    const ext = (fileName.match(/\.(\w+)$/)?.[1] ?? '').toLowerCase();
-    const normalizedExt = ext === 'jpg' ? 'jpeg' : ext === 'tif' ? 'tiff' : ext;
-    const isBdaCompatible = (BDA_LIMITS.async.supportedFormats as readonly string[]).includes(normalizedExt);
-    const isTextractCompatible = (TEXTRACT_LIMITS.analyzeDocument.supportedFormats as readonly string[]).includes(normalizedExt);
+    const ext = fileName.match(/\.(\w+)$/)?.[1] ?? '';
 
     const documentLanguages: string[] = body.documentLanguages ?? [];
 
@@ -205,40 +198,27 @@ router.post('/execute', async (req, res) => {
       composerNodeForFilter ? ((composerNodeForFilter.config as any).stages as string[]) : [],
     );
 
+    // Availability rules (config / format / language / capability) come from the
+    // shared service, so a method offered by /preview cannot be silently
+    // rejected here with different logic. The node_error events keep the same
+    // shape — only the reason text is now generated in one place.
     const validMethodNodes = methodNodes.filter((node) => {
       const method: ProcessingMethod = (node.config as any).method;
-      if (method === 'bda-custom' && !config.bdaProjectArn) {
-        emitSSE(res, { type: 'node_error', nodeId: node.id, error: 'BDA Custom not configured (BDA_PROJECT_ARN is empty)' } as PipelineExecutionEvent);
-        return false;
-      }
-      if (method.startsWith('bda-') && !config.bdaProfileArn && method !== 'bda-custom') {
-        emitSSE(res, { type: 'node_error', nodeId: node.id, error: 'BDA not configured (BDA_PROFILE_ARN is empty)' } as PipelineExecutionEvent);
-        return false;
-      }
-      if (method.startsWith('bda-') && !isBdaCompatible) {
-        emitSSE(res, { type: 'node_error', nodeId: node.id, error: `BDA does not support .${ext} files` } as PipelineExecutionEvent);
-        return false;
-      }
-      if (method.startsWith('textract-') && !isTextractCompatible) {
-        emitSSE(res, { type: 'node_error', nodeId: node.id, error: `Textract does not support .${ext} files` } as PipelineExecutionEvent);
-        return false;
-      }
-      if (method === 'bedrock-guardrails') {
-        if (!config.bedrockGuardrailId) {
-          emitSSE(res, { type: 'node_error', nodeId: node.id, error: 'Bedrock Guardrails not configured (BEDROCK_GUARDRAIL_ID is empty)' } as PipelineExecutionEvent);
-          return false;
-        }
-        // Guardrails inside a sequential composer is fed by upstream text —
-        // skip the Textract-compat check for that case. Standalone Guardrails
-        // requires Textract-compatible input.
-        const inSequential = sequentialStageIds.has(node.id);
-        if (!inSequential && !isTextractCompatible) {
-          emitSSE(res, { type: 'node_error', nodeId: node.id, error: `Guardrails requires Textract-compatible input; .${ext} not supported (run an LLM stage first)` } as PipelineExecutionEvent);
-          return false;
-        }
-      }
-      if (documentLanguages.length && !isMethodLanguageCompatible(method, documentLanguages)) {
-        emitSSE(res, { type: 'node_error', nodeId: node.id, error: `${method} does not support non-English documents (${documentLanguages.join(', ')})` } as PipelineExecutionEvent);
+      const availability = getMethodAvailability(method, {
+        extension: ext,
+        languages: documentLanguages,
+        capabilities: capabilities as Capability[],
+        hasProcessor: (m) => !!PROCESSOR_MAP[m],
+        // Guardrails inside a sequential composer is fed text by the upstream
+        // extraction stage, so it does not need a Textract-readable format.
+        guardrailsFedByUpstream: sequentialStageIds.has(node.id),
+      });
+      if (!availability.available) {
+        emitSSE(res, {
+          type: 'node_error',
+          nodeId: node.id,
+          error: availability.detail ?? `${method} is unavailable`,
+        } as PipelineExecutionEvent);
         return false;
       }
       return true;

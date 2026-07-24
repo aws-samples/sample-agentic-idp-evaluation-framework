@@ -17,6 +17,7 @@ import MethodCard from '../components/processing/MethodCard';
 import ComparisonTable from '../components/processing/ComparisonTable';
 import MetricsChart from '../components/processing/MetricsChart';
 import { useProcessing } from '../hooks/useProcessing';
+import StepGate from '../components/common/StepGate';
 
 interface ProcessingPageProps {
   document: UploadResponse | null;
@@ -57,9 +58,7 @@ export default function ProcessingPage({
   if (!document) {
     return (
       <ContentLayout header={<Header variant="h1">Processing</Header>}>
-        <Alert type="warning" header="No document uploaded">
-          Please go back to the Upload step and upload a document first.
-        </Alert>
+        <StepGate message="Upload a document to run it through the processing methods." />
       </ContentLayout>
     );
   }
@@ -67,9 +66,11 @@ export default function ProcessingPage({
   if (capabilities.length === 0) {
     return (
       <ContentLayout header={<Header variant="h1">Processing</Header>}>
-        <Alert type="warning" header="No capabilities selected">
-          Please go back to the Analyze step and select at least one capability.
-        </Alert>
+        <StepGate
+          message="Select at least one capability in the Analyze step before processing."
+          actionLabel="Go to Analyze & Preview"
+          actionHref="/conversation"
+        />
       </ContentLayout>
     );
   }

@@ -27,6 +27,7 @@ import { useArchitecture } from '../hooks/useArchitecture';
 import { useCodeGen } from '../hooks/useCodeGen';
 import MermaidDiagram from '../components/common/MermaidDiagram';
 import SafeHtml from '../components/common/SafeHtml';
+import StepGate from '../components/common/StepGate';
 import {
   buildMethodMap,
   generatePythonCode,
@@ -146,9 +147,7 @@ export default function ArchitecturePage({
   if (!document || capabilities.length === 0) {
     return (
       <ContentLayout header={<Header variant="h1">Architecture & Code</Header>}>
-        <Alert type="warning" header="No analysis data">
-          Please complete the Upload and Analyze steps first.
-        </Alert>
+        <StepGate message="Run an evaluation first — architecture guidance is generated from the methods you compared." />
       </ContentLayout>
     );
   }

@@ -40,7 +40,7 @@ describe('isMethodLanguageCompatible', () => {
     expect(isMethodLanguageCompatible('claude-sonnet', ['ko'])).toBe(true);
     expect(isMethodLanguageCompatible('claude-haiku', ['ko'])).toBe(true);
     expect(isMethodLanguageCompatible('nova-lite', ['ko'])).toBe(true);
-    expect(isMethodLanguageCompatible('nova-pro', ['ja'])).toBe(true);
+    expect(isMethodLanguageCompatible('nova-lite', ['ja'])).toBe(true);
   });
 
   it('treats English-only list as fully compatible', () => {

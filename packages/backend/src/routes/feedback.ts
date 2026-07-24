@@ -20,6 +20,17 @@ router.get('/status', async (req, res) => {
     const status = await getFeedbackStatus(alias);
     res.json(status);
   } catch (err) {
+    // The feedback table is optional infrastructure. When it does not exist
+    // (local dev, or a deployment without the table) treat feedback as
+    // "not submitted" rather than returning a 500: the survey is a nice-to-have
+    // and a missing table should not put an error in the user's console on
+    // every page load.
+    const name = (err as { name?: string })?.name;
+    if (name === 'ResourceNotFoundException') {
+      console.warn('[Feedback] Table not found — reporting feedback as not submitted.');
+      res.json({ submitted: false, available: false });
+      return;
+    }
     console.error('[Feedback] Status error:', err);
     res.status(500).json({ error: 'Failed to load feedback status' });
   }

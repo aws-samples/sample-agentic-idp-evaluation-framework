@@ -17,7 +17,4 @@ export class TextractNovaLiteProcessor extends ProcessorBase {
   readonly adapter = new TwoPhaseAdapter('textract-nova-lite');
 }
 
-export class TextractNovaProProcessor extends ProcessorBase {
-  readonly method: ProcessingMethod = 'textract-nova-pro';
-  readonly adapter = new TwoPhaseAdapter('textract-nova-pro');
-}
+

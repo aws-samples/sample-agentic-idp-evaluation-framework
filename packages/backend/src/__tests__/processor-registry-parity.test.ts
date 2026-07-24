@@ -64,9 +64,18 @@ describe('model ids', () => {
   it('no method points at a non-existent preview model', () => {
     // us.amazon.nova-2-pro-preview-20251202-v1:0 was configured but is not
     // resolvable in any region (Converse: ResourceNotFoundException), so every
-    // nova-pro run failed. Guard against reintroducing an unresolvable id.
+    // nova-pro run failed. Nova 1 Pro has since been dropped from the catalog
+    // entirely; guard against reintroducing either id.
     for (const method of METHODS as readonly ProcessingMethod[]) {
       expect(METHOD_INFO[method].modelId).not.toContain('nova-2-pro-preview');
+      expect(METHOD_INFO[method].modelId).not.toBe('us.amazon.nova-pro-v1:0');
     }
+  });
+
+  it('Nova is represented only by Nova 2 Lite', () => {
+    const novaMethods = (METHODS as readonly ProcessingMethod[]).filter(
+      (m) => METHOD_INFO[m].family === 'nova',
+    );
+    expect(novaMethods).toEqual(['nova-lite']);
   });
 });

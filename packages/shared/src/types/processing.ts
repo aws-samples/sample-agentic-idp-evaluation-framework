@@ -17,7 +17,6 @@ export const METHODS = [
   'claude-opus-4-7',
   'claude-sonnet-5',
   'nova-lite',
-  'nova-pro',
   'gpt-5-6-sol',
   'gpt-5-6-terra',
   'gpt-5-6-luna',
@@ -25,7 +24,6 @@ export const METHODS = [
   'textract-claude-sonnet',
   'textract-claude-haiku',
   'textract-nova-lite',
-  'textract-nova-pro',
   'nova-embeddings',
   'bedrock-guardrails',
 ] as const;
@@ -217,23 +215,6 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     strengths: ['GA model', 'Fastest Nova', 'Lowest cost', 'Fixed 230 tokens/image (resolution-independent)', 'Reasoning capabilities', 'Good for batch'],
     limitations: ['Smaller model', 'Simpler extraction than Pro'],
   },
-  // Nova Pro uses the GA `nova-pro-v1:0` profile. The previously configured
-  // `nova-2-pro-preview-20251202-v1:0` is not resolvable in any region
-  // (Converse returns ResourceNotFoundException: Model not found), which made
-  // every nova-pro run fail. GA nova-pro is verified working on PDF input.
-  'nova-pro': {
-    id: 'nova-pro',
-    family: 'nova',
-    name: 'Nova Pro',
-    shortName: 'Nova Pro',
-    description: 'Amazon Nova Pro (GA) - strong multimodal understanding for text, image, and video input',
-    modelId: 'us.amazon.nova-pro-v1:0',
-    tokenPricing: { inputPer1MTokens: 0.80, outputPer1MTokens: 3.20 },
-    estimatedCostPerPage: 0.008,
-    strengths: ['GA model', 'Higher accuracy than Lite', 'Strong multimodal', '300k context'],
-    limitations: ['Higher cost than Nova Lite', 'No native bounding boxes'],
-  },
-
   // ─── OpenAI GPT (via Amazon Bedrock Mantle, OpenAI Responses API) ─────────────
   // Frontier OpenAI models are NOT in the Bedrock Converse catalog; they are
   // served via the Bedrock Mantle Responses endpoint
@@ -325,18 +306,6 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     estimatedCostPerPage: 0.005,
     strengths: ['Textract precision + Nova speed', 'Lowest cost hybrid', 'GA models only', 'Good for batch'],
     limitations: ['Lite model for structuring', 'Two-step process'],
-  },
-  'textract-nova-pro': {
-    id: 'textract-nova-pro',
-    family: 'textract-llm',
-    name: 'Textract + Nova Pro',
-    shortName: 'Txt+Nova Pro',
-    description: 'Amazon Textract OCR followed by Nova Pro (GA) for structuring',
-    modelId: 'us.amazon.nova-pro-v1:0',
-    tokenPricing: { inputPer1MTokens: 0.80, outputPer1MTokens: 3.20 },
-    estimatedCostPerPage: 0.01,
-    strengths: ['Textract precision + Nova Pro accuracy', 'Better structuring than Lite', 'GA model'],
-    limitations: ['Two-step latency', 'Higher cost than Nova Lite'],
   },
 
   // ─── Guardrails ──────────────────────────────────────────────────────────────

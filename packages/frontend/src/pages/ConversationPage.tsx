@@ -13,6 +13,7 @@ import CapabilityCards from '../components/conversation/CapabilityCards';
 import PreviewComparison from '../components/conversation/PreviewComparison';
 import { useConversation } from '../hooks/useConversation';
 import { usePreview, type PreviewResponse } from '../hooks/usePreview';
+import StepGate from '../components/common/StepGate';
 
 interface ConversationPageProps {
   document: UploadResponse | null;
@@ -102,9 +103,7 @@ export default function ConversationPage({
   if (!document) {
     return (
       <ContentLayout header={<Header variant="h1">Document Analysis</Header>}>
-        <Alert type="warning" header="No document uploaded">
-          Please go back to the Upload step and upload a document first.
-        </Alert>
+        <StepGate message="Upload a document and the AI advisor will analyze its structure and recommend capabilities." />
       </ContentLayout>
     );
   }

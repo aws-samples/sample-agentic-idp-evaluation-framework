@@ -48,7 +48,6 @@ All prices are Standard Tier, US regions, as of 2026-03.
 | Method | `modelId` | Input/1M | Output/1M | $/page (est.) |
 |---|---|---|---|---|
 | `nova-lite` | `us.amazon.nova-2-lite-v1:0` | $0.30 | $2.50 | $0.001 |
-| `nova-pro` | `us.amazon.nova-2-pro-preview-20251202-v1:0` | $1.25 | $10.00 | $0.008 |
 
 Nova 2 Pro is a **Gated Preview** (no GA SLA, 100 RPM, limited regions). Nova 2 Lite prices images at a fixed **230 tokens/image** regardless of resolution.
 
@@ -59,7 +58,6 @@ Nova 2 Pro is a **Gated Preview** (no GA SLA, 100 RPM, limited regions). Nova 2 
 | `textract-claude-sonnet` | `us.anthropic.claude-sonnet-4-6` | $0.017 |
 | `textract-claude-haiku` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | $0.006 |
 | `textract-nova-lite` | `us.amazon.nova-2-lite-v1:0` | $0.005 |
-| `textract-nova-pro` | `us.amazon.nova-2-pro-preview-20251202-v1:0` | $0.010 |
 
 ### Embeddings
 
@@ -93,7 +91,7 @@ The adapter calls `ApplyGuardrailCommand` with `source: INPUT`, `outputScope: FU
 Rough decision tree — the app computes this empirically for you, but here's the intuition:
 
 1. **Non-English primary language?** → Skip BDA, BDA+LLM, and Textract+LLM — they produce garbled output on non-Latin text. See `isMethodLanguageCompatible()` in `processing.ts`.
-2. **Need bounding boxes?** → `nova-pro` (native) or `bda-custom` (blueprint fields). BDA Standard and LLM-only methods have none.
+2. **Need bounding boxes?** → `bda-custom` (blueprint fields). BDA Standard and LLM-only methods have none.
 3. **Tables-heavy?** → `textract-claude-sonnet` for forms with nested tables; `claude-sonnet` for freestyle tables.
 4. **Cost-first, English, simple?** → `bda-standard` ($0.01/page) or `nova-lite` (cheapest LLM).
 5. **Highest accuracy, budget OK?** → `claude-opus` (reasoning) or `bda-claude-sonnet` (hybrid).

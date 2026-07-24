@@ -21,6 +21,7 @@ import PipelineAlternatives from '../components/pipeline/PipelineAlternatives';
 import { usePipeline } from '../hooks/usePipeline';
 import { usePipelineChat } from '../hooks/usePipelineChat';
 import type { PreviewResponse } from '../hooks/usePreview';
+import StepGate from '../components/common/StepGate';
 
 interface PipelinePageProps {
   document: UploadResponse | null;
@@ -242,9 +243,7 @@ export default function PipelinePage({
   if (!document) {
     return (
       <ContentLayout header={<Header variant="h1">Pipeline Builder</Header>}>
-        <Alert type="warning" header="No document uploaded">
-          Please go back to the Upload step and upload a document first.
-        </Alert>
+        <StepGate message="Upload a document first — the pipeline is built around the capabilities it needs." />
       </ContentLayout>
     );
   }
@@ -252,9 +251,11 @@ export default function PipelinePage({
   if (capabilities.length === 0) {
     return (
       <ContentLayout header={<Header variant="h1">Pipeline Builder</Header>}>
-        <Alert type="warning" header="No capabilities selected">
-          Please go back to the Analyze step and select at least one capability.
-        </Alert>
+        <StepGate
+          message="Select at least one capability in the Analyze step to build a pipeline."
+          actionLabel="Go to Analyze & Preview"
+          actionHref="/conversation"
+        />
       </ContentLayout>
     );
   }

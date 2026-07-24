@@ -14,11 +14,10 @@ import {
   CATEGORY_INFO,
   CAPABILITY_CATEGORIES,
   getCapabilitiesByCategory,
-  METHOD_FAMILIES,
   METHODS,
   getMethodsByFamily,
 } from '@idp/shared';
-import type { SupportLevel } from '@idp/shared';
+import type { SupportLevel, MethodFamily } from '@idp/shared';
 import Popover from '@cloudscape-design/components/popover';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import {
@@ -30,6 +29,7 @@ import {
 import DocumentUpload from '../components/upload/DocumentUpload';
 import OnboardingBanner from '../components/common/OnboardingBanner';
 import { getCapabilityIcon } from '../components/common/icons';
+import { useMethodAvailability } from '../hooks/useMethodAvailability';
 
 interface HomePageProps {
   onUploadComplete: (doc: UploadResponse) => void;
@@ -50,6 +50,47 @@ const FAMILY_NAMES: Record<string, string> = {
   'bedrock-guardrails': 'Bedrock Guardrails',
 };
 
+/**
+ * Families grouped by the ROLE they play, because they are not interchangeable
+ * peers. Listing "BDA Standard" and "Bedrock Guardrails" in the same flat grid
+ * as "Claude Opus 5" implied you would pick between them, when in practice a
+ * managed pipeline, a general-purpose model and a PII policy engine answer
+ * different questions.
+ */
+const FAMILY_GROUPS: ReadonlyArray<{
+  title: string;
+  blurb: string;
+  families: readonly MethodFamily[];
+}> = [
+  {
+    title: 'General-purpose models',
+    blurb: 'Multimodal LLMs that read the document directly. Pick these to compare raw model quality.',
+    families: ['claude', 'gpt', 'nova'],
+  },
+  {
+    title: 'Managed extraction pipelines',
+    blurb: 'AWS-managed OCR and extraction. Lower cost and consistent output, with a fixed schema.',
+    families: ['bda'],
+  },
+  {
+    title: 'Two-stage hybrids',
+    blurb: 'A managed extractor handles OCR, then an LLM structures the result.',
+    families: ['bda-llm', 'textract-llm'],
+  },
+  {
+    title: 'Specialized services',
+    blurb: 'Purpose-built for one job rather than general extraction.',
+    families: ['guardrails', 'embeddings'],
+  },
+];
+
+/** Per-family note explaining what the family actually is, where it is not obvious. */
+const FAMILY_ROLE_NOTES: Partial<Record<MethodFamily, string>> = {
+  guardrails: 'Deterministic PII detection and redaction policy — applies only to PII capabilities, not general extraction.',
+  embeddings: 'Produces vectors for search and retrieval, not extracted fields.',
+  bda: 'Fully managed extraction service. Requires a data-automation profile.',
+};
+
 const STEPS = [
   { icon: <Upload size={24} strokeWidth={1.5} />, title: 'Upload', desc: 'Upload any document — PDF, image, Word, Excel, or PowerPoint.' },
   { icon: <MessageSquare size={24} strokeWidth={1.5} />, title: 'Analyze', desc: 'AI advisor identifies structure and recommends capabilities.' },
@@ -60,6 +101,7 @@ const STEPS = [
 export default function HomePage({ onUploadComplete }: HomePageProps) {
   const uploadRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { isUnavailable, reasonFor } = useMethodAvailability();
 
   const handleUploadComplete = (doc: UploadResponse) => {
     onUploadComplete(doc);
@@ -68,6 +110,11 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
 
   const scrollToUpload = () => {
     uploadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Move focus to the upload control as well. Scrolling alone leaves keyboard
+    // and screen-reader users where they were, so the CTA appeared to do nothing.
+    uploadRef.current?.querySelector<HTMLElement>('input[type="file"], button')?.focus({
+      preventScroll: true,
+    });
   };
 
   return (
@@ -107,7 +154,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                   <div style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     width: 48, height: 48, borderRadius: 10,
-                    border: '1px solid #e9ebed', color: '#0972d3', margin: '0 auto',
+                    border: '1px solid var(--color-border-divider-default, #e9ebed)', color: 'var(--color-text-link-default, #0972d3)', margin: '0 auto',
                   }}>
                     {step.icon}
                   </div>
@@ -153,7 +200,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                                 <SpaceBetween size="xs">
                                   <Box variant="strong">{cap.name}</Box>
                                   <Box color="text-body-secondary" fontSize="body-s">{cap.description}</Box>
-                                  <div style={{ borderTop: '1px solid #e9ebed', paddingTop: 6, marginTop: 2 }}>
+                                  <div style={{ borderTop: '1px solid var(--color-border-divider-default, #e9ebed)', paddingTop: 6, marginTop: 2 }}>
                                     {cap.category === 'document_conversion' ? (
                                       <>
                                         <Box variant="small" fontWeight="bold" padding={{ bottom: 'xxs' }}>Execution Method:</Box>
@@ -186,7 +233,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                                       </>
                                     )}
                                   </div>
-                                  <div style={{ borderTop: '1px solid #e9ebed', paddingTop: 6, marginTop: 2, fontSize: 12 }}>
+                                  <div style={{ borderTop: '1px solid var(--color-border-divider-default, #e9ebed)', paddingTop: 6, marginTop: 2, fontSize: 12 }}>
                                     <Box variant="small" color="text-body-secondary">
                                       Example: {cap.exampleInput} → {cap.exampleOutput}
                                     </Box>
@@ -198,12 +245,12 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                                 style={{
                                   display: 'inline-flex', alignItems: 'center', gap: 6,
                                   padding: '6px 10px', borderRadius: 6,
-                                  border: '1px solid #e9ebed', fontSize: 13,
+                                  border: '1px solid var(--color-border-divider-default, #e9ebed)', fontSize: 13,
                                   cursor: 'pointer',
                                   transition: 'border-color 0.15s',
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0972d3'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e9ebed'; }}
+                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-text-link-default, #0972d3)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-divider-default, #e9ebed)'; }}
                               >
                                 {getCapabilityIcon(cap.id, 18)}
                                 <span>{cap.name}</span>
@@ -220,56 +267,87 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
           </Container>
         </div>
 
-        {/* Methods */}
-        <Container header={<Header variant="h2" counter={`(${METHODS.length})`}>Processing Methods</Header>}>
-          <ColumnLayout columns={3} minColumnWidth={250} variant="text-grid">
-            {METHOD_FAMILIES.map((family) => {
-              const methods = getMethodsByFamily(family);
+        {/* Methods, grouped by role rather than as one flat list of peers */}
+        <Container
+          header={
+            <Header
+              variant="h2"
+              counter={`(${METHODS.length})`}
+              description="Grouped by the role each approach plays. Availability reflects this deployment's configuration."
+            >
+              Processing Methods
+            </Header>
+          }
+        >
+          <SpaceBetween size="l">
+            {FAMILY_GROUPS.map((group) => {
+              const families = group.families.filter((f) => getMethodsByFamily(f).length > 0);
+              if (families.length === 0) return null;
               return (
-                <SpaceBetween key={family} size="xs">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Box variant="h3">{FAMILY_NAMES[family]}</Box>
-                    <Badge>{methods.length}</Badge>
-                  </div>
-                  {methods.map((m) => (
-                    <div key={m.id} style={{ padding: '4px 0', borderBottom: '1px solid #f2f3f3' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <Box fontSize="body-s" fontWeight="bold">{m.shortName}</Box>
-                        {m.family !== 'textract-llm' && m.family !== 'bda-llm' && (
-                          m.tokenPricing.inputPer1MTokens > 0 ? (
-                            <Box fontSize="body-s" color="text-body-secondary">
-                              ${m.tokenPricing.inputPer1MTokens} / ${m.tokenPricing.outputPer1MTokens} MTok
-                            </Box>
-                          ) : (
-                            <Box fontSize="body-s" color="text-body-secondary">
-                              ${m.estimatedCostPerPage.toFixed(2)}/page
-                            </Box>
-                          )
-                        )}
-                      </div>
-                      {m.family === 'bda-llm' && (
-                        <Box fontSize="body-s" color="text-body-secondary">
-                          BDA $0.01/pg + LLM ${m.tokenPricing.inputPer1MTokens}/${m.tokenPricing.outputPer1MTokens} MTok
-                        </Box>
-                      )}
-                      {m.family === 'textract-llm' && (
-                        <Box fontSize="body-s" color="text-body-secondary">
-                          Textract $0.0015/pg + LLM ${m.tokenPricing.inputPer1MTokens}/${m.tokenPricing.outputPer1MTokens} MTok
-                        </Box>
-                      )}
-                    </div>
-                  ))}
-                </SpaceBetween>
+                <div key={group.title}>
+                  <SpaceBetween size="xs">
+                    <Box variant="h3">{group.title}</Box>
+                    <Box color="text-body-secondary" fontSize="body-s">{group.blurb}</Box>
+                    <ColumnLayout columns={3} minColumnWidth={250} variant="text-grid">
+                      {families.map((family) => {
+                        const methods = getMethodsByFamily(family);
+                        return (
+                          <SpaceBetween key={family} size="xxs">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Box variant="awsui-key-label">{FAMILY_NAMES[family]}</Box>
+                              <Badge>{methods.length}</Badge>
+                            </div>
+                            {FAMILY_ROLE_NOTES[family] && (
+                              <Box color="text-body-secondary" fontSize="body-s">
+                                {FAMILY_ROLE_NOTES[family]}
+                              </Box>
+                            )}
+                            {methods.map((m) => (
+                              <div
+                                key={m.id}
+                                style={{
+                                  padding: '4px 0',
+                                  borderBottom: '1px solid var(--color-border-divider-secondary, #f2f3f3)',
+                                  opacity: isUnavailable(m.id) ? 0.65 : 1,
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                                  <Box fontSize="body-s" fontWeight="bold">{m.shortName}</Box>
+                                  <Box fontSize="body-s" color="text-body-secondary">
+                                    {m.family === 'bda-llm'
+                                      ? `BDA $0.01/pg + $${m.tokenPricing.inputPer1MTokens}/$${m.tokenPricing.outputPer1MTokens} MTok`
+                                      : m.family === 'textract-llm'
+                                        ? `Textract $0.0015/pg + $${m.tokenPricing.inputPer1MTokens}/$${m.tokenPricing.outputPer1MTokens} MTok`
+                                        : m.tokenPricing.inputPer1MTokens > 0
+                                          ? `$${m.tokenPricing.inputPer1MTokens} / $${m.tokenPricing.outputPer1MTokens} MTok`
+                                          : `$${m.estimatedCostPerPage.toFixed(2)}/page`}
+                                  </Box>
+                                </div>
+                                {isUnavailable(m.id) && (
+                                  <Box fontSize="body-s">
+                                    <StatusIndicator type="stopped">
+                                      {reasonFor(m.id) ?? 'Not available in this deployment'}
+                                    </StatusIndicator>
+                                  </Box>
+                                )}
+                              </div>
+                            ))}
+                          </SpaceBetween>
+                        );
+                      })}
+                    </ColumnLayout>
+                  </SpaceBetween>
+                </div>
               );
             })}
-          </ColumnLayout>
+          </SpaceBetween>
         </Container>
 
         <Box color="text-body-secondary" fontSize="body-s" textAlign="center" padding={{ horizontal: 'l' }}>
           * Pricing shown as input / output per 1M tokens for LLM-based methods, and per-page for BDA.
           Actual costs depend on document size, token count, and region. Textract+LLM costs include
           Textract fees ($0.0015/page) plus LLM token costs. See the{' '}
-          <a href="https://aws.amazon.com/bedrock/pricing/" target="_blank" rel="noreferrer" style={{ color: '#0972d3' }}>
+          <a href="https://aws.amazon.com/bedrock/pricing/" target="_blank" rel="noreferrer" style={{ color: 'var(--color-text-link-default, #0972d3)' }}>
             Amazon Bedrock pricing page
           </a>{' '}
           for current rates.
