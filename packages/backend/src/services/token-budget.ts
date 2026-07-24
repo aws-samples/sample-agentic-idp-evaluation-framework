@@ -39,6 +39,21 @@ export function modelMaxOutputTokens(modelId?: string): number {
 }
 
 /**
+ * Apply a caller-supplied hard ceiling to a computed budget.
+ *
+ * The size-based budget is deliberately generous so full runs never truncate,
+ * but that headroom also lets a model generate all the way to the ceiling. In
+ * preview — where every method races in parallel and the user waits on the
+ * slowest — that turned one method into a 161s stall (Nova 2 Lite emitted 16.6k
+ * output tokens on a document it normally answers in ~5s). Callers that need a
+ * bounded response pass a smaller cap; `undefined` keeps the full budget.
+ */
+export function applyOutputCap(budget: number, cap?: number): number {
+  if (!cap || cap <= 0) return budget;
+  return Math.min(budget, cap);
+}
+
+/**
  * Clamp a desired budget to a model ceiling. Split out from calculateMaxTokens
  * so the clamp behavior can be tested against an arbitrary ceiling without
  * needing a real constrained model in the catalog.

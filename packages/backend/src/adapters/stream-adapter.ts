@@ -21,6 +21,14 @@ export interface AdapterInput {
    * text-only stage.
    */
   precomputedText?: string;
+  /**
+   * Hard ceiling on output tokens for this run, overriding the size-based
+   * budget. Preview uses it to keep a "quick look" quick: the generous budget
+   * that prevents truncation on a full pipeline run also lets a model generate
+   * until it hits that ceiling, which turned one preview method into a 161s
+   * stall. Full runs leave this unset and keep the untruncated budget.
+   */
+  maxOutputTokens?: number;
 }
 
 export interface AdapterOutput {

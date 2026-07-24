@@ -2,6 +2,7 @@ import { ConverseCommand, type Message, type ImageFormat } from '@aws-sdk/client
 import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
 import { bedrockClient, config } from '../../config/aws.js';
+import { buildInferenceConfig } from '../../adapters/extraction-shared.js';
 import { getDocumentBuffer } from '../../services/s3.js';
 import { convertOfficeDocument, isOfficeFormat } from '../../services/file-converter.js';
 
@@ -163,7 +164,7 @@ async function callBedrock(messages: Message[]): Promise<DocumentAnalysis> {
     modelId: config.claudeModelId,
     system: [{ text: 'You are a document analysis assistant. Return only valid JSON.' }],
     messages,
-    inferenceConfig: { maxTokens: 16384, temperature: 0 },
+    inferenceConfig: buildInferenceConfig(config.claudeModelId, 16384, 0),
   });
 
   const response = await bedrockClient.send(command);

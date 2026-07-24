@@ -66,6 +66,47 @@ function estimatePageCount(buffer: Buffer): number {
   return matches ? matches.length : 1;
 }
 
+/**
+ * Per-method ceiling for the preview step. Preview runs every method in
+ * parallel and the user waits on the slowest one, so an unbounded method makes
+ * the whole comparison unusable. 60s is far above the observed p99 for a
+ * healthy method (~5-25s) while still cutting off a runaway.
+ */
+const PREVIEW_METHOD_TIMEOUT_MS = 60_000;
+
+/**
+ * Output-token cap for preview runs. Healthy methods answer a single-page
+ * document in 200-500 output tokens, so 4096 leaves generous room for dense
+ * multi-table pages while preventing a model from generating to the full
+ * anti-truncation budget (16k+) during an interactive comparison.
+ */
+const PREVIEW_MAX_OUTPUT_TOKENS = 4096;
+
+class MethodTimeoutError extends Error {
+  constructor(method: string, ms: number) {
+    super(`${method} exceeded the ${ms / 1000}s preview limit and was cancelled. Run it from the Pipeline step for a full, untimed execution.`);
+    this.name = 'MethodTimeoutError';
+  }
+}
+
+/**
+ * Reject after `ms` if `promise` has not settled.
+ *
+ * Note this bounds how long preview WAITS, not the upstream Bedrock call
+ * itself — the underlying request keeps running until the SDK gives up. That is
+ * an acceptable trade for preview, where the goal is to stop one slow method
+ * from blocking the user's view of the other twenty.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, method: string): Promise<T> {
+  let timer: NodeJS.Timeout;
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new MethodTimeoutError(method, ms)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
+
 const router = Router();
 
 router.post('/', async (req, res) => {
@@ -96,6 +137,11 @@ router.post('/', async (req, res) => {
       capabilities: body.capabilities,
       pageCount,
       userInstruction: body.userInstruction,
+      // Preview is a side-by-side "quick look", not the authoritative run, so
+      // cap output well below the anti-truncation budget a full pipeline gets.
+      // Long answers here cost wall clock the user actively waits on, and the
+      // comparison only needs enough output to judge quality.
+      maxOutputTokens: PREVIEW_MAX_OUTPUT_TOKENS,
     };
 
     const methods = getAvailableMethods(body.methods);
@@ -156,7 +202,18 @@ router.post('/', async (req, res) => {
         const methodStart = Date.now();
         try {
           const processor = PROCESSOR_FACTORY[method]!();
-          const result = await processor.process(res, input);
+          // Bound each method independently. Preview is a "quick look" that the
+          // user waits on with every method racing in parallel, so total wall
+          // clock is the SLOWEST method. Without a cap, one model that runs
+          // away generating until it hits the output ceiling holds the whole
+          // run: a real document once pushed Nova 2 Lite to 161s (16.6k output
+          // tokens, i.e. the token ceiling) when it normally answers in ~5s.
+          // A timed-out method reports as an error instead of stalling the rest.
+          const result = await withTimeout(
+            processor.process(res, input),
+            PREVIEW_METHOD_TIMEOUT_MS,
+            method,
+          );
           const info = METHOD_INFO[method];
           console.log(`[Preview] ${method} ${result.status} ${Date.now() - methodStart}ms cost=$${result.metrics.cost.toFixed(4)}`);
           const methodResult = {

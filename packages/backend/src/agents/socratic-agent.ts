@@ -6,6 +6,7 @@ import type { Response } from 'express';
 import type { ConversationEvent, CapabilityRecommendation } from '@idp/shared';
 import { CAPABILITY_INFO, CAPABILITY_CATEGORIES, CATEGORY_INFO, getCapabilitiesByCategory } from '@idp/shared';
 import { bedrockClient, config } from '../config/aws.js';
+import { buildInferenceConfig } from '../adapters/extraction-shared.js';
 import { emitSSE } from '../services/streaming.js';
 import { analyzeDocument } from './tools/analyze-document.js';
 
@@ -76,10 +77,9 @@ export async function runSocraticAgent(
     modelId: config.claudeModelId,
     system: [{ text: systemPrompt }],
     messages,
-    inferenceConfig: {
-      maxTokens: 32768,
-      temperature: 0.7,
-    },
+    // Opus 5 / 4.8 / 4.7 / Sonnet 5 reject `temperature`; buildInferenceConfig
+    // omits it for those so the orchestration model can be upgraded freely.
+    inferenceConfig: buildInferenceConfig(config.claudeModelId, 32768, 0.7),
   });
 
   const response = await bedrockClient.send(command);

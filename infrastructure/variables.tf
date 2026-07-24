@@ -55,7 +55,7 @@ variable "cors_allowed_origins" {
 variable "claude_model_id" {
   description = "Bedrock inference profile / model ID for Claude (passed into backend + agent)"
   type        = string
-  default     = "us.anthropic.claude-sonnet-4-6"
+  default     = "us.anthropic.claude-opus-5"
 }
 
 variable "nova_model_id" {
@@ -94,9 +94,13 @@ variable "admin_users" {
 }
 
 variable "manage_activity_table" {
+  # Defaulted to false, which left ACTIVITY_TABLE pointing at a table that was
+  # never created: every run-history write failed with ResourceNotFoundException
+  # and "Recent Runs" was permanently empty. Creating the table is the correct
+  # default; set false only when an existing out-of-band table is in use.
   description = "If true, Terraform creates and manages the DynamoDB activity table. Set to false when an existing out-of-band table is already in use."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "manage_guardrail" {

@@ -10,7 +10,7 @@ import Badge from '@cloudscape-design/components/badge';
 import Tabs from '@cloudscape-design/components/tabs';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import type { CapabilityRecommendation, Capability, CapabilityCategory } from '@idp/shared';
-import { CAPABILITY_INFO, CAPABILITY_CATEGORIES, CATEGORY_INFO } from '@idp/shared';
+import { CAPABILITY_INFO, CAPABILITY_CATEGORIES, CATEGORY_INFO, isModelBackedCapability } from '@idp/shared';
 import type { PreviewResponse, MethodResult, CapabilityResult } from '../../hooks/usePreview';
 import SafeHtml from '../common/SafeHtml';
 
@@ -211,13 +211,24 @@ export default function CapabilityCards({
               cardDefinition={{
                 header: (item) => {
                   const info = CAPABILITY_INFO[item.capability];
+                  // Preprocessing capabilities (PDF conversion, format
+                  // standardization) are performed in code before extraction,
+                  // not by a model. Selecting one used to add it to every LLM
+                  // prompt, where it asked for output that cannot exist. Label
+                  // it and leave the toggle off rather than pretending it is a
+                  // model choice.
+                  const isPreprocessing = !isModelBackedCapability(item.capability);
                   return (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                       <Box variant="h3">{info?.name ?? item.capability}</Box>
-                      <Toggle
-                        checked={selected.includes(item.capability)}
-                        onChange={({ detail }) => onToggle(item.capability, detail.checked)}
-                      />
+                      {isPreprocessing ? (
+                        <Badge color="grey">Preprocessing</Badge>
+                      ) : (
+                        <Toggle
+                          checked={selected.includes(item.capability)}
+                          onChange={({ detail }) => onToggle(item.capability, detail.checked)}
+                        />
+                      )}
                     </div>
                   );
                 },

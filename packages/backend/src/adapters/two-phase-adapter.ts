@@ -14,7 +14,7 @@ import {
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
 import { textractClient, bedrockClient } from '../config/aws.js';
-import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
+import { applyOutputCap, calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
 import { buildInferenceConfig, parseStructuredJsonResults } from './extraction-shared.js';
 
 export class TwoPhaseAdapter implements StreamAdapter {
@@ -99,12 +99,15 @@ Return ONLY valid JSON, no markdown code blocks.`;
       // `temperature`, so textract-<model> combos would 400 with it hardcoded.
       inferenceConfig: buildInferenceConfig(
         this.modelId,
-        calculateMaxTokens(
-          input.capabilities.length,
-          input.pageCount ?? 1,
-          'json',
-          input.capabilities.some(isMediaCapability),
-          this.modelId,
+        applyOutputCap(
+          calculateMaxTokens(
+            input.capabilities.length,
+            input.pageCount ?? 1,
+            'json',
+            input.capabilities.some(isMediaCapability),
+            this.modelId,
+          ),
+          input.maxOutputTokens,
         ),
       ),
     });

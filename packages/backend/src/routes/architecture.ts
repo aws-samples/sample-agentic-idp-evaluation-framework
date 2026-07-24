@@ -4,6 +4,7 @@ import { ConverseStreamCommand, type Message } from '@aws-sdk/client-bedrock-run
 import { METHODS, METHOD_INFO } from '@idp/shared';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { bedrockClient, config } from '../config/aws.js';
+import { buildInferenceConfig } from '../adapters/extraction-shared.js';
 import { estimateMonthlyCost } from '../services/pricing.js';
 
 const ARCHITECT_SYSTEM_PROMPT = `You are an AWS Solutions Architect specializing in Intelligent Document Processing (IDP). Based on the processing results, comparison data, and the EXACT pipeline the user assembled (Step 3), create an architecture recommendation.
@@ -111,10 +112,7 @@ router.post('/', async (req, res) => {
       modelId: config.claudeModelId,
       system: [{ text: ARCHITECT_SYSTEM_PROMPT }],
       messages,
-      inferenceConfig: {
-        maxTokens: 32768,
-        temperature: 0.3,
-      },
+      inferenceConfig: buildInferenceConfig(config.claudeModelId, 32768, 0.3),
     });
 
     const response = await bedrockClient.send(command);

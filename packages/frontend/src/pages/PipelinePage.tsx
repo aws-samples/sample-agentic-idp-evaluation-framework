@@ -22,6 +22,7 @@ import { usePipeline } from '../hooks/usePipeline';
 import { usePipelineChat } from '../hooks/usePipelineChat';
 import type { PreviewResponse } from '../hooks/usePreview';
 import StepGate from '../components/common/StepGate';
+import ResultBlock from '../components/common/ResultBlock';
 
 interface PipelinePageProps {
   document: UploadResponse | null;
@@ -35,6 +36,7 @@ interface PipelinePageProps {
     comparison: ComparisonResult,
     pipeline: import('@idp/shared').PipelineDefinition | null,
     preferredMethod?: string,
+    runId?: string | null,
   ) => void;
 }
 
@@ -65,6 +67,7 @@ export default function PipelinePage({
     isExecuting,
     executionComplete,
     completionData,
+    runId,
     error,
     totalCost,
     totalLatencyMs,
@@ -97,9 +100,16 @@ export default function PipelinePage({
         completionData.comparison,
         pipeline ?? null,
         preferredMethod,
+        runId,
       );
     }
-  }, [executionComplete, completionData, onPipelineComplete, pipeline, preferredMethod]);
+  }, [executionComplete, completionData, onPipelineComplete, pipeline, preferredMethod, runId]);
+
+  // Show a "Final result" tab only when the pipeline actually aggregated across
+  // more than one method — with a single method its tab already IS the result.
+  const hasAggregatedResults = !!completionData
+    && Object.keys(completionData.results ?? {}).length > 0
+    && completionData.processorResults.filter((r) => r.status === 'complete').length > 1;
 
   const [smartRec, setSmartRec] = useState<SmartRecommendation | null>(null);
   const [isSmartGenerating, setIsSmartGenerating] = useState(false);
@@ -445,7 +455,48 @@ export default function PipelinePage({
             }
           >
             <Tabs
-              tabs={completionData.processorResults
+              tabs={[
+                // "Final result" first: when an Aggregator resolved competing
+                // answers, the user's actual output is the merged set, not any
+                // single method's tab. Previously only per-method tabs existed,
+                // so the pipeline's real output was never shown directly.
+                ...(hasAggregatedResults ? [{
+                  id: '__final__',
+                  label: `Final result (${Object.keys(completionData.results).length})`,
+                  content: (
+                    <SpaceBetween size="m">
+                      <Box color="text-body-secondary" fontSize="body-s">
+                        One answer per capability, selected across all methods by the
+                        pipeline&apos;s aggregation strategy.
+                      </Box>
+                      {Object.entries(completionData.results).map(([capId, capResult]) => {
+                        const capInfo = CAPABILITY_INFO[capId as keyof typeof CAPABILITY_INFO];
+                        const src = (capResult as { sourceMethod?: string }).sourceMethod;
+                        const alts = (capResult as { alternativeMethods?: string[] }).alternativeMethods ?? [];
+                        const dataStr = typeof capResult.data === 'string'
+                          ? capResult.data
+                          : JSON.stringify(capResult.data, null, 2);
+                        return (
+                          <ExpandableSection
+                            key={capId}
+                            headerText={`${capInfo?.name ?? capId} (${Math.round(capResult.confidence * 100)}%)`}
+                            headerDescription={
+                              src
+                                ? `Selected from ${METHOD_INFO[src as keyof typeof METHOD_INFO]?.shortName ?? src}${
+                                    alts.length ? ` · ${alts.length} other method${alts.length > 1 ? 's' : ''} also answered` : ''
+                                  }`
+                                : undefined
+                            }
+                            defaultExpanded={Object.keys(completionData.results).length <= 3}
+                          >
+                            <ResultBlock>{dataStr}</ResultBlock>
+                          </ExpandableSection>
+                        );
+                      })}
+                    </SpaceBetween>
+                  ),
+                }] : []),
+                ...completionData.processorResults
                 .filter(r => r.status === 'complete')
                 .map(r => {
                   const info = METHOD_INFO[r.method];
@@ -465,28 +516,15 @@ export default function PipelinePage({
                               headerText={`${capInfo?.name ?? capId} (${Math.round(capResult.confidence * 100)}%)`}
                               defaultExpanded={Object.keys(r.results).length <= 3}
                             >
-                              <pre style={{
-                                whiteSpace: 'pre-wrap',
-                                wordBreak: 'break-word',
-                                fontSize: '13px',
-                                lineHeight: '1.5',
-                                maxHeight: '400px',
-                                overflow: 'auto',
-                                background: '#f2f3f3',
-                                padding: '12px',
-                                borderRadius: '8px',
-                                margin: 0,
-                              }}>
-                                {dataStr}
-                              </pre>
+                              <ResultBlock>{dataStr}</ResultBlock>
                             </ExpandableSection>
                           );
                         })}
                       </SpaceBetween>
                     ),
                   };
-                })
-              }
+                }),
+              ]}
             />
           </Container>
         )}

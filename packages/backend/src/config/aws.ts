@@ -43,7 +43,7 @@ export const config = {
   bdaProjectArn: process.env.BDA_PROJECT_ARN ?? '',
   bedrockGuardrailId: process.env.BEDROCK_GUARDRAIL_ID ?? '',
   bedrockGuardrailVersion: process.env.BEDROCK_GUARDRAIL_VERSION ?? 'DRAFT',
-  claudeModelId: process.env.CLAUDE_MODEL_ID ?? 'us.anthropic.claude-sonnet-4-6',
+  claudeModelId: process.env.CLAUDE_MODEL_ID ?? 'us.anthropic.claude-opus-5',
   novaModelId: process.env.NOVA_MODEL_ID ?? 'us.amazon.nova-2-lite-v1:0',
   port: parseInt(process.env.PORT ?? '3001', 10),
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',

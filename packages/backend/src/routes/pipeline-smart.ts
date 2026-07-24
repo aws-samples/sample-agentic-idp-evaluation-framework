@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { bedrockClient, config } from '../config/aws.js';
+import { buildInferenceConfig } from '../adapters/extraction-shared.js';
 import { generatePipeline } from '../services/pipeline-generator.js';
 import type { Capability, ProcessingMethod, PipelineGenerateRequest } from '@idp/shared';
 import { CAPABILITY_SUPPORT, METHODS, METHOD_INFO, METHOD_FAMILIES } from '@idp/shared';
@@ -138,7 +139,7 @@ Return ONLY valid JSON:
     const command = new ConverseCommand({
       modelId: config.claudeModelId,
       messages: [{ role: 'user', content: [{ text: prompt }] }],
-      inferenceConfig: { maxTokens: 32768, temperature: 0.2 },
+      inferenceConfig: buildInferenceConfig(config.claudeModelId, 32768, 0.2),
     });
 
     const response = await bedrockClient.send(command);

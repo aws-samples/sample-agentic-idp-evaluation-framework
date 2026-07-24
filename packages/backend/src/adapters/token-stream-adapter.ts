@@ -10,7 +10,7 @@ import {
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
 import { bedrockClient } from '../config/aws.js';
-import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
+import { applyOutputCap, calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
 import { isOfficeFormat, convertOfficeDocument } from '../services/file-converter.js';
 import {
   IMAGE_EXTENSIONS,
@@ -149,12 +149,15 @@ export class TokenStreamAdapter implements StreamAdapter {
 
     const inferenceConfig = buildInferenceConfig(
       this.modelId,
-      calculateMaxTokens(
-        input.capabilities.length,
-        input.pageCount ?? 1,
-        'yaml',
-        input.capabilities.some(isMediaCapability),
-        this.modelId,
+      applyOutputCap(
+        calculateMaxTokens(
+          input.capabilities.length,
+          input.pageCount ?? 1,
+          'yaml',
+          input.capabilities.some(isMediaCapability),
+          this.modelId,
+        ),
+        input.maxOutputTokens,
       ),
     );
 

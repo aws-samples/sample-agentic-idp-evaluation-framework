@@ -4,7 +4,7 @@ import { METHOD_INFO } from '@idp/shared';
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
 import { invokeMantleResponses } from '../config/mantle.js';
-import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
+import { applyOutputCap, calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
 import { isOfficeFormat, convertOfficeDocument } from '../services/file-converter.js';
 import {
   IMAGE_EXTENSIONS,
@@ -89,12 +89,15 @@ export class MantleResponsesAdapter implements StreamAdapter {
 
     emitProgress(res, this.method, 'all', 40, 'GPT is analyzing the document...');
 
-    const maxOutputTokens = calculateMaxTokens(
-      input.capabilities.length,
-      input.pageCount ?? 1,
-      'yaml',
-      input.capabilities.some(isMediaCapability),
-      this.modelId,
+    const maxOutputTokens = applyOutputCap(
+      calculateMaxTokens(
+        input.capabilities.length,
+        input.pageCount ?? 1,
+        'yaml',
+        input.capabilities.some(isMediaCapability),
+        this.modelId,
+      ),
+      input.maxOutputTokens,
     );
 
     const result = await invokeMantleResponses({

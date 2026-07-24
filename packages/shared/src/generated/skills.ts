@@ -601,7 +601,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
   'format_standardization': {
     id: 'format_standardization',
     name: 'Format Standardization',
-    description: 'Normalize page sizes, orientations, and layouts. Detect and correct rotation, split multi-document PDFs, standardize to A4/Letter. Method Support: Lambda + PyMuPDF/pikepdf for lightweight ops, or Amazon Textract AnalyzeDocument for layout detection + Lambda for correction.',
+    description: 'Reference capability — not implemented in this demo. A production pipeline would normalize page size, orientation and rotation before extraction (for example Lambda with PyMuPDF or pikepdf). No model performs this, and this deployment does not run it.',
     category: 'document_conversion',
     icon: 'ruler',
     defaultFormat: 'json',
@@ -629,13 +629,13 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
   'pdf_conversion': {
     id: 'pdf_conversion',
     name: 'PDF Conversion',
-    description: 'Convert Word, Excel, PowerPoint, images, and other formats to standardized PDF. Method Support: Lambda + LibreOffice headless (serverless), or Step Functions + ECS Fargate for batch. Not a model-based capability — runs as a preprocessing step before BDA/LLM extraction.',
+    description: 'Preprocessing step, not a model capability. Office files (Word, Excel, PowerPoint) are parsed to text in-process before extraction so LLM methods can read them; PDFs and images are passed through natively. A production pipeline would render true PDFs here (for example Lambda with LibreOffice headless), which this demo does not do.',
     category: 'document_conversion',
     icon: 'file-output',
     defaultFormat: 'json',
     tags: ['pdf', 'convert', 'word', 'excel', 'pptx', 'lambda', 'libreoffice'],
     exampleInput: 'invoice.docx, report.xlsx, presentation.pptx',
-    exampleOutput: 'Standardized PDF files ready for BDA or LLM extraction',
+    exampleOutput: 'Extracted text content ready for BDA or LLM extraction',
     support: {
 
     },

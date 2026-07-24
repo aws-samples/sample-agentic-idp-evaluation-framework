@@ -7,6 +7,7 @@ import type {
   PipelineNodeType,
   ProcessorResult,
   ComparisonResult,
+  CapabilityResult,
 } from '@idp/shared';
 import { authedFetch } from '../services/api.js';
 
@@ -23,6 +24,8 @@ export interface NodeStateInfo {
 export interface CompletionData {
   processorResults: ProcessorResult[];
   comparison: ComparisonResult;
+  /** Aggregated per-capability results: one winner per capability. */
+  results: Record<string, CapabilityResult>;
   totalCost: number;
   totalLatencyMs: number;
 }
@@ -36,6 +39,8 @@ export interface UsePipelineResult {
   isExecuting: boolean;
   executionComplete: boolean;
   completionData: CompletionData | null;
+  /** Server-side id of the completed run, used to restore state after refresh. */
+  runId: string | null;
   error: string | null;
   generatePipeline: (request: PipelineGenerateRequest) => Promise<void>;
   executePipeline: (pipeline: PipelineDefinition, documentId: string, s3Uri: string) => void;
@@ -54,6 +59,7 @@ export function usePipeline(): UsePipelineResult {
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionComplete, setExecutionComplete] = useState(false);
   const [completionData, setCompletionData] = useState<CompletionData | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [totalCost, setTotalCost] = useState(0);
   const [totalLatencyMs, setTotalLatencyMs] = useState(0);
@@ -221,10 +227,18 @@ export function usePipeline(): UsePipelineResult {
                     setCompletionData({
                       processorResults: evt.processorResults,
                       comparison: evt.comparison,
+                      // Aggregated per-capability results (one winner per
+                      // capability when the pipeline has an Aggregator node).
+                      results: evt.results ?? {},
                       totalCost: tc,
                       totalLatencyMs: tl,
                     });
                   }
+                  // The server persists every run and returns its id here. The
+                  // client used to discard it, so a refresh had no way to ask
+                  // the server for the run again — state existed only in
+                  // sessionStorage and died with the tab.
+                  if (evt.runId) setRunId(evt.runId as string);
                   setExecutionComplete(true);
                   setIsExecuting(false);
                   break;
@@ -273,6 +287,7 @@ export function usePipeline(): UsePipelineResult {
     isExecuting,
     executionComplete,
     completionData,
+    runId,
     error,
     totalCost,
     totalLatencyMs,

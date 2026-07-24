@@ -19,7 +19,7 @@ new OneIdpStack(app, `${projectName}-${environment}`, {
   bdaProfileArn: app.node.tryGetContext('bdaProfileArn') ?? '',
   bdaProjectArn: app.node.tryGetContext('bdaProjectArn') ?? '',
   ecrImageTag: app.node.tryGetContext('ecrImageTag') ?? 'latest',
-  claudeModelId: app.node.tryGetContext('claudeModelId') ?? 'us.anthropic.claude-sonnet-4-6',
+  claudeModelId: app.node.tryGetContext('claudeModelId') ?? 'us.anthropic.claude-opus-5',
   novaModelId: app.node.tryGetContext('novaModelId') ?? 'us.amazon.nova-2-lite-v1:0',
   authProvider: (app.node.tryGetContext('authProvider') ?? 'none') as 'none' | 'cognito' | 'midway',
   adminUsers: app.node.tryGetContext('adminUsers') ?? '',

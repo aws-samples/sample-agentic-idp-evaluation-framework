@@ -11,7 +11,7 @@
 
 import sharp from 'sharp';
 import YAML from 'yaml';
-import { CAPABILITY_INFO } from '@idp/shared';
+import { CAPABILITY_INFO, filterModelBackedCapabilities } from '@idp/shared';
 
 export const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
 export const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp)$/i;
@@ -83,7 +83,14 @@ export const CAPABILITY_GUIDANCE: Record<string, string> = {
 };
 
 export function buildSystemPrompt(capabilities: string[], userInstruction?: string): string {
-  const capInstructions = capabilities.map((c) => {
+  // Drop capabilities no model can perform (pdf_conversion,
+  // format_standardization — pipeline preprocessing steps). They previously
+  // fell through to "Extract pdf conversion data.", which asks the model for
+  // output that cannot exist and invites it to pad the response.
+  const modelCapabilities = filterModelBackedCapabilities(capabilities);
+  const effective = modelCapabilities.length > 0 ? modelCapabilities : capabilities;
+
+  const capInstructions = effective.map((c) => {
     const info = CAPABILITY_INFO[c as keyof typeof CAPABILITY_INFO];
     const fmt = info?.defaultFormat ?? 'json';
     const guidance = CAPABILITY_GUIDANCE[c] ?? `Extract ${c.replace(/_/g, ' ')} data.`;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ConverseStreamCommand } from '@aws-sdk/client-bedrock-runtime';
 import { bedrockClient, config } from '../config/aws.js';
+import { buildInferenceConfig } from '../adapters/extraction-shared.js';
 import { generatePipeline } from '../services/pipeline-generator.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import type { Capability, ProcessingMethod, PipelineDefinition, PipelineGenerateRequest } from '@idp/shared';
@@ -117,7 +118,7 @@ RULES:
       modelId: config.claudeModelId,
       system: [{ text: systemPrompt }],
       messages,
-      inferenceConfig: { maxTokens: 16384, temperature: 0.3 },
+      inferenceConfig: buildInferenceConfig(config.claudeModelId, 16384, 0.3),
     });
 
     const response = await bedrockClient.send(command);

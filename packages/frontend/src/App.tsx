@@ -8,6 +8,7 @@ import TopNav from './components/layout/TopNav';
 import SideNav from './components/layout/SideNav';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import DisclaimerBanner from './components/common/DisclaimerBanner';
+import ResumeBanner from './components/common/ResumeBanner';
 import HomePage from './pages/HomePage';
 import type { AuthUser } from './services/api';
 import { authedFetch } from './services/api';
@@ -42,15 +43,55 @@ const STEPS = [
 
 const ADMIN_USERS = (import.meta.env.VITE_ADMIN_USERS || '').split(',').filter(Boolean);
 
-// Persist state in sessionStorage so it survives navigation and page refreshes
+/**
+ * Client-side workflow state.
+ *
+ * Uses localStorage rather than sessionStorage: sessionStorage is scoped to a
+ * single tab and is discarded when that tab closes, so closing the tab (or
+ * opening the app in a second one) silently lost an in-progress evaluation.
+ * localStorage survives both, and the server-side run id (see `runId` below)
+ * lets a completed evaluation be re-fetched even if this cache is cleared or the
+ * backend restarts — the run itself lives in DynamoDB, not in the browser.
+ *
+ * Writes are guarded: a quota failure must never break the app, and a corrupt
+ * entry must not wedge it on every future load.
+ */
+const STATE_PREFIX = 'idp-';
+
 function loadSession<T>(key: string, fallback: T): T {
   try {
-    const saved = sessionStorage.getItem(`idp-${key}`);
-    return saved ? JSON.parse(saved) : fallback;
-  } catch { return fallback; }
+    const saved = localStorage.getItem(`${STATE_PREFIX}${key}`);
+    if (saved == null) return fallback;
+    return JSON.parse(saved) as T;
+  } catch {
+    // Corrupt entry — drop it so it cannot fail again on the next load.
+    try { localStorage.removeItem(`${STATE_PREFIX}${key}`); } catch { /* ignore */ }
+    return fallback;
+  }
 }
+
 function saveSession(key: string, value: unknown) {
-  try { sessionStorage.setItem(`idp-${key}`, JSON.stringify(value)); } catch { /* quota */ }
+  try {
+    if (value == null) {
+      localStorage.removeItem(`${STATE_PREFIX}${key}`);
+      return;
+    }
+    localStorage.setItem(`${STATE_PREFIX}${key}`, JSON.stringify(value));
+  } catch {
+    // Quota exceeded. Results can be large; keeping the app usable matters more
+    // than caching them, and the run is still recoverable from the server.
+  }
+}
+
+/** Clear all workflow state — used when starting a fresh evaluation. */
+function clearWorkflowState() {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith(STATE_PREFIX) && key !== `${STATE_PREFIX}dark-mode`) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch { /* ignore */ }
 }
 
 export default function App() {
@@ -68,6 +109,10 @@ export default function App() {
   const [executedPipeline, setExecutedPipeline] = useState<PipelineDefinition | null>(() => loadSession('executedPipeline', null));
   const [selectedPipelineMethod, setSelectedPipelineMethod] = useState<string | undefined>(() => loadSession('selectedPipelineMethod', undefined));
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('idp-dark-mode') === 'true');
+  // Server-side id of the last completed run. Persisted so a refresh — or a
+  // browser cache clear, or a backend restart — can re-fetch the run from
+  // DynamoDB instead of losing the evaluation entirely.
+  const [runId, setRunId] = useState<string | null>(() => loadSession('runId', null));
 
   useEffect(() => {
     (async () => {
@@ -106,6 +151,7 @@ export default function App() {
   useEffect(() => { saveSession('comparison', comparison); }, [comparison]);
   useEffect(() => { saveSession('executedPipeline', executedPipeline); }, [executedPipeline]);
   useEffect(() => { saveSession('selectedPipelineMethod', selectedPipelineMethod); }, [selectedPipelineMethod]);
+  useEffect(() => { saveSession('runId', runId); }, [runId]);
 
   // Dark mode toggle (#16)
   useEffect(() => {
@@ -211,14 +257,32 @@ export default function App() {
       comp: ComparisonResult,
       pipeline: PipelineDefinition | null,
       preferred?: string,
+      completedRunId?: string | null,
     ) => {
       setProcessingResults(results);
       setComparison(comp);
       setExecutedPipeline(pipeline);
       setSelectedPipelineMethod(preferred);
+      if (completedRunId) setRunId(completedRunId);
     },
     [],
   );
+
+  /** Discard the current evaluation and start clean. */
+  const handleStartOver = useCallback(() => {
+    clearWorkflowState();
+    setDocument(null);
+    setSelectedCapabilities([]);
+    setPreviewData(null);
+    setPreferredMethod(undefined);
+    setDocumentLanguages([]);
+    setProcessingResults([]);
+    setComparison(null);
+    setExecutedPipeline(null);
+    setSelectedPipelineMethod(undefined);
+    setRunId(null);
+    navigate('/');
+  }, [navigate]);
 
   const handleViewArchitecture = useCallback(() => {
     navigate('/architecture');
@@ -328,7 +392,25 @@ export default function App() {
               <Routes>
                 <Route
                   path="/"
-                  element={<HomePage onUploadComplete={handleUploadComplete} />}
+                  element={
+                    <>
+                      {document && (
+                        <Box padding={{ bottom: 'l' }}>
+                          <ResumeBanner
+                            fileName={document.fileName}
+                            capabilityCount={selectedCapabilities.length}
+                            hasResults={processingResults.length > 0}
+                            runId={runId}
+                            onContinue={() => navigate(
+                              processingResults.length > 0 ? '/architecture' : '/conversation',
+                            )}
+                            onStartOver={handleStartOver}
+                          />
+                        </Box>
+                      )}
+                      <HomePage onUploadComplete={handleUploadComplete} />
+                    </>
+                  }
                 />
                 <Route
                   path="/conversation"

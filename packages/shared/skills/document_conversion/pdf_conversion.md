@@ -1,25 +1,25 @@
 ---
 id: "pdf_conversion"
 name: "PDF Conversion"
-description: "Convert Word, Excel, PowerPoint, images, and other formats to standardized PDF. Method Support: Lambda + LibreOffice headless (serverless), or Step Functions + ECS Fargate for batch. Not a model-based capability — runs as a preprocessing step before BDA/LLM extraction."
+description: "Preprocessing step, not a model capability. Office files (Word, Excel, PowerPoint) are parsed to text in-process before extraction so LLM methods can read them; PDFs and images are passed through natively. A production pipeline would render true PDFs here (for example Lambda with LibreOffice headless), which this demo does not do."
 category: "document_conversion"
 categoryName: "Document Conversion"
 icon: "file-output"
 defaultFormat: "json"
 tags: ["pdf", "convert", "word", "excel", "pptx", "lambda", "libreoffice"]
 exampleInput: "invoice.docx, report.xlsx, presentation.pptx"
-exampleOutput: "Standardized PDF files ready for BDA or LLM extraction"
+exampleOutput: "Extracted text content ready for BDA or LLM extraction"
 support:
 
 ---
 
 # PDF Conversion
 
-Convert Word, Excel, PowerPoint, images, and other formats to standardized PDF. Method Support: Lambda + LibreOffice headless (serverless), or Step Functions + ECS Fargate for batch. Not a model-based capability — runs as a preprocessing step before BDA/LLM extraction.
+Preprocessing step, not a model capability. Office files are parsed to text in-process before extraction; PDFs and images pass through natively.
 
 ## When to use
 
-Use this skill when the user needs to convert word, excel, powerpoint, images, and other formats to standardized pdf. method support: lambda + libreoffice headless (serverless), or step functions + ecs fargate for batch. not a model-based capability — runs as a preprocessing step before bda/llm extraction..
+Applies automatically when an uploaded file is an Office document. You do not select it as a model capability — no model performs it.
 
 ## Example
 

@@ -451,6 +451,15 @@ export interface CapabilityResult {
   data: unknown;
   confidence: number;
   format: 'html' | 'csv' | 'json' | 'text' | 'image' | 'markdown';
+  /**
+   * Which method's answer the pipeline aggregator selected for this capability.
+   * Set only when an Aggregator node resolved competing answers, so the UI can
+   * show WHY a particular result is displayed instead of presenting an
+   * unattributed merge.
+   */
+  sourceMethod?: ProcessingMethod;
+  /** Other methods that produced an answer for this capability. */
+  alternativeMethods?: ProcessingMethod[];
 }
 
 export interface ProcessorResult {

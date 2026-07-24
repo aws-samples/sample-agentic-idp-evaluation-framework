@@ -1,7 +1,7 @@
 ---
 id: "format_standardization"
 name: "Format Standardization"
-description: "Normalize page sizes, orientations, and layouts. Detect and correct rotation, split multi-document PDFs, standardize to A4/Letter. Method Support: Lambda + PyMuPDF/pikepdf for lightweight ops, or Amazon Textract AnalyzeDocument for layout detection + Lambda for correction."
+description: "Reference capability — not implemented in this demo. A production pipeline would normalize page size, orientation and rotation before extraction (for example Lambda with PyMuPDF or pikepdf). No model performs this, and this deployment does not run it."
 category: "document_conversion"
 categoryName: "Document Conversion"
 icon: "ruler"
@@ -15,11 +15,11 @@ support:
 
 # Format Standardization
 
-Normalize page sizes, orientations, and layouts. Detect and correct rotation, split multi-document PDFs, standardize to A4/Letter. Method Support: Lambda + PyMuPDF/pikepdf for lightweight ops, or Amazon Textract AnalyzeDocument for layout detection + Lambda for correction.
+Reference capability. Not implemented in this demo — listed to document where page normalization belongs in a production IDP pipeline.
 
 ## When to use
 
-Use this skill when the user needs to normalize page sizes, orientations, and layouts. detect and correct rotation, split multi-document pdfs, standardize to a4/letter. method support: lambda + pymupdf/pikepdf for lightweight ops, or amazon textract analyzedocument for layout detection + lambda for correction..
+Not selectable: no model performs this, and this deployment does not implement it. Shown for architecture reference only.
 
 ## Example
 

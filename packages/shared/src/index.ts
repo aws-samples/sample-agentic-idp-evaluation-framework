@@ -60,6 +60,8 @@ export {
   CATEGORY_INFO,
   getCapabilitiesByCategory,
   searchCapabilities,
+  isModelBackedCapability,
+  filterModelBackedCapabilities,
 } from './types/capabilities.js';
 export {
   DOCUMENT_TYPES,

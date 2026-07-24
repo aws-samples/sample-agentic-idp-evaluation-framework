@@ -126,6 +126,28 @@ export function getCapabilitiesByCategory(
   return Object.values(CAPABILITY_INFO).filter((c) => c.category === category);
 }
 
+/**
+ * Whether any method family can actually perform this capability.
+ *
+ * Two capabilities (pdf_conversion, format_standardization) declare no method
+ * support because they are pipeline PREPROCESSING steps — file conversion done
+ * in code before extraction — not things a model can be asked to do. They were
+ * still being sent to every LLM in the capability list, where they fell through
+ * to the generic "Extract <name> data." instruction and asked models to produce
+ * output that does not exist. Callers building model prompts should filter
+ * these out; the UI should present them as preprocessing, not as a model task.
+ */
+export function isModelBackedCapability(capability: Capability): boolean {
+  const support = CAPABILITY_INFO[capability]?.support;
+  if (!support) return false;
+  return Object.values(support).some((level) => level && level !== 'none');
+}
+
+/** Capabilities a model can be asked to perform, preserving input order. */
+export function filterModelBackedCapabilities<T extends string>(capabilities: readonly T[]): T[] {
+  return capabilities.filter((c) => isModelBackedCapability(c as Capability));
+}
+
 export function searchCapabilities(query: string): CapabilityInfo[] {
   const q = query.toLowerCase();
   return Object.values(CAPABILITY_INFO).filter(

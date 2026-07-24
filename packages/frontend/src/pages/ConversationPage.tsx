@@ -8,6 +8,7 @@ import Button from '@cloudscape-design/components/button';
 import Box from '@cloudscape-design/components/box';
 import Alert from '@cloudscape-design/components/alert';
 import type { UploadResponse, Capability } from '@idp/shared';
+import { isModelBackedCapability } from '@idp/shared';
 import ChatPanel from '../components/conversation/ChatPanel';
 import CapabilityCards from '../components/conversation/CapabilityCards';
 import PreviewComparison from '../components/conversation/PreviewComparison';
@@ -50,10 +51,14 @@ export default function ConversationPage({
   useEffect(() => {
     if (recommendations && selectedCapabilities.length === 0) {
       // Auto-select "Essential" (>=0.90) and "Highly relevant" (>=0.75) capabilities
-      // "Useful but not critical" (<0.75) are shown but not pre-selected
+      // "Useful but not critical" (<0.75) are shown but not pre-selected.
+      // Preprocessing capabilities are excluded: pdf_conversion was being
+      // auto-selected at 90% relevance and then sent to every LLM, which no
+      // model can act on.
       const caps = recommendations
         .filter((r) => r.relevance >= 0.75)
-        .map((r) => r.capability);
+        .map((r) => r.capability)
+        .filter(isModelBackedCapability);
       onCapabilitiesSelected(caps);
     }
   }, [recommendations, selectedCapabilities.length, onCapabilitiesSelected]);

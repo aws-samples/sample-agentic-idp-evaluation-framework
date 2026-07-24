@@ -11,6 +11,7 @@ import type {
 } from '@idp/shared';
 import { generatePipeline } from '../services/pipeline-generator.js';
 import { buildComparison } from '../services/comparison.js';
+import { aggregateResults, type AggregationStrategy, type MethodContribution } from '../services/aggregator.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { getDocumentBuffer } from '../services/s3.js';
 import { calculateCost } from '../services/pricing.js';
@@ -227,6 +228,9 @@ router.post('/execute', async (req, res) => {
     // Track total cost and results
     let totalCost = 0;
     const allResults: Record<string, CapabilityResult> = {};
+    // Per-method contributions, resolved by the aggregator node's strategy once
+    // every method has finished.
+    const contributions: MethodContribution[] = [];
 
     // Detect sequential-composer: if present, we execute stages serially,
     // forwarding the text extracted by upstream stages into the downstream
@@ -260,6 +264,16 @@ router.post('/execute', async (req, res) => {
         const result = await processor.process(res, overrideInput ?? input);
 
         if (result.status === 'complete') {
+          // Record this method's contribution; the aggregator node resolves
+          // conflicts after all methods finish. Assigning straight into
+          // allResults here meant the last method to complete overwrote the
+          // others regardless of the strategy shown on the canvas.
+          contributions.push({
+            method,
+            results: result.results as Record<string, CapabilityResult>,
+            latencyMs: result.metrics.latencyMs,
+            cost: result.metrics.cost,
+          });
           Object.assign(allResults, result.results);
           totalCost += result.metrics.cost;
 
@@ -352,6 +366,28 @@ router.post('/execute', async (req, res) => {
       .map((s) => s.value);
 
     const comparison = buildComparison(processorResults);
+
+    // Resolve the aggregator node, if the pipeline has one. Without this the
+    // canvas advertised a strategy (best-confidence / best-cost / best-speed)
+    // that never ran: results were merged by completion order instead.
+    const aggregatorNode = pipeline.nodes.find((n) => n.type === 'aggregator');
+    if (aggregatorNode && contributions.length > 1) {
+      const strategy = ((aggregatorNode.config as any).strategy ?? 'best-confidence') as AggregationStrategy;
+      const aggregated = aggregateResults(contributions, strategy);
+      // Replace, not merge: the aggregated map already holds one winner per
+      // capability across every contributing method.
+      for (const key of Object.keys(allResults)) delete allResults[key];
+      Object.assign(allResults, aggregated);
+      emitSSE(res, {
+        type: 'node_complete',
+        nodeId: aggregatorNode.id,
+        result: aggregated,
+        metrics: { latencyMs: 0, cost: 0 },
+      } as PipelineExecutionEvent);
+      console.log(
+        `[Pipeline] aggregator strategy=${strategy} resolved ${Object.keys(aggregated).length} capabilities from ${contributions.length} methods`,
+      );
+    }
 
     // Save run results for the "Recent Runs" feature (non-blocking)
     const ext2 = (fileName.match(/\.(\w+)$/)?.[1] ?? '').toLowerCase();

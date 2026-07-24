@@ -9,6 +9,7 @@ import type { Response } from 'express';
 import type { ConversationEvent, CapabilityRecommendation } from '@idp/shared';
 import { CAPABILITIES } from '@idp/shared';
 import { config } from '../config/aws.js';
+import { supportsTemperature } from '../adapters/extraction-shared.js';
 import { emitSSE } from '../services/streaming.js';
 import { analyzeDocument } from './tools/analyze-document.js';
 import { validateRecommendations } from './tools/recommend-capabilities.js';
@@ -173,11 +174,14 @@ export async function runSocraticAgentStrands(
   conversationHistory: Array<{ role: string; content: string }>,
   options: SocraticAgentOptions = {},
 ): Promise<void> {
+  // Strands takes temperature directly rather than an inferenceConfig object,
+  // and Opus 5 / 4.8 / 4.7 / Sonnet 5 reject the param outright. Omit it for
+  // those models so the orchestration model can be upgraded without 400s.
   const model = new BedrockModel({
     modelId: config.claudeModelId,
     region: config.region,
     maxTokens: 32768,
-    temperature: 0.7,
+    ...(supportsTemperature(config.claudeModelId) ? { temperature: 0.7 } : {}),
   });
 
   // Convert history to MessageData[] for the Agent constructor

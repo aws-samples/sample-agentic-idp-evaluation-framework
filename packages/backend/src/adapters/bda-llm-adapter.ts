@@ -11,7 +11,7 @@ import {
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
 import { bdaClient, s3Client, bedrockClient, config } from '../config/aws.js';
-import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
+import { applyOutputCap, calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
 import { buildInferenceConfig, parseStructuredJsonResults } from './extraction-shared.js';
 
 // BDA status values from API: Created | InProgress | Success | ServiceError | ClientError
@@ -178,12 +178,15 @@ Return ONLY valid JSON, no markdown code blocks.${clipped ? '\n\nNOTE: The BDA o
       // `temperature`, so bda-<model> combos would 400 with it hardcoded.
       inferenceConfig: buildInferenceConfig(
         this.modelId,
-        calculateMaxTokens(
-          input.capabilities.length,
-          input.pageCount ?? 1,
-          'json',
-          input.capabilities.some(isMediaCapability),
-          this.modelId,
+        applyOutputCap(
+          calculateMaxTokens(
+            input.capabilities.length,
+            input.pageCount ?? 1,
+            'json',
+            input.capabilities.some(isMediaCapability),
+            this.modelId,
+          ),
+          input.maxOutputTokens,
         ),
       ),
     });

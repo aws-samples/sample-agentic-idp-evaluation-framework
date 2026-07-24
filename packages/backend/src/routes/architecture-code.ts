@@ -3,6 +3,7 @@ import { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { Capability, ProcessorResult, ComparisonResult, ProcessingMethod, PipelineDefinition } from '@idp/shared';
 import { METHOD_INFO, CAPABILITY_INFO } from '@idp/shared';
 import { bedrockClient, config } from '../config/aws.js';
+import { buildInferenceConfig } from '../adapters/extraction-shared.js';
 
 interface CodeGenRequest {
   capabilities: Capability[];
@@ -385,7 +386,7 @@ router.post('/', async (req, res) => {
     const command = new ConverseCommand({
       modelId: config.claudeModelId,
       messages: [{ role: 'user', content: [{ text: prompt }] }],
-      inferenceConfig: { maxTokens: 32768, temperature: 0.1 },
+      inferenceConfig: buildInferenceConfig(config.claudeModelId, 32768, 0.1),
     });
 
     const response = await bedrockClient.send(command);
