@@ -148,10 +148,17 @@ export default function ConversationPage({
       }
     >
       <SpaceBetween size="l">
+        {/*
+          Split at `m`, not `l`. The side navigation consumes 260px, so on a
+          1440px laptop the content area fell short of the `l` breakpoint and
+          this Grid silently stacked — pushing the document preview a full
+          screen below the chat. `m` keeps chat and preview side by side at
+          normal laptop widths and still stacks on genuinely narrow screens.
+        */}
         <Grid
           gridDefinition={[
-            { colspan: { default: 12, l: 7 } },
-            { colspan: { default: 12, l: 5 } },
+            { colspan: { default: 12, m: 7 } },
+            { colspan: { default: 12, m: 5 } },
           ]}
         >
           {/* Chat Panel */}
@@ -172,7 +179,7 @@ export default function ConversationPage({
             }
           >
             {isImage ? (
-              <div style={{ maxHeight: '500px', overflow: 'auto', textAlign: 'center' }}>
+              <div style={{ maxHeight: 'calc(100vh - 380px)', minHeight: '300px', overflow: 'auto', textAlign: 'center' }}>
                 <img
                   src={document.previewUrl}
                   alt={document.fileName}
@@ -180,7 +187,7 @@ export default function ConversationPage({
                 />
               </div>
             ) : isPdf ? (
-              <div style={{ height: '500px', overflow: 'auto' }}>
+              <div style={{ height: 'calc(100vh - 380px)', minHeight: '300px', overflow: 'auto' }}>
                 <iframe
                   src={document.previewUrl}
                   style={{ width: '100%', height: '100%', border: 'none' }}

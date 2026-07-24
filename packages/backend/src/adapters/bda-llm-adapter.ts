@@ -12,7 +12,7 @@ import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapte
 import { emitProgress } from './stream-adapter.js';
 import { bdaClient, s3Client, bedrockClient, config } from '../config/aws.js';
 import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
-import { buildInferenceConfig } from './extraction-shared.js';
+import { buildInferenceConfig, parseStructuredJsonResults } from './extraction-shared.js';
 
 // BDA status values from API: Created | InProgress | Success | ServiceError | ClientError
 const TERMINAL_STATUSES = ['Success', 'ServiceError', 'ClientError'];
@@ -208,7 +208,7 @@ Return ONLY valid JSON, no markdown code blocks.${clipped ? '\n\nNOTE: The BDA o
 
     emitProgress(res, this.method, 'all', 100, 'Complete');
 
-    const results = this.parseResults(fullText, input.capabilities);
+    const results = parseStructuredJsonResults(fullText, input.capabilities, 0.8);
 
     return {
       results,
@@ -284,49 +284,4 @@ Return ONLY valid JSON, no markdown code blocks.${clipped ? '\n\nNOTE: The BDA o
     }
   }
 
-  private parseResults(
-    rawOutput: string,
-    capabilities: string[],
-  ): Record<string, { capability: string; data: unknown; confidence: number; format: string }> {
-    const results: Record<string, { capability: string; data: unknown; confidence: number; format: string }> = {};
-
-    let parsed: Record<string, unknown>;
-    try {
-      const cleaned = rawOutput.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '');
-      parsed = JSON.parse(cleaned);
-    } catch {
-      for (const cap of capabilities) {
-        results[cap] = {
-          capability: cap,
-          data: rawOutput,
-          confidence: 0.5,
-          format: 'text',
-        };
-      }
-      return results;
-    }
-
-    for (const cap of capabilities) {
-      const capData = parsed[cap] as Record<string, unknown> | undefined;
-      if (capData && typeof capData === 'object' && 'data' in capData) {
-        // For content_moderation, null/empty data means "safe" — treat as valid
-        const isSafeNull = capData.data == null && cap === 'content_moderation';
-        results[cap] = {
-          capability: cap,
-          data: isSafeNull ? { safe: true, flags: [] } : capData.data,
-          confidence: (capData.confidence as number) ?? (isSafeNull ? 0.95 : 0.8),
-          format: (capData.format as string) ?? 'json',
-        };
-      } else {
-        results[cap] = {
-          capability: cap,
-          data: capData ?? rawOutput,
-          confidence: 0.8,
-          format: 'json',
-        };
-      }
-    }
-
-    return results;
-  }
 }

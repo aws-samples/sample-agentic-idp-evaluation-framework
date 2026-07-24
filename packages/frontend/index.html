@@ -15,11 +15,24 @@
       #app-splash .label { font-size: 13px; color: #5f6b7a; letter-spacing: 0.15px; font-weight: 500; }
       #app-splash .sublabel { font-size: 12px; color: #95a5ba; margin-top: -10px; }
       @keyframes app-splash-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      /*
+        Pre-React splash colors only. Once the app mounts, Cloudscape controls
+        theming by toggling `awsui-dark-mode` on <body>, so the page background
+        must follow THAT class — not just the OS preference. Keying dark styles
+        solely off `prefers-color-scheme` meant the in-app Dark Mode toggle
+        recolored every component but left the page background and gutters
+        light, so dark content sat inside a white frame.
+      */
       @media (prefers-color-scheme: dark) {
         html, body, #app-splash { background: #0f1419; color: #e9ebed; }
         #app-splash .label { color: #a2a9b0; }
         #app-splash .sublabel { color: #5f6b7a; }
       }
+      /* In-app toggle: wins over the OS preference in both directions. */
+      body.awsui-dark-mode { background: #0f1419; color: #e9ebed; }
+      html:has(body.awsui-dark-mode) { background: #0f1419; }
+      body:not(.awsui-dark-mode) { background: #fafbfc; color: #16191f; }
+      html:has(body:not(.awsui-dark-mode)) { background: #fafbfc; }
     </style>
   </head>
   <body>

@@ -302,8 +302,11 @@ export default function PipelinePage({
         {pipeline && (
           <Grid
             gridDefinition={[
-              { colspan: { default: 12, l: 5 } },
-              { colspan: { default: 12, l: 7 } },
+              // Split at `m`: the 260px side nav pushes the content area below
+              // the `l` breakpoint on a 1440px laptop, which silently stacked
+              // these columns instead of showing them side by side.
+              { colspan: { default: 12, m: 5 } },
+              { colspan: { default: 12, m: 7 } },
             ]}
           >
             {/* Chat Panel */}

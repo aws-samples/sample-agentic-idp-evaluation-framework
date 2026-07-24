@@ -112,6 +112,61 @@ RULES:
 export type ParsedResults = Record<string, { capability: string; data: unknown; confidence: number; format: string }>;
 
 /**
+ * Parse the strict-JSON output of a two-stage adapter's structuring step.
+ *
+ * The BDA+LLM and Textract+LLM adapters each carried their own copy of this
+ * function; the copies had already drifted apart (one defaulted missing
+ * confidence to 0.8, the other to 0.7). One implementation means the two paths
+ * cannot report differently for identical model output.
+ *
+ * Distinct from `parseResults` below, which handles the looser YAML-or-JSON
+ * output of the direct-LLM extraction path.
+ */
+export function parseStructuredJsonResults(
+  rawOutput: string,
+  capabilities: string[],
+  fallbackConfidence = 0.8,
+): ParsedResults {
+  const results: ParsedResults = {};
+
+  let parsed: Record<string, unknown>;
+  try {
+    const cleaned = rawOutput.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '');
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // Unparseable output is still worth showing as text rather than discarding.
+    for (const cap of capabilities) {
+      results[cap] = { capability: cap, data: rawOutput, confidence: 0.5, format: 'text' };
+    }
+    return results;
+  }
+
+  for (const cap of capabilities) {
+    const capData = parsed[cap] as Record<string, unknown> | undefined;
+    if (capData && typeof capData === 'object' && 'data' in capData) {
+      // For content_moderation, null/empty data means "nothing flagged", which
+      // is a successful result rather than a missing one.
+      const isSafeNull = capData.data == null && cap === 'content_moderation';
+      results[cap] = {
+        capability: cap,
+        data: isSafeNull ? { safe: true, flags: [] } : capData.data,
+        confidence: (capData.confidence as number) ?? (isSafeNull ? 0.95 : fallbackConfidence),
+        format: (capData.format as string) ?? 'json',
+      };
+    } else {
+      results[cap] = {
+        capability: cap,
+        data: capData ?? rawOutput,
+        confidence: fallbackConfidence,
+        format: 'json',
+      };
+    }
+  }
+
+  return results;
+}
+
+/**
  * Parse an LLM's raw text output into per-capability results. Tries YAML first
  * (handles truncation gracefully), then JSON, then several fence-stripping and
  * extraction fallbacks, and finally degrades to raw text per capability.
