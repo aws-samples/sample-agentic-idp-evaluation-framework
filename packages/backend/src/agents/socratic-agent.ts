@@ -77,7 +77,7 @@ export async function runSocraticAgent(
     system: [{ text: systemPrompt }],
     messages,
     inferenceConfig: {
-      maxTokens: 16384,
+      maxTokens: 32768,
       temperature: 0.7,
     },
   });

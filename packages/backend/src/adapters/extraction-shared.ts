@@ -17,6 +17,38 @@ export const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
 export const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp)$/i;
 export const PDF_EXTENSION = /\.pdf$/i;
 
+/**
+ * Newer Anthropic models on Bedrock REJECT the `temperature` inference param
+ * with `ValidationException: "temperature" is deprecated for this model`.
+ * Adaptive-thinking models control determinism via effort, not temperature.
+ *
+ * Verified live against Bedrock Converse (us-west-2):
+ *   rejected → claude-opus-5, claude-opus-4-8, claude-opus-4-7, claude-sonnet-5
+ *   accepted → claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5, nova-*
+ *
+ * Every Converse-based adapter must route its inferenceConfig through
+ * `buildInferenceConfig()` so a new model id can never silently 400 again.
+ */
+const TEMPERATURE_UNSUPPORTED = /claude-(opus-5|opus-4-[78]|sonnet-5)/;
+
+export function supportsTemperature(modelId: string): boolean {
+  return !TEMPERATURE_UNSUPPORTED.test(modelId);
+}
+
+/**
+ * Build a Bedrock Converse `inferenceConfig`, omitting `temperature` on models
+ * that reject it. Use this instead of hand-writing `{ maxTokens, temperature }`.
+ */
+export function buildInferenceConfig(
+  modelId: string,
+  maxTokens: number,
+  temperature = 0,
+): { maxTokens: number; temperature?: number } {
+  const cfg: { maxTokens: number; temperature?: number } = { maxTokens };
+  if (supportsTemperature(modelId)) cfg.temperature = temperature;
+  return cfg;
+}
+
 export type ImageFormat = 'jpeg' | 'png' | 'gif' | 'webp';
 
 export async function resizeImageIfNeeded(buffer: Buffer, format: string): Promise<Buffer> {

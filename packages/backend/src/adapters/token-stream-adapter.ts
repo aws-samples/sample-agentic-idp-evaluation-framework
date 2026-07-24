@@ -19,12 +19,8 @@ import {
   resizeImageIfNeeded,
   buildSystemPrompt,
   parseResults,
+  buildInferenceConfig,
 } from './extraction-shared.js';
-
-// Some newer Bedrock models (Claude Opus 4.8/4.7, Sonnet 5) REJECT the
-// `temperature` inference param ("temperature is deprecated for this model").
-// We omit temperature for those and let Bedrock use its deterministic default.
-const TEMPERATURE_UNSUPPORTED = /claude-(opus-4-[78]|sonnet-5)/;
 
 // Bedrock Converse rejects PDFs > 100 pages. For large PDFs we slice into
 // ≤CHUNK_PAGES chunks and merge results after processing.
@@ -151,18 +147,16 @@ export class TokenStreamAdapter implements StreamAdapter {
       { role: 'user', content: contentBlocks },
     ];
 
-    const inferenceConfig: { maxTokens: number; temperature?: number } = {
-      maxTokens: calculateMaxTokens(
+    const inferenceConfig = buildInferenceConfig(
+      this.modelId,
+      calculateMaxTokens(
         input.capabilities.length,
         input.pageCount ?? 1,
         'yaml',
         input.capabilities.some(isMediaCapability),
+        this.modelId,
       ),
-    };
-    // Opus 4.8/4.7 and Sonnet 5 reject `temperature`; only set it where supported.
-    if (!TEMPERATURE_UNSUPPORTED.test(this.modelId)) {
-      inferenceConfig.temperature = 0;
-    }
+    );
 
     const command = new ConverseStreamCommand({
       modelId: this.modelId,

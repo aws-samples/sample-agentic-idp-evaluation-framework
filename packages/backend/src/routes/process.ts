@@ -8,7 +8,7 @@ import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
 import { BdaStandardProcessor, BdaCustomProcessor } from '../processors/bda-processor.js';
 import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor } from '../processors/bda-llm.js';
-import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor, ClaudeOpus48Processor, ClaudeOpus47Processor, ClaudeSonnet5Processor } from '../processors/claude-direct.js';
+import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor, ClaudeOpus5Processor, ClaudeOpus48Processor, ClaudeOpus47Processor, ClaudeSonnet5Processor } from '../processors/claude-direct.js';
 import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
 import { Gpt56SolProcessor, Gpt56TerraProcessor, Gpt56LunaProcessor, Gpt55Processor } from '../processors/gpt-direct.js';
 import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor, TextractNovaProProcessor } from '../processors/textract-llm.js';
@@ -24,6 +24,7 @@ const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Re
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
   'claude-haiku': () => new ClaudeHaikuProcessor(),
   'claude-opus': () => new ClaudeOpusProcessor(),
+  'claude-opus-5': () => new ClaudeOpus5Processor(),
   'claude-opus-4-8': () => new ClaudeOpus48Processor(),
   'claude-opus-4-7': () => new ClaudeOpus47Processor(),
   'claude-sonnet-5': () => new ClaudeSonnet5Processor(),
@@ -152,3 +153,7 @@ router.post('/', async (req, res) => {
 });
 
 export default router;
+
+/** Test-only: lets processor-registry-parity.test.ts compare the three route
+ * registries so they can never silently drift again. */
+export const PROCESSOR_MAP_FOR_TEST = PROCESSOR_MAP;

@@ -31,24 +31,29 @@ export function generateArchitecture(
   const method = best.method;
   const info = METHOD_INFO[method];
 
+  // Derive services from the method FAMILY rather than enumerating method ids.
+  // An id-by-id switch silently produced an incomplete service list every time
+  // a new model was added (opus-5, sonnet-5, the GPT tiers all fell through).
   const services: string[] = ['Amazon S3'];
-  switch (method) {
-    case 'bda-standard':
-    case 'bda-custom':
+  switch (info.family) {
+    case 'bda':
       services.push('Amazon Bedrock Data Automation', 'Amazon Bedrock');
       break;
-    case 'claude-sonnet':
-    case 'claude-haiku':
-    case 'claude-opus':
-    case 'nova-pro':
-    case 'nova-lite':
-      services.push('Amazon Bedrock');
+    case 'bda-llm':
+      services.push('Amazon Bedrock Data Automation', 'Amazon Bedrock');
       break;
-    case 'textract-claude-sonnet':
-    case 'textract-claude-haiku':
-    case 'textract-nova-lite':
-    case 'textract-nova-pro':
+    case 'textract-llm':
       services.push('Amazon Textract', 'Amazon Bedrock');
+      break;
+    case 'guardrails':
+      services.push('Amazon Textract', 'Amazon Bedrock Guardrails');
+      break;
+    case 'claude':
+    case 'nova':
+    case 'gpt':
+    case 'embeddings':
+    default:
+      services.push('Amazon Bedrock');
       break;
   }
   services.push('AWS Lambda', 'Amazon API Gateway', 'Amazon DynamoDB', 'Amazon CloudWatch');

@@ -5,9 +5,9 @@ import { getDocumentBuffer } from '../services/s3.js';
 import { convertOfficeDocument, isOfficeFormat } from '../services/file-converter.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
 import { ProcessorBase } from '../processors/processor-base.js';
-import { BdaStandardProcessor } from '../processors/bda-processor.js';
+import { BdaStandardProcessor, BdaCustomProcessor } from '../processors/bda-processor.js';
 import { BdaClaudeSonnetProcessor, BdaClaudeHaikuProcessor, BdaNovaLiteProcessor } from '../processors/bda-llm.js';
-import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor, ClaudeOpus48Processor, ClaudeOpus47Processor, ClaudeSonnet5Processor } from '../processors/claude-direct.js';
+import { ClaudeSonnetProcessor, ClaudeHaikuProcessor, ClaudeOpusProcessor, ClaudeOpus5Processor, ClaudeOpus48Processor, ClaudeOpus47Processor, ClaudeSonnet5Processor } from '../processors/claude-direct.js';
 import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
 import { Gpt56SolProcessor, Gpt56TerraProcessor, Gpt56LunaProcessor, Gpt55Processor } from '../processors/gpt-direct.js';
 import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor, TextractNovaProProcessor } from '../processors/textract-llm.js';
@@ -36,12 +36,16 @@ function getAvailableMethods(requestedMethods?: ProcessingMethod[]): ProcessingM
 
 const PROCESSOR_FACTORY: Partial<Record<ProcessingMethod, () => ProcessorBase>> = {
   'bda-standard': () => new BdaStandardProcessor(),
+  // preview already filters bda-custom on BDA_PROJECT_ARN, but the processor
+  // was never registered, so the method could never be offered at all.
+  'bda-custom': () => new BdaCustomProcessor(),
   'bda-claude-sonnet': () => new BdaClaudeSonnetProcessor(),
   'bda-claude-haiku': () => new BdaClaudeHaikuProcessor(),
   'bda-nova-lite': () => new BdaNovaLiteProcessor(),
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
   'claude-haiku': () => new ClaudeHaikuProcessor(),
   'claude-opus': () => new ClaudeOpusProcessor(),
+  'claude-opus-5': () => new ClaudeOpus5Processor(),
   'claude-opus-4-8': () => new ClaudeOpus48Processor(),
   'claude-opus-4-7': () => new ClaudeOpus47Processor(),
   'claude-sonnet-5': () => new ClaudeSonnet5Processor(),
@@ -245,3 +249,7 @@ router.post('/', async (req, res) => {
 });
 
 export default router;
+
+/** Test-only: lets processor-registry-parity.test.ts compare the three route
+ * registries so they can never silently drift again. */
+export const PROCESSOR_FACTORY_FOR_TEST = PROCESSOR_FACTORY;

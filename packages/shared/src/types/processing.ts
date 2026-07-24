@@ -12,6 +12,7 @@ export const METHODS = [
   'claude-sonnet',
   'claude-haiku',
   'claude-opus',
+  'claude-opus-5',
   'claude-opus-4-8',
   'claude-opus-4-7',
   'claude-sonnet-5',
@@ -154,6 +155,18 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     strengths: ['Highest accuracy', 'Best reasoning', '128k output', 'Complex analysis', 'Contract/legal', '1M context'],
     limitations: ['Higher cost than 4.8', 'Moderate latency'],
   },
+  'claude-opus-5': {
+    id: 'claude-opus-5',
+    family: 'claude',
+    name: 'Claude Opus 5',
+    shortName: 'Opus 5',
+    description: "Anthropic Claude Opus 5 via Bedrock - Anthropic's most intelligent model, with adaptive thinking on by default",
+    modelId: 'us.anthropic.claude-opus-5',
+    tokenPricing: { inputPer1MTokens: 5.00, outputPer1MTokens: 25.00 },
+    estimatedCostPerPage: 0.025,
+    strengths: ['Highest accuracy', 'Adaptive thinking on by default', '128k output', '1M context', 'Best for complex/legal/financial documents'],
+    limitations: ['Highest cost', 'Higher latency when thinking deeply'],
+  },
   'claude-opus-4-8': {
     id: 'claude-opus-4-8',
     family: 'claude',
@@ -204,17 +217,21 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
     strengths: ['GA model', 'Fastest Nova', 'Lowest cost', 'Fixed 230 tokens/image (resolution-independent)', 'Reasoning capabilities', 'Good for batch'],
     limitations: ['Smaller model', 'Simpler extraction than Pro'],
   },
+  // Nova Pro uses the GA `nova-pro-v1:0` profile. The previously configured
+  // `nova-2-pro-preview-20251202-v1:0` is not resolvable in any region
+  // (Converse returns ResourceNotFoundException: Model not found), which made
+  // every nova-pro run fail. GA nova-pro is verified working on PDF input.
   'nova-pro': {
     id: 'nova-pro',
     family: 'nova',
-    name: 'Nova 2 Pro (Preview)',
-    shortName: 'Nova 2 Pro',
-    description: 'Amazon Nova 2 Pro (Gated Preview) - strong multimodal with native bounding box support',
-    modelId: 'us.amazon.nova-2-pro-preview-20251202-v1:0',
-    tokenPricing: { inputPer1MTokens: 1.25, outputPer1MTokens: 10.00 },
+    name: 'Nova Pro',
+    shortName: 'Nova Pro',
+    description: 'Amazon Nova Pro (GA) - strong multimodal understanding for text, image, and video input',
+    modelId: 'us.amazon.nova-pro-v1:0',
+    tokenPricing: { inputPer1MTokens: 0.80, outputPer1MTokens: 3.20 },
     estimatedCostPerPage: 0.008,
-    strengths: ['Native bounding boxes', 'Higher accuracy', 'Strong multimodal'],
-    limitations: ['Gated Preview (no GA SLA)', 'Limited regional support', 'Quota limits (100 RPM)'],
+    strengths: ['GA model', 'Higher accuracy than Lite', 'Strong multimodal', '300k context'],
+    limitations: ['Higher cost than Nova Lite', 'No native bounding boxes'],
   },
 
   // ─── OpenAI GPT (via Amazon Bedrock Mantle, OpenAI Responses API) ─────────────
@@ -312,14 +329,14 @@ export const METHOD_INFO: Record<ProcessingMethod, MethodInfo> = {
   'textract-nova-pro': {
     id: 'textract-nova-pro',
     family: 'textract-llm',
-    name: 'Textract + Nova 2 Pro (Preview)',
+    name: 'Textract + Nova Pro',
     shortName: 'Txt+Nova Pro',
-    description: 'Amazon Textract OCR followed by Nova 2 Pro (Gated Preview) for structuring',
-    modelId: 'us.amazon.nova-2-pro-preview-20251202-v1:0',
-    tokenPricing: { inputPer1MTokens: 1.25, outputPer1MTokens: 10.00 },
+    description: 'Amazon Textract OCR followed by Nova Pro (GA) for structuring',
+    modelId: 'us.amazon.nova-pro-v1:0',
+    tokenPricing: { inputPer1MTokens: 0.80, outputPer1MTokens: 3.20 },
     estimatedCostPerPage: 0.01,
-    strengths: ['Textract precision + Nova Pro accuracy', 'Better structuring than Lite', 'Native bbox support'],
-    limitations: ['Nova Pro is Gated Preview', 'Two-step process', 'Limited regional support'],
+    strengths: ['Textract precision + Nova Pro accuracy', 'Better structuring than Lite', 'GA model'],
+    limitations: ['Two-step latency', 'Higher cost than Nova Lite'],
   },
 
   // ─── Guardrails ──────────────────────────────────────────────────────────────

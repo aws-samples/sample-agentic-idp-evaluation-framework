@@ -12,6 +12,7 @@ import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapte
 import { emitProgress } from './stream-adapter.js';
 import { bdaClient, s3Client, bedrockClient, config } from '../config/aws.js';
 import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
+import { buildInferenceConfig } from './extraction-shared.js';
 
 // BDA status values from API: Created | InProgress | Success | ServiceError | ClientError
 const TERMINAL_STATUSES = ['Success', 'ServiceError', 'ClientError'];
@@ -27,9 +28,13 @@ const MAX_POLL_ATTEMPTS = 60; // ~5 minutes
 const INPUT_TOKEN_BUDGETS: Record<string, number> = {
   'us.anthropic.claude-haiku-4-5-20251001-v1:0': 180_000,
   'us.anthropic.claude-sonnet-4-6': 700_000,
+  'us.anthropic.claude-sonnet-5': 700_000,
   'us.anthropic.claude-opus-4-6-v1': 700_000,
+  'us.anthropic.claude-opus-4-7': 700_000,
+  'us.anthropic.claude-opus-4-8': 700_000,
+  'us.anthropic.claude-opus-5': 700_000,
   'us.amazon.nova-2-lite-v1:0': 250_000,
-  'us.amazon.nova-2-pro-preview-20251202-v1:0': 250_000,
+  'us.amazon.nova-pro-v1:0': 250_000,
 };
 
 const CHARS_PER_TOKEN = 3.5; // English-ish rough estimate
@@ -170,15 +175,18 @@ Return ONLY valid JSON, no markdown code blocks.${clipped ? '\n\nNOTE: The BDA o
       modelId: this.modelId,
       system: [{ text: systemPrompt }],
       messages,
-      inferenceConfig: {
-        maxTokens: calculateMaxTokens(
+      // Routed through buildInferenceConfig: Opus 5/4.8/4.7 and Sonnet 5 reject
+      // `temperature`, so bda-<model> combos would 400 with it hardcoded.
+      inferenceConfig: buildInferenceConfig(
+        this.modelId,
+        calculateMaxTokens(
           input.capabilities.length,
           input.pageCount ?? 1,
           'json',
           input.capabilities.some(isMediaCapability),
+          this.modelId,
         ),
-        temperature: 0,
-      },
+      ),
     });
 
     const llmResponse = await bedrockClient.send(converseCommand);

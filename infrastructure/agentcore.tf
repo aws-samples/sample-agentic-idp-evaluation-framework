@@ -30,7 +30,7 @@ resource "aws_bedrockagentcore_agent_runtime" "idp_agent" {
     AWS_DEFAULT_REGION = var.aws_region
     S3_BUCKET          = aws_s3_bucket.uploads.id
     S3_OUTPUT_PREFIX   = "idp-outputs/"
-    BDA_PROFILE_ARN    = var.bda_profile_arn
+    BDA_PROFILE_ARN    = local.bda_profile_arn
     BDA_PROJECT_ARN    = var.bda_project_arn
     NODE_ENV           = "production"
     AGENT_PORT         = "8080"

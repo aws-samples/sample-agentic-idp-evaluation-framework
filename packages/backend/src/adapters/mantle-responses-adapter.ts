@@ -94,6 +94,7 @@ export class MantleResponsesAdapter implements StreamAdapter {
       input.pageCount ?? 1,
       'yaml',
       input.capabilities.some(isMediaCapability),
+      this.modelId,
     );
 
     const result = await invokeMantleResponses({

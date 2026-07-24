@@ -117,7 +117,7 @@ RULES:
       modelId: config.claudeModelId,
       system: [{ text: systemPrompt }],
       messages,
-      inferenceConfig: { maxTokens: 4096, temperature: 0.3 },
+      inferenceConfig: { maxTokens: 16384, temperature: 0.3 },
     });
 
     const response = await bedrockClient.send(command);

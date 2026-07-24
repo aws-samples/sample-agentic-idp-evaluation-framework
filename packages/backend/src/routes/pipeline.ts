@@ -26,7 +26,17 @@ import {
   ClaudeSonnetProcessor,
   ClaudeHaikuProcessor,
   ClaudeOpusProcessor,
+  ClaudeOpus5Processor,
+  ClaudeOpus48Processor,
+  ClaudeOpus47Processor,
+  ClaudeSonnet5Processor,
 } from '../processors/claude-direct.js';
+import {
+  Gpt56SolProcessor,
+  Gpt56TerraProcessor,
+  Gpt56LunaProcessor,
+  Gpt55Processor,
+} from '../processors/gpt-direct.js';
 import { NovaLiteProcessor, NovaProProcessor } from '../processors/nova-direct.js';
 import {
   TextractClaudeSonnetProcessor,
@@ -48,6 +58,16 @@ const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Re
   'claude-sonnet': () => new ClaudeSonnetProcessor(),
   'claude-haiku': () => new ClaudeHaikuProcessor(),
   'claude-opus': () => new ClaudeOpusProcessor(),
+  // These were missing, so a pipeline that selected any of them failed at
+  // execution with "No processor for method" even though /preview offered them.
+  'claude-opus-5': () => new ClaudeOpus5Processor(),
+  'claude-opus-4-8': () => new ClaudeOpus48Processor(),
+  'claude-opus-4-7': () => new ClaudeOpus47Processor(),
+  'claude-sonnet-5': () => new ClaudeSonnet5Processor(),
+  'gpt-5-6-sol': () => new Gpt56SolProcessor(),
+  'gpt-5-6-terra': () => new Gpt56TerraProcessor(),
+  'gpt-5-6-luna': () => new Gpt56LunaProcessor(),
+  'gpt-5-5': () => new Gpt55Processor(),
   'nova-lite': () => new NovaLiteProcessor(),
   'nova-pro': () => new NovaProProcessor(),
   'textract-claude-sonnet': () => new TextractClaudeSonnetProcessor(),
@@ -396,3 +416,7 @@ router.post('/execute', async (req, res) => {
 });
 
 export default router;
+
+/** Test-only: lets processor-registry-parity.test.ts compare the three route
+ * registries so they can never silently drift again. */
+export const PROCESSOR_MAP_FOR_TEST = PROCESSOR_MAP;

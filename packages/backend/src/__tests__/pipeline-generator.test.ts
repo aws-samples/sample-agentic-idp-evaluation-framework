@@ -66,7 +66,7 @@ describe('generatePipeline — sequential mode (Guardrails + extraction)', () =>
     expect(stages[stages.length - 1]).toBe(guardrailsNode.id);
   });
 
-  it('edges wire input → extract → guardrails → composer → output', () => {
+  it('edges wire input → extract → guardrails → output, with the composer as edge-less metadata', () => {
     const { pipeline } = generatePipeline(baseRequest({
       capabilities: ['document_summarization', 'pii_redaction'],
       methodAssignments: {
@@ -88,10 +88,17 @@ describe('generatePipeline — sequential mode (Guardrails + extraction)', () =>
     expect(pipeline.edges.some((e) => e.source === inputNode.id && e.target === extractNode.id)).toBe(true);
     // extract → guardrails
     expect(pipeline.edges.some((e) => e.source === extractNode.id && e.target === guardrailsNode.id)).toBe(true);
-    // guardrails → composer
-    expect(pipeline.edges.some((e) => e.source === guardrailsNode.id && e.target === composerNode.id)).toBe(true);
-    // composer → output
-    expect(pipeline.edges.some((e) => e.source === composerNode.id && e.target === outputNode.id)).toBe(true);
+    // guardrails → output: Guardrails is the final stage, so it feeds the
+    // output node directly.
+    expect(pipeline.edges.some((e) => e.source === guardrailsNode.id && e.target === outputNode.id)).toBe(true);
+
+    // The sequential composer carries orchestration METADATA only — it is drawn
+    // off-canvas and deliberately has no edges. The executor reads its
+    // `stages` array to run the chain serially (see routes/pipeline.ts), so
+    // wiring it into the graph would double-execute the stages.
+    expect(pipeline.edges.some((e) => e.source === composerNode.id)).toBe(false);
+    expect(pipeline.edges.some((e) => e.target === composerNode.id)).toBe(false);
+    expect((composerNode.config as any).stages).toEqual([extractNode.id, guardrailsNode.id]);
   });
 
   it('does NOT emit sequential-composer when only PII capabilities (no extraction)', () => {

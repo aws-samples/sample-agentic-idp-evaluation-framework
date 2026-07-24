@@ -96,7 +96,7 @@ const cmd = new ConverseCommand({
     { document: { name: 'document', format: 'pdf', source: { bytes: docBytes } } },
     { text: \`Extract: \${capabilities.join(', ')}\` },
   ]}],
-  inferenceConfig: { maxTokens: 8192, temperature: 0 },
+  inferenceConfig: { maxTokens: 32768, temperature: 0 },
 });
 const out = await bedrock.send(cmd);
 // Output is YAML with one top-level key per capability: { data, confidence, format }.

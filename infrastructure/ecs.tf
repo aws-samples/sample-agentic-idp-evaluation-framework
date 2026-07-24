@@ -6,6 +6,17 @@
 # ============================================================================
 
 # ============================================================================
+# BDA profile
+# ============================================================================
+# Every account has a built-in "standard" data-automation profile whose ARN is
+# derivable from account + region. When bda_profile_arn is left at its empty
+# default we use that, so BDA Standard / BDA+LLM methods work without extra
+# configuration. Set var.bda_profile_arn to override.
+locals {
+  bda_profile_arn = var.bda_profile_arn != "" ? var.bda_profile_arn : "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:data-automation-profile/us.data-automation-v1"
+}
+
+# ============================================================================
 # CloudWatch Log Group
 # ============================================================================
 
@@ -84,7 +95,10 @@ resource "aws_ecs_task_definition" "backend" {
           { name = "AWS_REGION", value = var.aws_region },
           { name = "S3_BUCKET", value = aws_s3_bucket.uploads.id },
           { name = "S3_OUTPUT_PREFIX", value = "idp-outputs/" },
-          { name = "BDA_PROFILE_ARN", value = var.bda_profile_arn },
+          # Falls back to the account's built-in standard data-automation
+          # profile so BDA methods work out of the box. Leaving this empty
+          # disabled every BDA method at runtime.
+          { name = "BDA_PROFILE_ARN", value = local.bda_profile_arn },
           { name = "BDA_PROJECT_ARN", value = var.bda_project_arn },
           { name = "NODE_ENV", value = "production" },
           { name = "PORT", value = "3001" },

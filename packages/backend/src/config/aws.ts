@@ -8,6 +8,25 @@ import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 
 const region = process.env.AWS_REGION ?? 'us-west-2';
 
+/**
+ * Every account gets a built-in BDA "standard" data-automation profile whose
+ * ARN is derivable from account + region. Both Terraform and CDK now pass that
+ * derived ARN in BDA_PROFILE_ARN, but local/dev runs often have only
+ * AWS_ACCOUNT_ID set — derive it there too so BDA methods are not silently
+ * disabled (the adapters throw "BDA Profile ARN not configured" and the routes
+ * filter every BDA method out when this is empty).
+ *
+ * Verified live: invoking the public-default project with this derived profile
+ * ARN completes successfully (status Success in ~7s).
+ */
+function resolveBdaProfileArn(): string {
+  const explicit = process.env.BDA_PROFILE_ARN;
+  if (explicit) return explicit;
+  const accountId = process.env.AWS_ACCOUNT_ID;
+  if (!accountId) return '';
+  return `arn:aws:bedrock:${region}:${accountId}:data-automation-profile/us.data-automation-v1`;
+}
+
 export const s3Client = new S3Client({ region });
 export const bedrockClient = new BedrockRuntimeClient({ region });
 export const bdaClient = new BedrockDataAutomationRuntimeClient({ region });
@@ -20,7 +39,7 @@ export const config = {
   region,
   s3Bucket: process.env.S3_BUCKET ?? '',
   s3OutputPrefix: process.env.S3_OUTPUT_PREFIX ?? 'outputs/',
-  bdaProfileArn: process.env.BDA_PROFILE_ARN ?? '',
+  bdaProfileArn: resolveBdaProfileArn(),
   bdaProjectArn: process.env.BDA_PROJECT_ARN ?? '',
   bedrockGuardrailId: process.env.BEDROCK_GUARDRAIL_ID ?? '',
   bedrockGuardrailVersion: process.env.BEDROCK_GUARDRAIL_VERSION ?? 'DRAFT',

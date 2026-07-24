@@ -15,6 +15,7 @@ import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapte
 import { emitProgress } from './stream-adapter.js';
 import { textractClient, bedrockClient } from '../config/aws.js';
 import { calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
+import { buildInferenceConfig } from './extraction-shared.js';
 
 export class TwoPhaseAdapter implements StreamAdapter {
   public readonly method: ProcessingMethod;
@@ -94,15 +95,18 @@ Return ONLY valid JSON, no markdown code blocks.`;
       modelId: this.modelId,
       system: [{ text: systemPrompt }],
       messages,
-      inferenceConfig: {
-        maxTokens: calculateMaxTokens(
+      // Routed through buildInferenceConfig: Opus 5/4.8/4.7 and Sonnet 5 reject
+      // `temperature`, so textract-<model> combos would 400 with it hardcoded.
+      inferenceConfig: buildInferenceConfig(
+        this.modelId,
+        calculateMaxTokens(
           input.capabilities.length,
           input.pageCount ?? 1,
           'json',
           input.capabilities.some(isMediaCapability),
+          this.modelId,
         ),
-        temperature: 0,
-      },
+      ),
     });
 
     const llmResponse = await bedrockClient.send(converseCommand);

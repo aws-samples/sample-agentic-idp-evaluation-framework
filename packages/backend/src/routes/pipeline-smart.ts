@@ -138,7 +138,7 @@ Return ONLY valid JSON:
     const command = new ConverseCommand({
       modelId: config.claudeModelId,
       messages: [{ role: 'user', content: [{ text: prompt }] }],
-      inferenceConfig: { maxTokens: 16384, temperature: 0.2 },
+      inferenceConfig: { maxTokens: 32768, temperature: 0.2 },
     });
 
     const response = await bedrockClient.send(command);

@@ -17,6 +17,11 @@ export class ClaudeOpusProcessor extends ProcessorBase {
   readonly adapter = new TokenStreamAdapter('claude-opus');
 }
 
+export class ClaudeOpus5Processor extends ProcessorBase {
+  readonly method: ProcessingMethod = 'claude-opus-5';
+  readonly adapter = new TokenStreamAdapter('claude-opus-5');
+}
+
 export class ClaudeOpus48Processor extends ProcessorBase {
   readonly method: ProcessingMethod = 'claude-opus-4-8';
   readonly adapter = new TokenStreamAdapter('claude-opus-4-8');

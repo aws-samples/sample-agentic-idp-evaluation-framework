@@ -58,6 +58,17 @@ const SPEED_RANK: Record<string, number> = {
   'claude-opus': 13,
   'bda-custom': 14,
   'nova-embeddings': 15,
+  // Frontier Claude tiers: Sonnet 5 is fast for its class; the Opus tiers think
+  // adaptively and are the slowest but most accurate.
+  'claude-sonnet-5': 6,
+  'claude-opus-4-7': 16,
+  'claude-opus-4-8': 17,
+  'claude-opus-5': 18,
+  // GPT tiers via Mantle (luna fastest → sol slowest).
+  'gpt-5-6-luna': 5,
+  'gpt-5-6-terra': 8,
+  'gpt-5-6-sol': 13,
+  'gpt-5-5': 13,
   // Guardrails is fast (Textract + deterministic policy eval, ~4s). Ranked
   // between nova-pro and textract-claude-haiku.
   'bedrock-guardrails': 4,

@@ -53,6 +53,14 @@ export class OneIdpStack extends cdk.Stack {
       domainName: props.domainName,
     });
 
+    // Every account has a built-in "standard" data-automation profile whose ARN
+    // is derivable from account + region. When no bdaProfileArn is supplied we
+    // use that, so BDA Standard / BDA+LLM methods work without extra config.
+    // Leaving it empty disabled every BDA method at runtime.
+    const bdaProfileArn =
+      props.bdaProfileArn ||
+      `arn:aws:bedrock:${this.region}:${this.account}:data-automation-profile/us.data-automation-v1`;
+
     const ecr = new EcrConstruct(this, 'Ecr', {
       projectName: props.projectName,
     });
@@ -69,7 +77,7 @@ export class OneIdpStack extends cdk.Stack {
       repository: ecr.repository,
       imageTag: props.ecrImageTag,
       uploadsBucket: storage.uploadsBucket,
-      bdaProfileArn: props.bdaProfileArn ?? '',
+      bdaProfileArn,
       bdaProjectArn: props.bdaProjectArn ?? '',
       claudeModelId: props.claudeModelId,
       novaModelId: props.novaModelId,
@@ -113,7 +121,7 @@ export class OneIdpStack extends cdk.Stack {
       uploadsBucket: storage.uploadsBucket,
       activityTable: activity.table,
       agentRuntimeArn: agent.runtimeArn,
-      bdaProfileArn: props.bdaProfileArn ?? '',
+      bdaProfileArn,
       bdaProjectArn: props.bdaProjectArn ?? '',
       claudeModelId: props.claudeModelId,
       novaModelId: props.novaModelId,
