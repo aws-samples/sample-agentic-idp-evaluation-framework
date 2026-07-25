@@ -3,6 +3,7 @@ import Container from '@cloudscape-design/components/container';
 import Header from '@cloudscape-design/components/header';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import Box from '@cloudscape-design/components/box';
+import Alert from '@cloudscape-design/components/alert';
 import Tabs from '@cloudscape-design/components/tabs';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import Button from '@cloudscape-design/components/button';
@@ -297,11 +298,21 @@ export default function PreviewComparison({
                       "hovered" rather than "chosen" — and it is the only cue that
                       survives for a user who cannot distinguish the tint.
                     */}
-                    {isSelected ? (
-                      <StatusIndicator type="success">Selected</StatusIndicator>
-                    ) : (
-                      <span style={{ fontSize: 12, color: token.textSecondary }}>Select</span>
-                    )}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      {/*
+                        Truncation must be visible on the CARD, not only once the output
+                        is open: a fragment scores a normal-looking confidence and a fast
+                        latency, so on the grid it reads as one of the better results.
+                      */}
+                      {r.truncated && (
+                        <StatusIndicator type="warning">Cut off</StatusIndicator>
+                      )}
+                      {isSelected ? (
+                        <StatusIndicator type="success">Selected</StatusIndicator>
+                      ) : (
+                        <span style={{ fontSize: 12, color: token.textSecondary }}>Select</span>
+                      )}
+                    </span>
                   </div>
 
                   {/*
@@ -350,6 +361,18 @@ export default function PreviewComparison({
                   : "Rendered from the model's response. Switch to Source to see it verbatim."
               }
             >
+              {shownResult.truncated && (
+                <Box padding={{ bottom: 's' }}>
+                  <Alert type="warning" header="This output is incomplete">
+                    {shownResult.shortName} stopped at its output-token limit, so the
+                    response was cut off mid-value — what you see below is a fragment,
+                    not the whole document. The confidence figure describes the part that
+                    was written, not the part that is missing. Run this method from the
+                    Pipeline step, which uses the full model budget instead of the
+                    smaller preview cap.
+                  </Alert>
+                </Box>
+              )}
               {shownCapabilities.length > 1 ? (
                 <Tabs
                   activeTabId={activeCap ?? undefined}

@@ -136,7 +136,7 @@ Full list in [`.env.example`](.env.example). Highlights:
 | `COGNITO_CLIENT_ID` | *(empty)* | Optional allowlist, comma-separated |
 | `BDA_PROFILE_ARN` / `BDA_PROJECT_ARN` | *(empty)* | Optional — BDA methods unavailable if unset |
 | `CLAUDE_MODEL_ID` / `NOVA_MODEL_ID` | GA defaults | Override for regional variants |
-| `VITE_APP_TITLE` | `ONE IDP Framework` | Frontend top-nav title |
+| `VITE_APP_TITLE` | `ONE IDP Evaluation Framework` | Frontend top-nav title |
 | `VITE_REPO_URL` / `VITE_CHAT_URL` | *(unset)* | Source / chat links. **Shown only in dev builds** by default (`import.meta.env.DEV`). Set `VITE_SHOW_LINKS=true` at build time to force-show in prod. |
 
 ## Deployment

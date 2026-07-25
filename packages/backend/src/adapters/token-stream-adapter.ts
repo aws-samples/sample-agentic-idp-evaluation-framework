@@ -226,9 +226,20 @@ export class TokenStreamAdapter implements StreamAdapter {
     let fullText = '';
     let tokenCount = 0;
     let tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number } | undefined;
+    /*
+     * Why this is read at all: Bedrock tells us WHY generation stopped, and we were
+     * throwing that away. A response cut off at the token ceiling arrived as valid-
+     * looking YAML whose last value was half-written, got parsed as far as it went,
+     * and was presented as a success with the model's self-reported confidence — so a
+     * truncated table looked exactly like a complete one.
+     */
+    let stopReason: string | undefined;
 
     if (response.stream) {
       for await (const event of response.stream) {
+        if (event.messageStop?.stopReason) {
+          stopReason = event.messageStop.stopReason;
+        }
         if (event.contentBlockDelta?.delta?.text) {
           const chunk = event.contentBlockDelta.delta.text;
           fullText += chunk;
@@ -261,6 +272,7 @@ export class TokenStreamAdapter implements StreamAdapter {
       rawOutput: fullText,
       latencyMs: Date.now() - start,
       tokenUsage,
+      truncated: stopReason === 'max_tokens',
     };
   }
 

@@ -142,9 +142,15 @@ Return ONLY valid JSON, no markdown code blocks.`;
     let fullText = '';
     let tokenCount = 0;
     let tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number } | undefined;
+    // Why generation stopped. Discarding this made a response cut off at the token
+    // ceiling indistinguishable from a complete one — see AdapterOutput.truncated.
+    let stopReason: string | undefined;
 
     if (llmResponse.stream) {
       for await (const event of llmResponse.stream) {
+        if (event.messageStop?.stopReason) {
+          stopReason = event.messageStop.stopReason;
+        }
         if (event.contentBlockDelta?.delta?.text) {
           const chunk = event.contentBlockDelta.delta.text;
           fullText += chunk;
@@ -180,6 +186,7 @@ Return ONLY valid JSON, no markdown code blocks.`;
     return {
       results,
       rawOutput: JSON.stringify({ textractBlocks: blocks.length, llmOutput: fullText }),
+      truncated: stopReason === 'max_tokens',
       latencyMs: Date.now() - start,
       tokenUsage,
       ocrConfidence: this.meanOcrConfidence(blocks),

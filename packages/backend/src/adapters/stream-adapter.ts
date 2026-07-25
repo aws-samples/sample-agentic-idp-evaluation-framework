@@ -54,6 +54,20 @@ export interface AdapterOutput {
    * more than an order of magnitude in either direction.
    */
   perPageFee?: number;
+  /**
+   * True when the model stopped because it hit the output-token ceiling rather than
+   * because it had finished.
+   *
+   * Bedrock reports this as `messageStop.stopReason === 'max_tokens'` and we were
+   * discarding it, so a response cut off mid-JSON — `data: - {"label": "Benchmark`
+   * with no closing brace — was parsed as far as it went and reported as a clean
+   * success with the model's own confidence attached (0.88). The user then had no way
+   * to tell a complete extraction from half of one.
+   *
+   * Truncation is a property of the RUN, not of any single capability, so it lives
+   * here rather than on a result.
+   */
+  truncated?: boolean;
 }
 
 export function emitProgress(

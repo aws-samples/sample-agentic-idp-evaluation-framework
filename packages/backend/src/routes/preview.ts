@@ -118,8 +118,25 @@ const PREVIEW_METHOD_TIMEOUT_MS = 300_000;
  * Truncated preview output is still useful (it is a sample, and the Pipeline step
  * runs untruncated), but it should not be the common case for a real document.
  */
-const PREVIEW_TOKENS_PER_PAGE = 1_200;
-const PREVIEW_TOKENS_PER_CAPABILITY = 1_500;
+/*
+ * These were 1,200/page + 1,500/capability, which put a 1-page, 2-capability request
+ * at 4,200 output tokens — and that is simply not enough for real output. Measured on
+ * a single dense page: table_extraction alone emitted ~3,900 tokens of HTML (six
+ * tables), and bounding_box on the same page emitted ~2,600 tokens of per-cell boxes.
+ * Together they need roughly 6,500, so the response was cut off mid-value and the
+ * fragment was reported as a success.
+ *
+ * The per-capability term matters far more than the per-page term here, because the
+ * expensive capabilities are the structured ones (tables, boxes, layout) whose output
+ * scales with density rather than page count. Raised so a realistic single-page
+ * request fits, with the 32k ceiling still bounding a runaway.
+ *
+ * maxTokens is an upper BOUND, not an allocation — you are billed for tokens actually
+ * generated — so a larger cap costs nothing on short answers and only prevents
+ * truncation on long ones.
+ */
+const PREVIEW_TOKENS_PER_PAGE = 2_000;
+const PREVIEW_TOKENS_PER_CAPABILITY = 4_000;
 /** Ceiling for preview specifically; full runs may go to the model maximum. */
 const PREVIEW_MAX_OUTPUT_TOKENS = 32_000;
 
@@ -290,6 +307,9 @@ router.post('/', async (req, res) => {
             // non-self-reported confidence figure available.
             ocrConfidence: result.metrics.ocrConfidence,
             tokenUsage: result.metrics.tokenUsage,
+            // The model hit its output ceiling, so this result is a fragment. Sent so
+            // the UI can say so — a truncated table otherwise looks complete.
+            ...(result.truncated ? { truncated: true } : {}),
             ...(result.error ? { error: result.error } : {}),
           });
         } catch (err) {

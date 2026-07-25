@@ -117,6 +117,7 @@ export class MantleResponsesAdapter implements StreamAdapter {
       results,
       rawOutput: result.text,
       latencyMs: Date.now() - start,
+      truncated: result.truncated,
       tokenUsage:
         result.inputTokens || result.outputTokens
           ? {

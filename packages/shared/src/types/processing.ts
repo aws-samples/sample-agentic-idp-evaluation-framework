@@ -911,6 +911,17 @@ export interface ProcessorResult {
     tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
   };
   rawOutput?: string;
+  /**
+   * The model stopped at its output-token ceiling instead of finishing, so this
+   * result is a FRAGMENT.
+   *
+   * Reported because a truncated extraction is otherwise indistinguishable from a
+   * complete one: the response was cut off mid-value (`data: - {"label": "Benchmark`
+   * with no closing brace), parsed as far as it went, and shown with the model's own
+   * confidence attached. Whatever is here may be usable, but it is not all of the
+   * document, and the user has to be told which.
+   */
+  truncated?: boolean;
   error?: string;
 }
 

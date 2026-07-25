@@ -89,6 +89,10 @@ export abstract class ProcessorBase {
           tokenUsage: output.tokenUsage,
         },
         rawOutput: output.rawOutput,
+        // A fragment, not a failure: the parsed part is often still useful, so this
+        // is surfaced rather than thrown. Throwing would discard tokens the user has
+        // already paid for; hiding it would let half a table pass as a whole one.
+        ...(output.truncated ? { truncated: true } : {}),
       };
 
       if (res) emitSSE(res, { type: 'method_complete', method: this.method, data: result });

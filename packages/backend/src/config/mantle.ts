@@ -39,6 +39,16 @@ export interface MantleResponsesResult {
   text: string;
   inputTokens: number;
   outputTokens: number;
+  /**
+   * True when the model stopped because it hit `max_output_tokens` rather than
+   * because it finished.
+   *
+   * The Responses API signals this as `status: "incomplete"` with
+   * `incomplete_details.reason === "max_output_tokens"`. Both were dropped, so a
+   * response cut off mid-JSON was parsed as far as it went and reported as a clean
+   * success — the GPT-family equivalent of the Converse `stopReason` bug.
+   */
+  truncated: boolean;
   raw: unknown;
 }
 
@@ -90,6 +100,9 @@ export async function invokeMantleResponses(params: {
     text: extractOutputText(data),
     inputTokens: data.usage?.input_tokens ?? 0,
     outputTokens: data.usage?.output_tokens ?? 0,
+    truncated:
+      data.status === 'incomplete'
+      && data.incomplete_details?.reason === 'max_output_tokens',
     raw: data,
   };
 }
@@ -100,6 +113,9 @@ interface MantleResponsesRaw {
     content?: Array<{ type?: string; text?: string }>;
   }>;
   usage?: { input_tokens?: number; output_tokens?: number };
+  /** "completed" | "incomplete" | … — `incomplete` means it ran out of room. */
+  status?: string;
+  incomplete_details?: { reason?: string };
 }
 
 /** Concatenate all `output_text` blocks from Responses API `message` items. */

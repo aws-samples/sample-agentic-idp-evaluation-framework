@@ -139,6 +139,14 @@ export class PegasusAdapter implements StreamAdapter {
         outputTokens,
         totalTokens: payload.usage?.totalTokens ?? outputTokens,
       },
+      /*
+       * Pegasus reports why it stopped in `stopReason`/`finishReason` (it returned
+       * "stop" on the verified run). The field was parsed and then ignored, which is
+       * the same defect as the Converse path: a summary cut off at the ceiling would
+       * have read as a complete one.
+       */
+      truncated:
+        payload.stopReason === 'max_tokens' || payload.finishReason === 'max_tokens',
     };
   }
 }

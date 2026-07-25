@@ -26,6 +26,15 @@ export interface MethodResult {
    */
   ocrConfidence?: number;
   tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
+  /**
+   * The model stopped at its output-token ceiling, so this result is a FRAGMENT —
+   * the response was cut off mid-value and parsed as far as it went.
+   *
+   * Shown prominently because the failure is invisible otherwise: a table missing its
+   * last rows renders as a perfectly good table, with the model's own confidence
+   * beside it.
+   */
+  truncated?: boolean;
   error?: string;
 }
 

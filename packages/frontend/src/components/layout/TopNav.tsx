@@ -7,7 +7,7 @@ interface TopNavProps {
   onToggleDarkMode?: () => void;
 }
 
-const APP_TITLE = import.meta.env.VITE_APP_TITLE || 'ONE IDP Framework';
+const APP_TITLE = import.meta.env.VITE_APP_TITLE || 'ONE IDP Evaluation Framework';
 
 // External links are only shown when explicitly opted in via VITE_SHOW_LINKS=true.
 const SHOW_LINKS = import.meta.env.VITE_SHOW_LINKS === 'true';
