@@ -22,7 +22,7 @@
     "check:prices": "node scripts/sync-model-catalog.mjs --strict"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0",
+    "concurrently": "^9.2.4",
     "typescript": "^5.5.0"
   }
 }
