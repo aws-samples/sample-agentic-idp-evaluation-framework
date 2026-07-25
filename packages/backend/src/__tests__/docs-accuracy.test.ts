@@ -155,6 +155,31 @@ describe('the served docs describe the system that actually exists', () => {
     expect(offenders, `hardcoded deployment identifiers: ${offenders.join(' | ')}`).toEqual([]);
   });
 
+  it('names infrastructure files that actually exist', () => {
+    /*
+     * The docs listed `lib/app-runner.ts` as the backend stack. That file was deleted in
+     * the move to ECS Fargate — the real one is `lib/ecs-backend.ts` — so a reader
+     * following the docs looks for a file that is not there. A prose sweep for
+     * "App Runner" missed it because the mention was inside a code-formatted path.
+     */
+    const CDK_LIB = join(import.meta.dirname, '..', '..', '..', '..', 'infrastructure-cdk', 'lib');
+    const real = new Set(readdirSync(CDK_LIB));
+    /*
+     * Only THIS repo's stack files. The docs also name paths inside the project the tool
+     * GENERATES (`lib/idp-stack.ts`), which by definition do not exist here — checking
+     * those would be a false positive, so they are listed explicitly rather than guessed.
+     */
+    const GENERATED_PROJECT_PATHS = new Set(['idp-stack.ts']);
+    const offenders: string[] = [];
+    for (const [f, body] of all) {
+      for (const m of body.matchAll(/`lib\/([\w-]+\.ts)`/g)) {
+        if (GENERATED_PROJECT_PATHS.has(m[1])) continue;
+        if (!real.has(m[1])) offenders.push(`${f}: lib/${m[1]} does not exist`);
+      }
+    }
+    expect(offenders, `docs name non-existent files: ${offenders.join(' | ')}`).toEqual([]);
+  });
+
   it('marks the unbuilt docs package so nobody edits the wrong copy', () => {
     // Two prose trees is the root cause of every drift above. The dead one must say so.
     const readme = readFileSync(

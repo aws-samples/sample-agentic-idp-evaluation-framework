@@ -1100,7 +1100,25 @@ found, because the "why" is what makes it fixable.
       compile error. `scripts/shoot-catalog.mjs` screenshots it and asserts no
       "undefined", no repetition, and every family named.
 
-22. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
+22. [x] **README walkthrough animation, recorded from the live app.**
+      `scripts/record-walkthrough.mjs` drives the real deployment in Chromium (Playwright
+      ships it, so no new dependency) with burned-in "Step N of 4" captions, then encodes
+      with ffmpeg. Deliberately the SAME harness family as the audit walkthrough: if a step
+      is broken the recording shows it broken, so the animation cannot drift from the
+      product. It already earned that — the first take captured `$0.0067/p` + `age`
+      wrapping mid-word in the pipeline cost tile, which is now fixed (the unit moved into
+      the label; `awsui-value-large` at 4 columns cannot fit the value plus "/page").
+      Format: **mp4 3.5 MB vs GIF 9.0 MB** for the same 80 seconds, so the README leads
+      with the mp4 and keeps the GIF as the fallback for viewers that will not play video.
+      GIF is tuned hard for size (8 fps, 760px, 96-colour palette, coarse Bayer dither):
+      a naive 1000px/10fps two-pass encode was 20 MB.
+      Two things the recording taught me that guessing did not: "Skip questions, use
+      defaults" **starts the preview itself** (there is no Run Preview button on that path
+      — two earlier attempts to click one logged a warning I wrongly read as a selector
+      bug, until I listed the live DOM's buttons), and the step-3 canvas does not exist for
+      several seconds because the pipeline is model-generated, so a fixed wait clicked into
+      a spinner.
+23. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
       ideas from the accelerator study, listed in detail in the section above.
 
 ### Open questions / risks

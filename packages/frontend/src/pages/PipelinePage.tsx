@@ -432,8 +432,13 @@ export default function PipelinePage({
               <SpaceBetween size="m">
                 <ColumnLayout columns={4} variant="text-grid">
                   <div>
-                    <Box variant="awsui-key-label">Estimated Cost</Box>
-                    <Box variant="awsui-value-large">${pipeline.estimatedCostPerPage.toFixed(4)}/page</Box>
+                    {/*
+                      The unit lives in the LABEL, not the value. `awsui-value-large` at
+                      4 columns is not wide enough for "$0.0067/page", so it wrapped
+                      mid-word to "$0.0067/p" + "age" — visible in the README recording.
+                    */}
+                    <Box variant="awsui-key-label">Estimated cost / page</Box>
+                    <Box variant="awsui-value-large">${pipeline.estimatedCostPerPage.toFixed(4)}</Box>
                   </div>
                   <div>
                     <Box variant="awsui-key-label">Estimated Latency</Box>

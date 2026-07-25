@@ -43,7 +43,7 @@ Architecture & Code stage does two things:
 1. Streams an **architecture recommendation** (text + Mermaid diagram + cost table at 1 k / 10 k / 100 k docs/month).
 2. Generates a **deployable project (11 files)**: `process.py`, `requirements.txt`, `process.ts`, `package.json`, CDK stack (`lib/idp-stack.ts`, `lambda/processor.ts`, `bin/idp.ts`, `cdk.json`, `cdk/package.json`), and a `README.md`.
 
-Click **Download All Code** — you get a single markdown file with path-hinted sections you can split into a real project tree, then `cd cdk && npm install && npx cdk deploy`.
+Click **Download ZIP** — you get a real project tree (not a markdown file to split by hand), named after the document you evaluated. Then `cd cdk && npm install && npx cdk deploy`.
 
 ## What to try next
 

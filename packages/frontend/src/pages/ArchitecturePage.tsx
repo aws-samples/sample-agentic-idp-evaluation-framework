@@ -404,8 +404,9 @@ export default function ArchitecturePage({
           <SpaceBetween size="m">
             <ColumnLayout columns={4} variant="text-grid">
               <div>
-                <Box variant="awsui-key-label">Estimated Cost</Box>
-                <Box variant="awsui-value-large">${summaryCostPerPage.toFixed(4)}/page</Box>
+                {/* Unit in the label — see PipelinePage: "/page" wrapped mid-word here. */}
+                <Box variant="awsui-key-label">Estimated cost / page</Box>
+                <Box variant="awsui-value-large">${summaryCostPerPage.toFixed(4)}</Box>
               </div>
               <div>
                 <Box variant="awsui-key-label">Methods</Box>

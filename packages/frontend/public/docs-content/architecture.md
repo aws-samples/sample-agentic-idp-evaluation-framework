@@ -112,7 +112,7 @@ Lives in `infrastructure-cdk/`. Uses the official `aws-cdk-lib/aws-bedrockagentc
 - `lib/storage.ts` — S3 buckets.
 - `lib/ecr.ts` — container registry.
 - `lib/agent-runtime.ts` — AgentCore runtime.
-- `lib/app-runner.ts` — backend service.
+- `lib/ecs-backend.ts` — ALB + ECS Fargate backend service.
 - `lib/edge.ts` — CloudFront + Route 53.
 - `lib/activity-table.ts` — DynamoDB.
 

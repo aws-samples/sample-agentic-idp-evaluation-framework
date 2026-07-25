@@ -8,7 +8,31 @@ applicable method runs **in parallel on your document** — 29 methods across 33
 capabilities — so the comparison is measured rather than assumed. Finish with a
 deployable project (Python, TypeScript and CDK) wired to the methods you picked.
 
-![The four steps: upload, analyze and compare, build a pipeline, generate architecture and code](docs/images/walkthrough.gif)
+<!--
+  Recorded from the live deployment by `scripts/record-walkthrough.mjs`, which drives the
+  real app in Chromium — nothing here is mocked or staged, so the animation cannot drift
+  from the product. The mp4 is 3.1 MB against 9.4 MB for the same content as a GIF, so it
+  is listed first; the GIF is the fallback for viewers that will not play video.
+-->
+<p align="center">
+  <a href="docs/images/walkthrough.mp4">
+    <img src="docs/images/walkthrough.gif"
+         alt="The four steps: upload a document, compare every applicable method in parallel, build a pipeline, then generate deployable architecture and code"
+         width="100%">
+  </a>
+  <br>
+  <em>Steps 1–4 on a real invoice, recorded from a live deployment.
+  <a href="docs/images/walkthrough.mp4">Watch as video (3 MB)</a></em>
+</p>
+
+## What you get
+
+| Step | What happens | What you get |
+| --- | --- | --- |
+| **1 · Upload** | One real document — PDF, image, Word, Excel, PowerPoint, audio or video. | Everything after this is measured on *your* document, not a sample. |
+| **2 · Analyze & Compare** | An advisor reads the document and suggests what to extract. Every applicable method then runs **in parallel**. | Real cost, latency and output side by side — including which methods returned nothing, and which got cut off at their token limit. |
+| **3 · Build Pipeline** | Assemble the winners into a pipeline and run it end to end. | What a production run actually produces and costs, not an estimate. |
+| **4 · Architecture & Code** | Generate a deployable project wired to the methods you picked. | 11 files — Python, TypeScript, a CDK app and a README — plus cost projections at 1k / 10k / 100k docs per month. |
 
 ## Architecture at a glance
 
