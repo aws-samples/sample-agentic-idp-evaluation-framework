@@ -73,6 +73,57 @@ describe('the landing page shows the WHOLE catalog', () => {
     expect(reachable.length, 'methods reachable through the groups').toBe(METHODS.length);
   });
 
+  it('sizes the support matrix to its container instead of a fixed width', () => {
+    /*
+     * The matrix was intrinsically sized, so it rendered at a fixed ~1168px whatever the
+     * window was: measured 70px of dead space beside it on a 1600px viewport, and a
+     * horizontal scrollbar at 1280px even though the same content fits a narrower grid.
+     *
+     * `table-layout: fixed` + `width: 100%` makes the browser distribute the space: the
+     * label column takes its declared width and the data columns share the remainder.
+     * Measured after the change — 100% fill from 1440px up, scrolling only below ~1300px
+     * where 29 columns genuinely cannot fit.
+     *
+     * The CSS lives in a template literal in main.tsx (Cloudscape hashes its custom
+     * property names, so these rules cannot be authored as tokens), which is why this is
+     * a source assertion rather than a DOM test.
+     */
+    const styles = readFileSync(
+      join(FRONTEND, 'src', 'main.tsx'),
+      'utf-8',
+    );
+    const block = styles.slice(
+      styles.indexOf('.idp-matrix {'),
+      styles.indexOf('.idp-matrix th, .idp-matrix td'),
+    );
+    expect(block, 'matrix must fill its container').toContain('width: 100%');
+    expect(block, 'columns must be distributed, not intrinsic').toContain('table-layout: fixed');
+    expect(block, 'must not collapse to unreadable columns on a phone').toMatch(/min-width:\s*\d+px/);
+
+    /*
+     * The label column has to be pinned with `width`, not `min-width`: under a fixed
+     * table layout the first row's declared widths decide the grid and min-width is
+     * ignored, so a min-width here silently does nothing.
+     */
+    const corner = styles.slice(
+      styles.indexOf('.idp-matrix-corner {'),
+      styles.indexOf('.idp-matrix-row {'),
+    );
+    expect(corner, 'the label column needs an explicit width').toMatch(/\n\s*width:\s*\d+px/);
+  });
+
+  it('never writes the matrix dimensions by hand', () => {
+    // The header read "33 capabilities x 22 methods" long after there were 29 methods.
+    const matrix = read('src/components/common/SupportMatrix.tsx');
+    expect(matrix).toContain('${CAPABILITIES.length} capabilities x ${METHODS.length} methods');
+    // No stale hardcoded count anywhere, including comments — a comment that says 22
+    // is how the next reader concludes the column list is complete when it is not.
+    const staleCounts = [...matrix.matchAll(/\b(\d{2})\s*(?:methods|columns)\b/g)]
+      .map((m) => m[0])
+      .filter((t) => !t.startsWith(String(METHODS.length)));
+    expect(staleCounts, `hardcoded method counts: ${staleCounts.join(', ')}`).toEqual([]);
+  });
+
   it('gives every capability a real category', () => {
     // Same failure shape on the capability catalog: a capability whose category is not
     // in CAPABILITY_CATEGORIES renders under no heading and is invisible.

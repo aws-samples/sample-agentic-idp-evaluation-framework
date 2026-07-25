@@ -1151,7 +1151,34 @@ found, because the "why" is what makes it fixable.
       as a spec sheet. Capabilities stays open because it answers "what can this thing even
       do?". Verified live on both stacks: folded on load, 29 rows on expand, 21 with the
       availability toggle, filter and sort both working.
-24. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
+24. [x] **Support matrix is now responsive — full-width instead of a fixed 1168px.**
+      Measured before: the table was intrinsically sized, so it rendered at ~1168px
+      regardless of the window — **70px of dead space** beside it at a 1600px viewport, and
+      a **horizontal scrollbar at 1280px** even though the same 29 columns fit comfortably
+      in a narrower grid. `table-layout: fixed` + `width: 100%` hands the distribution to
+      the browser: the label column takes its declared width, the 29 data columns share the
+      remainder.
+      Two details that are load-bearing:
+      - The label column must be pinned with **`width`, not `min-width`** — under a fixed
+        table layout the first row's declared widths decide the grid and `min-width` is
+        silently ignored. The row headers also had to drop their own `min-width`/`nowrap`
+        pair, which was what forced the table wider than its container.
+      - A `min-width: 848px` floor (210px label + 29 columns at a 22px legible minimum)
+        keeps it from compressing into unreadable 1px columns; below that it scrolls, which
+        is the honest fallback for a 30-column grid rather than pretending it fits.
+      Measured after: **100% fill from 1440px up**, columns scaling 30→41px with the
+      window, zero clipped rotated labels, scrolling only below ~1300px. Verified live on
+      both stacks at 1440/1600/1920.
+      Also cleaned up the stale "22 methods / 22 columns" counts that survived in this
+      component's comments and header long after there were 29 — a comment asserting 22 is
+      how the next reader concludes the column list is complete when it is not. A test now
+      fails on any hardcoded method count in the file.
+      **Note on the CSS:** these rules live in a template literal in `main.tsx` (Cloudscape
+      hashes its custom-property names, so they cannot be authored as tokens). Backticks in
+      a comment inside that literal terminate the string — my first attempt did exactly
+      that and broke the build with eight bogus TS1005 errors. Keep comments there
+      backtick-free.
+25. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
       ideas from the accelerator study, listed in detail in the section above.
 
 ### Open questions / risks

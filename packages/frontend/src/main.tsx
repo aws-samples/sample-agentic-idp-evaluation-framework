@@ -88,15 +88,36 @@ table.idp-extracted-table {
 .idp-extracted-table tbody tr:nth-child(even) { background: rgba(128,128,128,0.06); }
 
 /* ─── Capability x method support matrix ─────────────────────────────────────
-   33 rows x up to 22 columns. Column headers are rotated so 22 of them fit
-   without a 3000px-wide table, and both the header row and the capability column
-   are sticky because a cell is meaningless once you have scrolled its labels off
-   screen. Colours use rgba/currentColor so one rule set serves both themes. */
-.idp-matrix { border-collapse: separate; border-spacing: 0; font-size: 12px; }
+   33 rows x 29 columns. Column headers are rotated so 29 of them fit without a
+   3000px-wide table, and both the header row and the capability column are sticky
+   because a cell is meaningless once you have scrolled its labels off screen.
+   Colours use rgba/currentColor so one rule set serves both themes.
+
+   RESPONSIVE WIDTH. The table used to be intrinsically sized, so it rendered at a
+   fixed ~1168px whatever the window was: 70px of dead space beside it on a 1600px
+   viewport, and a horizontal scrollbar at 1280px even though the content would
+   have fitted in a narrower grid. table-layout: fixed plus width: 100% makes
+   the browser distribute the space instead — the label column takes its declared
+   width and the 29 data columns share what is left equally, so the grid grows and
+   shrinks with the panel. min-width keeps it from compressing into unreadable
+   1px columns on a phone; below that it scrolls, which is the honest fallback for
+   a 30-column grid. */
+.idp-matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  table-layout: fixed;
+  width: 100%;
+  /* 210px label column + 29 columns at a legible 22px floor. */
+  min-width: 848px;
+}
 .idp-matrix th, .idp-matrix td {
   border-bottom: 1px solid rgba(128,128,128,0.22);
   padding: 3px 6px;
 }
+/* With table-layout: fixed the glyph cells need no intrinsic width; let them flex
+   and keep the padding from forcing a minimum that defeats the distribution. */
+.idp-matrix td { padding-left: 2px; padding-right: 2px; }
 /*
   Stacking order, and why it matters: the capability popover is rendered inside a
   sticky row header, and the sticky THEAD used to sit at z-index 3 above it — so
@@ -123,18 +144,25 @@ table.idp-extracted-table {
 }
 /* Group separator: a hairline every time the method FAMILY changes, so the eye
    can tell "all five BDA columns" from "all seven Claude columns" without
-   reading 22 rotated labels. */
+   reading every rotated label. */
 .idp-matrix .idp-matrix-groupstart { border-left: 2px solid rgba(128,128,128,0.38); }
 .idp-matrix-corner {
   left: 0; z-index: 2 !important;
   writing-mode: horizontal-tb; vertical-align: bottom !important;
-  text-align: left; min-width: 210px;
+  text-align: left;
+  /* width, not min-width: under table-layout: fixed the first row's declared
+     widths determine the whole grid and min-width is ignored. This is what reserves
+     room for "Key-Value Pair Extraction" while the 29 glyph columns share the rest. */
+  width: 210px;
 }
 .idp-matrix-row {
   position: sticky; left: 0; z-index: 1;
   background: var(--idp-matrix-row-bg, #ffffff);
-  text-align: left; font-weight: 400; white-space: nowrap;
-  min-width: 210px; max-width: 260px;
+  text-align: left; font-weight: 400;
+  /* No min/max-width: the corner cell above already fixes this column. Long
+     capability names wrap instead of forcing the table wider than its container,
+     which is what the old white-space: nowrap + min-width pair did. */
+  white-space: normal; overflow-wrap: break-word;
 }
 /* Lift the hovered row header above every sticky layer so its popover is never
    clipped by the sticky header or the corner cell. */

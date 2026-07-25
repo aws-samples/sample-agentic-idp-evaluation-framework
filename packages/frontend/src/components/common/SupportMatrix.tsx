@@ -22,7 +22,8 @@ import { useMethodAvailability } from '../../hooks/useMethodAvailability';
 import { token } from '../../theme/tokens';
 
 /**
- * The complete capability × method support matrix — 33 capabilities × 22 methods.
+ * The complete capability × method support matrix — every capability against every
+ * method (currently 33 x 29; both counts are read from the catalog, never written here).
  *
  * The catalog previously listed capabilities and methods as two independent lists,
  * so the one question that decides everything ("can THIS method do THIS thing, and
@@ -53,14 +54,14 @@ export default function SupportMatrix() {
   const { isUnavailable } = useMethodAvailability();
 
   /*
-   * One column per METHOD — all 22, always.
+   * One column per METHOD — all of them, always.
    *
-   * There used to be a family/method toggle, on the theory that 22 columns of
+   * There used to be a family/method toggle, on the theory that dozens of columns of
    * which groups share a value invited false distinctions. That stopped being true
    * once per-method overrides existed (CAPABILITY_SUPPORT_OVERRIDES): tiers within
    * a family genuinely differ now — the frontier GPT-5.6 and Opus tiers return
-   * usable bounding boxes where the small tiers do not — so collapsing to 8 columns
-   * would hide real information. One view, no control to reason about.
+   * usable bounding boxes where the small tiers do not — so collapsing to one column
+   * per family would hide real information. One view, no control to reason about.
    */
   const columns = useMemo(
     () => (METHODS as readonly ProcessingMethod[]).map((m, i, all) => ({
@@ -68,7 +69,7 @@ export default function SupportMatrix() {
       method: m,
       label: METHOD_INFO[m].shortName,
       family: getMethodFamily(m),
-      // First column of a family group, so a separator can be drawn there. 22
+      // First column of a family group, so a separator can be drawn there. Dozens of
       // rotated labels are hard to parse as groups; a hairline per family is not.
       groupStart: i > 0 && getMethodFamily(all[i - 1]) !== getMethodFamily(m),
     })),
@@ -117,7 +118,7 @@ export default function SupportMatrix() {
                   className={`idp-matrix-col${col.groupStart ? ' idp-matrix-groupstart' : ''}`}
                   title={`${METHOD_INFO[col.method].name} — ${col.family} family${isUnavailable(col.method) ? ' (not available in this deployment)' : ''}`}
                 >
-                  {/* Rotated labels keep 22 columns legible without a 3000px table. */}
+                  {/* Rotated labels keep every column legible without a 3000px table. */}
                   <span className="idp-matrix-collabel">
                     {col.label}
                     {isUnavailable(col.method) && ' ⚠'}
@@ -161,8 +162,8 @@ export default function SupportMatrix() {
                             Opens to the LEFT. `position="right"` pushed the popover
                             across the grid and under the sticky column headers, which
                             is the other half of why the description was unreadable —
-                            the z-index fix alone would still have it overlapping 22
-                            columns of glyphs.
+                            the z-index fix alone would still have it overlapping every
+                            column of glyphs.
                           */
                           position="left"
                           size="medium"
