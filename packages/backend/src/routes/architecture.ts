@@ -19,12 +19,22 @@ Your response MUST include:
 
 1. **Architecture Overview**: Text explanation grounded in the actual pipeline (name the methods the user picked).
 
-2. **Architecture Diagram**: Mermaid diagram that MATCHES the pipeline structure. Wrap it in <diagram> tags:
+2. **Architecture Diagram**: Mermaid diagram that MATCHES the pipeline structure. Wrap it in <diagram> tags.
+
+Mermaid syntax rules — these are the two mistakes that make a diagram fail to render:
+- Do NOT put a \`\`\` code fence inside the <diagram> tags. The tags already delimit it;
+  a fence makes the first line something other than \`graph TD\` and Mermaid reports
+  "No diagram type detected".
+- ALWAYS double-quote a node label containing ( ) / : or &. Write A["Textract (OCR)"],
+  not A[Textract (OCR)] — unquoted parentheses are a hard parse error because Mermaid
+  reads them as shape syntax. Model names and costs hit this constantly
+  ("Txt+Nova 2 Lite", "$0.0015/pg", "Step 1: Upload").
+
 <diagram>
 graph TD
     A[Document Upload] --> B[S3 Bucket]
-    B --> C[Processing Pipeline]
-    ...
+    B --> C["Textract (OCR)"]
+    C --> D["Claude Sonnet 4.6"]
 </diagram>
 
 3. **Cost Projections**: Monthly cost estimates at different scales. Wrap in <costs> tags:

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Alert from '@cloudscape-design/components/alert';
 import Box from '@cloudscape-design/components/box';
 import SpaceBetween from '@cloudscape-design/components/space-between';
+import { PRODUCT_NAME } from '@idp/shared';
 
 const STORAGE_KEY = 'idp-onboarding-dismissed';
 
@@ -15,7 +16,7 @@ export default function OnboardingBanner() {
   return (
     <Alert
       type="info"
-      header="Welcome to IDP Evaluation Framework"
+      header={`Welcome to ${PRODUCT_NAME}`}
       dismissible
       onDismiss={() => {
         setDismissed(true);

@@ -144,3 +144,22 @@ export { MODEL_MAX_OUTPUT_TOKENS, catalogMaxOutputTokens } from './generated/mod
 // the advisor interview having run.
 export { detectScripts } from './utils/script-detect.js';
 export type { ScriptDetection } from './utils/script-detect.js';
+
+// Product name and tagline, defined once so the tab title, top nav, hero, docs
+// and generated code headers cannot drift into different names.
+export {
+  PRODUCT_NAME,
+  PRODUCT_NAME_SHORT,
+  PRODUCT_TAGLINE,
+  PRODUCT_TAGLINE_SHORT,
+} from './constants/branding.js';
+
+// The four workflow steps: nav label, page title, description and gate copy in one
+// place, so a nav item and the page it opens cannot disagree about its own name.
+export {
+  WORKFLOW_STEPS,
+  TOTAL_STEPS,
+  stepNumber,
+  stepSubtitle,
+} from './constants/steps.js';
+export type { WorkflowStep } from './constants/steps.js';

@@ -4,7 +4,7 @@ import AppLayout from '@cloudscape-design/components/app-layout';
 import Spinner from '@cloudscape-design/components/spinner';
 import Box from '@cloudscape-design/components/box';
 import type { UploadResponse, Capability, ProcessorResult, ComparisonResult, PipelineDefinition } from '@idp/shared';
-import { getDocumentType, getRunStage } from '@idp/shared';
+import { getDocumentType, getRunStage, WORKFLOW_STEPS} from '@idp/shared';
 import TopNav from './components/layout/TopNav';
 import SideNav from './components/layout/SideNav';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -35,12 +35,14 @@ function PageSpinner() {
   );
 }
 
-const STEPS = [
-  { href: '/', text: 'Upload' },
-  { href: '/conversation', text: 'Analyze & Preview' },
-  { href: '/pipeline', text: 'Pipeline' },
-  { href: '/architecture', text: 'Architecture & Code' },
-];
+/*
+ * Nav labels come from WORKFLOW_STEPS, not a parallel literal.
+ *
+ * This list said "Analyze & Preview" / "Pipeline" while the pages titled themselves
+ * "Document Analysis" / "Pipeline Builder", so clicking a nav item landed you on a
+ * page with a different name. One source means they cannot disagree.
+ */
+const STEPS = WORKFLOW_STEPS.map((s) => ({ href: s.href, text: s.title }));
 
 /**
  * Recent Runs is conditional, not part of the four-step flow.

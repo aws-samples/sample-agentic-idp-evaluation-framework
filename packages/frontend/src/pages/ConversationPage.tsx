@@ -8,7 +8,7 @@ import Button from '@cloudscape-design/components/button';
 import Box from '@cloudscape-design/components/box';
 import Alert from '@cloudscape-design/components/alert';
 import type { UploadResponse, Capability } from '@idp/shared';
-import { isModelBackedCapability } from '@idp/shared';
+import { isModelBackedCapability, WORKFLOW_STEPS, stepSubtitle} from '@idp/shared';
 import ChatPanel from '../components/conversation/ChatPanel';
 import CapabilityCards from '../components/conversation/CapabilityCards';
 import PreviewComparison from '../components/conversation/PreviewComparison';
@@ -29,6 +29,9 @@ interface ConversationPageProps {
   /** Called when a preview run finishes, so the result can be persisted. */
   onPreviewComplete?: (preview: PreviewResponse) => void;
 }
+
+/** This page IS step 2; its title, gate copy and sub-title all come from there. */
+const STEP = WORKFLOW_STEPS[1];
 
 export default function ConversationPage({
   document,
@@ -157,8 +160,8 @@ export default function ConversationPage({
 
   if (!document) {
     return (
-      <ContentLayout header={<Header variant="h1">Document Analysis</Header>}>
-        <StepGate message="Upload a document and the AI advisor will analyze its structure and recommend capabilities." />
+      <ContentLayout header={<Header variant="h1">{STEP.title}</Header>}>
+        <StepGate message={STEP.gate} />
       </ContentLayout>
     );
   }
@@ -173,7 +176,7 @@ export default function ConversationPage({
       header={
         <Header
           variant="h1"
-          description={`Step 2 of 4 · ${document.fileName} · ${document.pageCount} page${document.pageCount === 1 ? '' : 's'}`}
+          description={stepSubtitle(STEP.href, document.fileName, document.pageCount)}
           actions={
             selectedCapabilities.length > 0 ? (
               <SpaceBetween direction="horizontal" size="s">
@@ -205,7 +208,7 @@ export default function ConversationPage({
             )
           }
         >
-          Document Analysis
+          {STEP.title}
         </Header>
       }
     >

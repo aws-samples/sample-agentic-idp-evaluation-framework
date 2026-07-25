@@ -12,7 +12,7 @@ import ColumnLayout from '@cloudscape-design/components/column-layout';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import Badge from '@cloudscape-design/components/badge';
 import type { UploadResponse, Capability, ProcessingMethod, ProcessorResult, ComparisonResult, MethodFamily } from '@idp/shared';
-import { METHODS, METHOD_INFO, METHOD_FAMILIES, getMethodsByFamily } from '@idp/shared';
+import { METHODS, METHOD_INFO, METHOD_FAMILIES, getMethodsByFamily, WORKFLOW_STEPS } from '@idp/shared';
 import MethodCard from '../components/processing/MethodCard';
 import ComparisonTable from '../components/processing/ComparisonTable';
 import MetricsChart from '../components/processing/MetricsChart';
@@ -68,7 +68,7 @@ export default function ProcessingPage({
       <ContentLayout header={<Header variant="h1">Processing</Header>}>
         <StepGate
           message="Select at least one capability in the Analyze step before processing."
-          actionLabel="Go to Analyze & Preview"
+          actionLabel={`Go to ${WORKFLOW_STEPS[1].title}`}
           actionHref="/conversation"
         />
       </ContentLayout>

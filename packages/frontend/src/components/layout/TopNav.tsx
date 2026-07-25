@@ -1,5 +1,6 @@
 import TopNavigation from '@cloudscape-design/components/top-navigation';
 import type { AuthUser } from '../../services/api';
+import { PRODUCT_NAME } from '@idp/shared';
 
 interface TopNavProps {
   user: AuthUser | null;
@@ -7,7 +8,7 @@ interface TopNavProps {
   onToggleDarkMode?: () => void;
 }
 
-const APP_TITLE = import.meta.env.VITE_APP_TITLE || 'ONE IDP Evaluation Framework';
+const APP_TITLE = import.meta.env.VITE_APP_TITLE || PRODUCT_NAME;
 
 // External links are only shown when explicitly opted in via VITE_SHOW_LINKS=true.
 const SHOW_LINKS = import.meta.env.VITE_SHOW_LINKS === 'true';

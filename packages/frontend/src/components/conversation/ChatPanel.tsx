@@ -64,7 +64,7 @@ export default function ChatPanel({ messages, isStreaming, error, onSendMessage,
       fitHeight
       header={
         <Box variant="h3" padding={{ top: 'xs', bottom: 'xs' }}>
-          {title ?? 'Document Analysis Chat'}
+          {title ?? 'Advisor'}
         </Box>
       }
       footer={

@@ -4,8 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>IDP Evaluation Framework</title>
-    <meta name="description" content="Evaluate, compare, and recommend the optimal AWS document processing approach for your use case." />
+    <!--
+      Kept in sync with PRODUCT_NAME / PRODUCT_TAGLINE_SHORT in
+      packages/shared/src/constants/branding.ts. This file is the static shell, so it
+      cannot import them — a test asserts the two agree, because the tab title said
+      "IDP Evaluation Framework" while the header said "ONE IDP Framework" and the
+      splash said "ONE IDP", so one product looked like three.
+    -->
+    <title>ONE IDP Evaluation Framework</title>
+    <meta name="description" content="Compare AWS document processing methods side by side on your own documents." />
     <style>
       html, body { margin: 0; padding: 0; height: 100%; background: #fafbfc; color: #16191f; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
       #app-splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 9999; background: #fafbfc; transition: opacity 200ms ease; }
@@ -36,7 +43,7 @@
     </style>
   </head>
   <body>
-    <div id="app-splash" role="status" aria-live="polite" aria-label="Loading ONE IDP">
+    <div id="app-splash" role="status" aria-live="polite" aria-label="Loading ONE IDP Evaluation Framework">
       <div class="logo">IDP</div>
       <div class="spinner"></div>
       <div class="label">Loading…</div>

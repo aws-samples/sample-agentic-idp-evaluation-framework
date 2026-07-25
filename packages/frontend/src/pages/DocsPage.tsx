@@ -8,6 +8,7 @@ import Spinner from '@cloudscape-design/components/spinner';
 import Box from '@cloudscape-design/components/box';
 import { marked } from 'marked';
 import SafeHtml from '../components/common/SafeHtml';
+import { PRODUCT_NAME, PRODUCT_NAME_SHORT } from '@idp/shared';
 
 interface DocItem {
   slug: string;
@@ -27,7 +28,7 @@ const DOCS_INDEX: DocSection[] = [
   {
     title: 'Getting started',
     items: [
-      { slug: 'introduction', title: 'Introduction', description: "What ONE IDP is and who it's for." },
+      { slug: 'introduction', title: 'Introduction', description: `What ${PRODUCT_NAME_SHORT} is and who it\u2019s for.` },
       { slug: 'quickstart', title: 'Quickstart', description: 'Upload a document and run a benchmark in 5 minutes.' },
     ],
   },
@@ -112,8 +113,8 @@ export default function DocsPage() {
   }, [markdown]);
 
   useEffect(() => {
-    if (title) document.title = `${title} · ONE IDP Docs`;
-    return () => { document.title = 'ONE IDP'; };
+    if (title) document.title = `${title} · ${PRODUCT_NAME_SHORT} Docs`;
+    return () => { document.title = PRODUCT_NAME; };
   }, [title]);
 
   return (
@@ -124,7 +125,7 @@ export default function DocsPage() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
           <span>Back to app</span>
         </div>
-        <div className="docs-sidebar-title">ONE IDP Docs</div>
+        <div className="docs-sidebar-title">{PRODUCT_NAME_SHORT} Docs</div>
         <nav className="docs-nav">
           {DOCS_INDEX.map((section) => (
             <div key={section.title} className="docs-nav-section">

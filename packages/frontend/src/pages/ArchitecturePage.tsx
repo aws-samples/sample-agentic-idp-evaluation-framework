@@ -22,7 +22,7 @@ import type {
   PipelineDefinition,
 } from '@idp/shared';
 import type { ProcessingMethod } from '@idp/shared';
-import { CAPABILITY_INFO, METHOD_INFO } from '@idp/shared';
+import { CAPABILITY_INFO, METHOD_INFO, WORKFLOW_STEPS, stepSubtitle} from '@idp/shared';
 import { marked } from 'marked';
 import { useArchitecture } from '../hooks/useArchitecture';
 import { useCodeGen } from '../hooks/useCodeGen';
@@ -135,6 +135,9 @@ const ZIP_PATHS: Record<FileKey, string> = {
   cdkPkg: 'cdk/package.json',
   cdkJson: 'cdk/cdk.json',
 };
+
+/** This page IS step 4. */
+const STEP = WORKFLOW_STEPS[3];
 
 export default function ArchitecturePage({
   document,
@@ -298,8 +301,8 @@ export default function ArchitecturePage({
 
   if (!document || capabilities.length === 0) {
     return (
-      <ContentLayout header={<Header variant="h1">Architecture & Code</Header>}>
-        <StepGate message="Run an evaluation first — architecture guidance is generated from the methods you compared." />
+      <ContentLayout header={<Header variant="h1">{STEP.title}</Header>}>
+        <StepGate message={STEP.gate} />
       </ContentLayout>
     );
   }
@@ -333,7 +336,7 @@ export default function ArchitecturePage({
       header={
         <Header
           variant="h1"
-          description={`Step 4 of 4 · Production-ready code for ${document.fileName}, covering ${capabilities.length} capabilit${capabilities.length === 1 ? 'y' : 'ies'}`}
+          description={`${stepSubtitle(STEP.href, document.fileName)} · a deployable project for ${capabilities.length} capabilit${capabilities.length === 1 ? 'y' : 'ies'}`}
         >
           Architecture & Code Generation
         </Header>

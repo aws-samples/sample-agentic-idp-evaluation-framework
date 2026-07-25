@@ -17,6 +17,8 @@ import {
   METHODS,
   METHOD_FAMILIES,
   getMethodsByFamily,
+  PRODUCT_NAME,
+  PRODUCT_TAGLINE
 } from '@idp/shared';
 import type { SupportLevel, MethodFamily } from '@idp/shared';
 import Popover from '@cloudscape-design/components/popover';
@@ -77,17 +79,56 @@ const FAMILY_GROUPS: ReadonlyArray<{
     families: ['bda-llm', 'textract-llm'],
   },
   {
+    title: 'Purpose-built media models',
+    blurb: 'Built for video rather than pages — they read visuals, audio and on-screen text with timestamps.',
+    families: ['video-understanding'],
+  },
+  {
+    title: 'Specialist OCR (self-hosted)',
+    blurb: 'Document-OCR models on your own SageMaker endpoints. Strongest at dense layouts and grids; billed by GPU hour, so each is opt-in.',
+    families: ['sagemaker-ocr'],
+  },
+  {
     title: 'Specialized services',
     blurb: 'Purpose-built for one job rather than general extraction.',
     families: ['guardrails', 'embeddings'],
   },
 ];
 
+/*
+ * Every family MUST appear in exactly one group above.
+ *
+ * FAMILY_GROUPS is hand-ordered (the order is editorial — general-purpose first,
+ * niche last), so it cannot be derived from METHOD_FAMILIES. But that made it a
+ * second list to keep in sync, and it went stale immediately: adding
+ * `video-understanding` and `sagemaker-ocr` left them in no group, so the header
+ * counted 29 methods while the body rendered only 22 — seven methods vanished from
+ * the first screen a user sees, with no error anywhere.
+ *
+ * Rendering the leftovers instead of dropping them means a future family shows up
+ * ungrouped-but-visible rather than silently disappearing.
+ */
+const GROUPED_FAMILIES = new Set(FAMILY_GROUPS.flatMap((g) => g.families));
+const UNGROUPED_FAMILIES = METHOD_FAMILIES.filter((f) => !GROUPED_FAMILIES.has(f));
+
+const ALL_FAMILY_GROUPS: typeof FAMILY_GROUPS = UNGROUPED_FAMILIES.length > 0
+  ? [
+    ...FAMILY_GROUPS,
+    {
+      title: 'Other methods',
+      blurb: 'Not yet assigned to a role group above.',
+      families: UNGROUPED_FAMILIES,
+    },
+  ]
+  : FAMILY_GROUPS;
+
 /** Per-family note explaining what the family actually is, where it is not obvious. */
 const FAMILY_ROLE_NOTES: Partial<Record<MethodFamily, string>> = {
   guardrails: 'Deterministic PII detection and redaction policy — applies only to PII capabilities, not general extraction.',
   embeddings: 'Produces vectors for search and retrieval, not extracted fields.',
   bda: 'Fully managed extraction service. Requires a data-automation profile.',
+  'video-understanding': 'Reads video natively — visuals, audio and on-screen text — and answers with timestamps. Video input only; it cannot read a document.',
+  'sagemaker-ocr': 'Specialist document-OCR models you host yourself. Cost is GPU hours rather than tokens, so each endpoint is opt-in and off unless configured.',
 };
 
 const STEPS = [
@@ -139,9 +180,9 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
       header={
         <Header
           variant="h1"
-          description="Upload a document, compare AWS processing methods side by side, and get architecture guidance with real cost projections."
+          description={PRODUCT_TAGLINE}
         >
-          IDP Evaluation Framework
+          {PRODUCT_NAME}
         </Header>
       }
     >
@@ -344,7 +385,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
           }
         >
           <SpaceBetween size="l">
-            {FAMILY_GROUPS.map((group) => {
+            {ALL_FAMILY_GROUPS.map((group) => {
               const families = group.families.filter((f) => getMethodsByFamily(f).length > 0);
               if (families.length === 0) return null;
               return (

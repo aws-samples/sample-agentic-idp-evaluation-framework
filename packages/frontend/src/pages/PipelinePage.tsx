@@ -10,7 +10,7 @@ import ColumnLayout from '@cloudscape-design/components/column-layout';
 import Grid from '@cloudscape-design/components/grid';
 import Spinner from '@cloudscape-design/components/spinner';
 import type { UploadResponse, Capability, ProcessorResult, ComparisonResult } from '@idp/shared';
-import { METHOD_INFO, CAPABILITY_INFO } from '@idp/shared';
+import { METHOD_INFO, CAPABILITY_INFO, WORKFLOW_STEPS, stepSubtitle} from '@idp/shared';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import Tabs from '@cloudscape-design/components/tabs';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
@@ -49,6 +49,9 @@ interface SmartRecommendation {
   estimatedSavings: string;
   tokenUsage?: { inputTokens: number; outputTokens: number };
 }
+
+/** This page IS step 3. */
+const STEP = WORKFLOW_STEPS[2];
 
 export default function PipelinePage({
   document,
@@ -282,18 +285,18 @@ export default function PipelinePage({
 
   if (!document) {
     return (
-      <ContentLayout header={<Header variant="h1">Pipeline Builder</Header>}>
-        <StepGate message="Upload a document first — the pipeline is built around the capabilities it needs." />
+      <ContentLayout header={<Header variant="h1">{STEP.title}</Header>}>
+        <StepGate message={STEP.gate} />
       </ContentLayout>
     );
   }
 
   if (capabilities.length === 0) {
     return (
-      <ContentLayout header={<Header variant="h1">Pipeline Builder</Header>}>
+      <ContentLayout header={<Header variant="h1">{STEP.title}</Header>}>
         <StepGate
-          message="Select at least one capability in the Analyze step to build a pipeline."
-          actionLabel="Go to Analyze & Preview"
+          message={`Select at least one capability in ${WORKFLOW_STEPS[1].title} to build a pipeline.`}
+          actionLabel={`Go to ${WORKFLOW_STEPS[1].title}`}
           actionHref="/conversation"
         />
       </ContentLayout>
@@ -305,9 +308,9 @@ export default function PipelinePage({
       header={
         <Header
           variant="h1"
-          description={`Step 3 of 4 · Optimized processing pipeline for ${document.fileName}`}
+          description={stepSubtitle(STEP.href, document.fileName)}
         >
-          Pipeline Builder
+          {STEP.title}
         </Header>
       }
     >

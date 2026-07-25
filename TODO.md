@@ -159,6 +159,74 @@ Local: `npm run dev -w packages/backend` + `npm run dev -w packages/frontend`
   whose MIME type is missing or `application/octet-stream` but whose extension is
   supported — common for `.csv` and for scripted uploads.
 
+### First-run experience: naming, catalog completeness, copy (2026-07-25)
+
+Reviewed as a first-time user walking steps 1 → 4. Three defects, all invisible from
+the source and all on the first screen.
+
+- **SEVEN of 29 methods were missing from the landing page.** The header counted
+  `METHODS.length` (29) while the body rendered only families listed in a
+  hand-maintained `FAMILY_GROUPS` array. The two new families
+  (`video-understanding`, `sagemaker-ocr`) were in no group, so their methods
+  rendered nowhere — no crash, no warning, just a count that disagreed with the list
+  under it. Grouped properly, and an `UNGROUPED_FAMILIES` bucket now renders any
+  future family ungrouped-but-visible rather than dropping it.
+- **The product had SIX names.** Tab title "IDP Evaluation Framework", top nav "ONE
+  IDP Framework", hero "IDP Evaluation Framework", splash "Loading ONE IDP", docs
+  sidebar "ONE IDP Docs", feedback modal "the ONE IDP evaluation platform", and
+  generated code headers "ONE IDP Platform" — a name used nowhere else, in a
+  customer-facing artifact. Now one `PRODUCT_NAME` in
+  `shared/src/constants/branding.ts`, with `index.html` (which cannot import it)
+  pinned by a test.
+- **Nav labels and page titles disagreed.** Nav said "Analyze & Preview" / "Pipeline";
+  the pages titled themselves "Document Analysis" / "Pipeline Builder". Clicking a nav
+  item opened a page with a different name. `WORKFLOW_STEPS` in
+  `shared/src/constants/steps.ts` now defines each step's title, description, gate
+  copy and number once; `stepSubtitle()` derives "Step 2 of 4 · invoice.pdf · 6 pages"
+  from position rather than a hardcoded string per page.
+- Step descriptions rewritten as outcomes rather than mechanics — "Start with one real
+  document … everything after this is measured against your document, not a sample"
+  instead of "Upload any document — PDF, image, Word…".
+
+### Diagram generation: two reproducible render failures fixed
+
+Verified against the real Mermaid parser, not guessed:
+
+1. **A ```mermaid fence inside `<diagram>` tags** → "No diagram type detected". The
+   model wraps the diagram even though the tags already delimit it, so the first line
+   is the fence rather than `graph TD`.
+2. **Unquoted parentheses in a label** → hard "Parse error on line 2". `A[Textract
+   (OCR)]` is invalid because Mermaid reads `(` as shape syntax — and model names and
+   costs hit this constantly ("Txt+Nova 2 Lite", "$0.0015/pg", "Step 1: Upload").
+
+Either produced "Diagram render failed" with the raw source dumped below it, which
+reads as a broken feature. Fixed at **both** ends: the prompt now states the two rules
+with a correct example, and `sanitizeMermaid()` repairs the output anyway because the
+model will still slip. A valid diagram passes through byte-identical.
+
+Worth recording: my first sanitizer regex matched a character class of opening
+delimiters, so the `(` inside the label was taken as the opener and it emitted
+`A["Textract (OCR")]` — still broken, differently. Anchoring on `[`…`]` fixed it, and
+that specific regression is now a test, because it would otherwise look correct.
+
+### Security: unauthenticated config disclosure closed
+
+`/api/health` is mounted BEFORE the auth middleware so a load balancer can reach it —
+which on the public demo means anyone can. `/api/health/detailed` was echoing the live
+configuration back to an anonymous caller:
+
+- the **S3 bucket name holding uploaded documents**
+- the region, and the exact Claude and Nova model ids
+- in plain language, **"Auth disabled (AUTH_PROVIDER=none)"** — the single most useful
+  sentence to hand someone probing a public URL
+
+It now reports whether each thing is *configured*, never what it is set to. Every
+diagnostic use survives (an operator needs to know which check fails, not to be told
+the bucket name they own). Verified live on both stacks: no bucket name, no region, no
+model id, no auth status. `/api/methods` was already clean; `/api/admin/*` already 403.
+`public-endpoint-leakage.test.ts` pins each removed value and also asserts `/features`
+stays a single boolean rather than growing into a config dump.
+
 ### Run history disabled on shared deployments (SECURITY)
 
 **Document disclosure between strangers.** With `AUTH_PROVIDER=none` every visitor
@@ -923,7 +991,24 @@ found, because the "why" is what makes it fixable.
       comparing one against a full extract-and-structure method understates it. Either
       compose them as two-stage methods (like `textract-llm`) or label the figure as
       stage-1-only in the UI.
-15. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
+15. [ ] **Layout/copy items reviewed this pass but NOT changed** — recorded so the
+      review is not mistaken for complete:
+      - The docs (`packages/docs/content/docs/*.mdx`) still say "ONE IDP" in prose.
+        That reads fine as the short form, so it was left; but `architecture.mdx` still
+        describes an **App Runner backend**, which is wrong — it has been ECS Fargate
+        behind an ALB for some time. Docs prose was out of scope for this pass and
+        needs its own accuracy sweep.
+      - `/processing` (`ProcessingPage`) is still a dead route nothing links to. It now
+        compiles against the new families, but it duplicates step-2/3 UI and should be
+        deleted or wired up rather than quietly maintained.
+      - `README.md` header still reads "ONE IDP — Intelligent Document Processing
+        Evaluation Platform", a fourth phrasing. Harmless in a repo README but it is
+        the one remaining place the name is written by hand.
+      - Mermaid render failures BEYOND the two fixed here are unverified: I could not
+        run the parser standalone in this environment (it needs a DOM), so the
+        remaining shapes were reasoned about rather than measured. If a diagram still
+        fails, capture the source from the error panel — it is displayed verbatim.
+16. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
       ideas from the accelerator study, listed in detail in the section above.
 
 ### Open questions / risks

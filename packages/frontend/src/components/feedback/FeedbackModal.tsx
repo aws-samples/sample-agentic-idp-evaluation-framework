@@ -12,6 +12,7 @@ import {
   FEEDBACK_RATING_STEP,
 } from '@idp/shared';
 import { authedFetch } from '../../services/api';
+import { PRODUCT_NAME } from '@idp/shared';
 
 interface FeedbackModalProps {
   visible: boolean;
@@ -170,7 +171,7 @@ export default function FeedbackModal({ visible, onDismiss, onSubmitted }: Feedb
     >
       <SpaceBetween size="l">
         <Box>
-          How would you rate your experience with the ONE IDP evaluation platform? Your feedback helps
+          How would you rate your experience with {PRODUCT_NAME}? Your feedback helps
           us understand what's working and what needs improvement. This is a one-time ask per user.
         </Box>
 
