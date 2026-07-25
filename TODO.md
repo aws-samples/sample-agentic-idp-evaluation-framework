@@ -99,8 +99,11 @@ Local: `npm run dev -w packages/backend` + `npm run dev -w packages/frontend`
 - `ResultBlock` replaces raw `<pre>` blocks that were unreadable in dark mode.
 
 ### Safety
-- Site-wide non-dismissible demo disclaimer; strengthened upload warning
-  (PII/PHI/financial explicitly prohibited).
+- Site-wide non-dismissible demo disclaimer (no SLA, no PII/PHI/financial data,
+  not an AWS product).
+- The PII prohibition is stated **once**, in that banner, in full. The upload
+  control previously repeated a longer version of it directly below, so the same
+  warning appeared twice on one screen; it now carries a one-line reminder.
 
 ### Code quality
 - One shared availability service (`method-availability.ts`) replaces the same
@@ -135,6 +138,29 @@ Local: `npm run dev -w packages/backend` + `npm run dev -w packages/frontend`
       context compaction, mid-conversation tool changes) are **not** wired.
       Thinking is on by default so Opus 5 already benefits; exposing
       `output_config.effort` as a per-method option is a separate change.
+
+### Next session — start here
+1. **Continue UX polish on steps 2-4** (the largest remaining item). Landing is
+   done; Analyze / Pipeline / Architecture still need spacing, density and
+   hierarchy work. Read the screenshots approach below rather than guessing.
+2. **Verify by driving the running app, not by reading code.** Several bugs in
+   this round (dark mode, stacked columns, decorative classifier, the DynamoDB
+   key mismatch) were invisible in the source and only showed up live. Pattern
+   that worked:
+   ```bash
+   npm run dev -w packages/backend & npm run dev -w packages/frontend &
+   # then Playwright against http://localhost:5180, screenshot, and read
+   # CloudWatch / the dev log for the matching server-side error
+   ```
+   Beware two traps: headless Chromium does not render PDF iframes (a blank
+   preview box is not a bug), and full-page screenshots move sticky elements
+   (measure the viewport instead).
+3. **Do not trust `finch build` exit 0.** It returns 0 when the VM is stopped and
+   when the disk is full. Check the log tail for `exporting manifest`, and check
+   the image digest actually changed.
+4. Deploy order that works: build image → push to both ECRs → `force-new-deployment`
+   on both services → wait for `COMPLETED` → verify `/api/health` and
+   `/api/methods` on both stacks.
 
 ### Open questions / risks
 - [ ] `format_standardization` is documented as reference-only because nothing

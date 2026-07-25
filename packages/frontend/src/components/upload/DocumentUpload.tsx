@@ -85,12 +85,14 @@ export default function DocumentUpload({ onUploadComplete, bare = false }: Docum
           showFileLastModified
           tokenLimit={1}
         />
-        <Alert type="warning" statusIconAriaLabel="Warning">
-          Do not upload documents containing personally identifiable information (PII), protected
-          health information (PHI), financial records, or any sensitive or confidential data. This
-          is a shared demonstration environment — use only sample, synthetic, or fully redacted
-          documents.
-        </Alert>
+        {/*
+          Short reminder only. The full prohibition is stated once in the
+          site-wide DisclaimerBanner; repeating it in full here put the same
+          warning on screen twice, directly above and below the file picker.
+        */}
+        <Box color="text-status-warning" fontSize="body-s">
+          Sample, synthetic or fully redacted documents only — no PII, PHI or financial data.
+        </Box>
 
         {files.length > 0 && !uploadResult && (
           <Button
