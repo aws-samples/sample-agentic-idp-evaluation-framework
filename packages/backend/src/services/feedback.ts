@@ -12,7 +12,10 @@ import {
 } from '@idp/shared';
 
 // We reuse the activity table with a fixed sort key so each user has exactly one row.
-// userId = alias, sk = 'feedback#submission'.
+// The table's sort key is literally named `timestamp#type` (both the Terraform and
+// CDK definitions), NOT `sk` — writing `sk` produced
+// "ValidationException: The provided key element does not match the schema"
+// on every read and write.
 const FEEDBACK_SK = 'feedback#submission';
 const FEEDBACK_TYPE = 'feedback';
 
@@ -35,7 +38,7 @@ export async function getFeedbackStatus(userId: string): Promise<FeedbackStatus>
   if (!config.activityTable) return { submitted: false };
   const res = await docClient.send(new GetCommand({
     TableName: config.activityTable,
-    Key: { userId, sk: FEEDBACK_SK },
+    Key: { userId, 'timestamp#type': FEEDBACK_SK },
   }));
   if (!res.Item) return { submitted: false };
   return {
@@ -70,7 +73,7 @@ export async function submitFeedback(
     TableName: config.activityTable,
     Item: {
       userId,
-      sk: FEEDBACK_SK,
+      'timestamp#type': FEEDBACK_SK,
       type: FEEDBACK_TYPE,
       timestamp: submittedAt,
       submittedAt,
@@ -91,7 +94,8 @@ export async function getFeedbackSummary(): Promise<FeedbackSummary> {
   const { ScanCommand } = await import('@aws-sdk/lib-dynamodb');
   const res = await docClient.send(new ScanCommand({
     TableName: config.activityTable,
-    FilterExpression: 'sk = :sk',
+    FilterExpression: '#sk = :sk',
+    ExpressionAttributeNames: { '#sk': 'timestamp#type' },
     ExpressionAttributeValues: { ':sk': FEEDBACK_SK },
   }));
   const items = (res.Items ?? []) as Array<{

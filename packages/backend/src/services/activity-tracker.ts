@@ -13,7 +13,8 @@ export type ActivityType =
 
 export interface ActivityRecord {
   userId: string;
-  sk: string; // ISO timestamp#type for sort key
+  /** Sort key. Must be named `timestamp#type` to match the DynamoDB table. */
+  ['timestamp#type']: string;
   type: ActivityType;
   timestamp: string;
   documentId?: string;
@@ -24,7 +25,8 @@ export interface ActivityRecord {
 
 export interface RunRecord {
   userId: string;
-  sk: string; // run#<runId>
+  /** Sort key: `run#<runId>`, stored under the table's `timestamp#type` key. */
+  ['timestamp#type']: string;
   runId: string;
   timestamp: string;
   status: 'complete' | 'error';
@@ -76,7 +78,7 @@ export async function trackActivity(
   const timestamp = new Date().toISOString();
   const record: ActivityRecord = {
     userId,
-    sk: `${timestamp}#${type}`,
+    'timestamp#type': `${timestamp}#${type}`,
     type,
     timestamp,
     ...data,
@@ -112,11 +114,19 @@ export async function queryActivity(options: {
     };
 
     if (startDate && endDate) {
-      (params as any).KeyConditionExpression += ' AND sk BETWEEN :start AND :end';
+      // `timestamp#type` contains '#', reserved in DynamoDB expressions, so the
+      // sort key is referenced via an alias. Declared only on this branch:
+      // DynamoDB rejects an ExpressionAttributeNames entry no expression uses.
+      (params as any).ExpressionAttributeNames = { '#sk': 'timestamp#type' };
+      (params as any).KeyConditionExpression += ' AND #sk BETWEEN :start AND :end';
       (params.ExpressionAttributeValues as Record<string, unknown>)[':start'] = startDate;
       (params.ExpressionAttributeValues as Record<string, unknown>)[':end'] = endDate + '\uffff';
     } else if (startDate) {
-      (params as any).KeyConditionExpression += ' AND sk >= :start';
+      // `timestamp#type` contains '#', reserved in DynamoDB expressions, so the
+      // sort key is referenced via an alias. Declared only on this branch:
+      // DynamoDB rejects an ExpressionAttributeNames entry no expression uses.
+      (params as any).ExpressionAttributeNames = { '#sk': 'timestamp#type' };
+      (params as any).KeyConditionExpression += ' AND #sk >= :start';
       (params.ExpressionAttributeValues as Record<string, unknown>)[':start'] = startDate;
     }
 
@@ -180,7 +190,7 @@ export async function trackRunResults(
   const timestamp = new Date().toISOString();
   const record: RunRecord = {
     userId,
-    sk: `run#${data.runId}`,
+    'timestamp#type': `run#${data.runId}`,
     runId: data.runId,
     timestamp,
     status: data.status ?? 'complete',
@@ -229,7 +239,8 @@ export async function getRecentRuns(userId: string, limit = 20): Promise<RunReco
   try {
     const result = await docClient.send(new QueryCommand({
       TableName: config.activityTable,
-      KeyConditionExpression: 'userId = :uid AND begins_with(sk, :prefix)',
+      KeyConditionExpression: 'userId = :uid AND begins_with(#sk, :prefix)',
+      ExpressionAttributeNames: { '#sk': 'timestamp#type' },
       ExpressionAttributeValues: {
         ':uid': userId,
         ':prefix': 'run#',
@@ -251,7 +262,7 @@ export async function getRecentRuns(userId: string, limit = 20): Promise<RunReco
 
 /**
  * Get recent runs across ALL users (admin view).
- * Uses a Scan with `begins_with(sk, 'run#')` filter, sorted by timestamp descending.
+ * Uses a Scan with a `begins_with(#sk, 'run#')` filter, sorted by timestamp descending.
  */
 export async function getAllRecentRuns(limit = 50): Promise<RunRecord[]> {
   if (!config.activityTable) return [];
@@ -259,7 +270,8 @@ export async function getAllRecentRuns(limit = 50): Promise<RunRecord[]> {
   try {
     const result = await docClient.send(new ScanCommand({
       TableName: config.activityTable,
-      FilterExpression: 'begins_with(sk, :prefix)',
+      FilterExpression: 'begins_with(#sk, :prefix)',
+      ExpressionAttributeNames: { '#sk': 'timestamp#type' },
       ExpressionAttributeValues: {
         ':prefix': 'run#',
       },
@@ -285,7 +297,7 @@ export async function getRunById(userId: string, runId: string): Promise<RunReco
       TableName: config.activityTable,
       Key: {
         userId,
-        sk: `run#${runId}`,
+        'timestamp#type': `run#${runId}`,
       },
     }));
     return (result.Item as RunRecord) ?? null;
@@ -358,11 +370,19 @@ export async function queryActivityPaginated(options: {
       ExclusiveStartKey: exclusiveStartKey,
     };
     if (startDate && endDate) {
-      (params as any).KeyConditionExpression += ' AND sk BETWEEN :start AND :end';
+      // `timestamp#type` contains '#', reserved in DynamoDB expressions, so the
+      // sort key is referenced via an alias. Declared only on this branch:
+      // DynamoDB rejects an ExpressionAttributeNames entry no expression uses.
+      (params as any).ExpressionAttributeNames = { '#sk': 'timestamp#type' };
+      (params as any).KeyConditionExpression += ' AND #sk BETWEEN :start AND :end';
       (params.ExpressionAttributeValues as Record<string, unknown>)[':start'] = startDate;
       (params.ExpressionAttributeValues as Record<string, unknown>)[':end'] = endDate + '￿';
     } else if (startDate) {
-      (params as any).KeyConditionExpression += ' AND sk >= :start';
+      // `timestamp#type` contains '#', reserved in DynamoDB expressions, so the
+      // sort key is referenced via an alias. Declared only on this branch:
+      // DynamoDB rejects an ExpressionAttributeNames entry no expression uses.
+      (params as any).ExpressionAttributeNames = { '#sk': 'timestamp#type' };
+      (params as any).KeyConditionExpression += ' AND #sk >= :start';
       (params.ExpressionAttributeValues as Record<string, unknown>)[':start'] = startDate;
     }
     const result = await docClient.send(new QueryCommand(params as any));
