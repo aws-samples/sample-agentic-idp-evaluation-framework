@@ -12,6 +12,7 @@ import type {
 import { generatePipeline } from '../services/pipeline-generator.js';
 import { buildComparison } from '../services/comparison.js';
 import { aggregateResults, type AggregationStrategy, type MethodContribution } from '../services/aggregator.js';
+import { classifyPages, summarizeClassification } from '../services/page-classifier.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { getDocumentBuffer } from '../services/s3.js';
 import { calculateCost } from '../services/pricing.js';
@@ -231,6 +232,44 @@ router.post('/execute', async (req, res) => {
     // Per-method contributions, resolved by the aggregator node's strategy once
     // every method has finished.
     const contributions: MethodContribution[] = [];
+
+    // Page classifier: the canvas advertises this stage ("Route by content
+    // type", hybrid routing) but the executor never ran it, so the node was
+    // decoration. Run it for real and report what it found. Classification is
+    // advisory — a failure must not fail the pipeline, so the run continues with
+    // every page routed to its configured method.
+    const classifierNode = pipeline.nodes.find((n) => n.type === 'page-classifier');
+    if (classifierNode) {
+      emitSSE(res, {
+        type: 'node_start',
+        nodeId: classifierNode.id,
+        nodeType: 'page-classifier',
+      } as PipelineExecutionEvent);
+
+      const classification = await classifyPages(documentBuffer, fileName, pageCount);
+      if (classification.error) {
+        console.warn(`[Pipeline] page classification skipped: ${classification.error}`);
+        emitSSE(res, {
+          type: 'node_complete',
+          nodeId: classifierNode.id,
+          result: { note: 'Classification unavailable — all pages routed to their configured method.' },
+          metrics: { latencyMs: classification.latencyMs, cost: 0 },
+        } as PipelineExecutionEvent);
+      } else {
+        const summary = summarizeClassification(classification.pages);
+        console.log(`[Pipeline] page classifier: ${summary || 'no pages classified'} in ${classification.latencyMs}ms`);
+        emitSSE(res, {
+          type: 'node_complete',
+          nodeId: classifierNode.id,
+          result: {
+            summary,
+            contentTypes: classification.contentTypes,
+            pages: classification.pages,
+          },
+          metrics: { latencyMs: classification.latencyMs, cost: 0 },
+        } as PipelineExecutionEvent);
+      }
+    }
 
     // Detect sequential-composer: if present, we execute stages serially,
     // forwarding the text extracted by upstream stages into the downstream

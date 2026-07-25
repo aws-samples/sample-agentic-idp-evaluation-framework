@@ -120,25 +120,33 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
   return (
     <ContentLayout
       header={
-        <Header variant="h1" description="Evaluate, compare, and recommend the optimal AWS document processing approach.">
+        <Header
+          variant="h1"
+          description="Upload a document, compare AWS processing methods side by side, and get architecture guidance with real cost projections."
+        >
           IDP Evaluation Framework
         </Header>
       }
     >
       <SpaceBetween size="l">
 
-        {/* Hero */}
+        {/*
+          Hero. The page header already states the product and its purpose, so
+          this used to repeat both ("IDP Evaluation Framework" above
+          "Find the Right IDP Approach" above a paraphrase of the same
+          description) — three stacked headings before any content. It now
+          carries only the call to action.
+        */}
         <Container>
-          <div style={{ textAlign: 'center', padding: '24px 0 16px' }}>
-            <SpaceBetween size="s">
-              <Box variant="h2" fontSize="display-l">Find the Right IDP Approach</Box>
+          <div style={{ textAlign: 'center', padding: '32px 0 24px' }}>
+            <SpaceBetween size="m">
+              <Box variant="h2" fontSize="display-l">Find the right IDP approach</Box>
               <Box color="text-body-secondary" fontSize="heading-s" padding={{ horizontal: 'xxxl' }}>
-                Upload a document and let our AI advisor analyze it, recommend the right capabilities,
-                then compare processing methods side-by-side for accuracy, cost, and speed.
+                Four steps, roughly a minute per document.
               </Box>
-              <div style={{ paddingTop: 12 }}>
+              <div style={{ paddingTop: 8 }}>
                 <Button variant="primary" iconName="upload" onClick={scrollToUpload}>
-                  Start Evaluation
+                  Start evaluation
                 </Button>
               </div>
             </SpaceBetween>
@@ -355,7 +363,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
 
         {/* Upload */}
         <div ref={uploadRef}>
-          <Container header={<Header variant="h2">Get Started</Header>}>
+          <Container header={<Header variant="h2" description="Step 1 of 4">Get started</Header>}>
             <DocumentUpload onUploadComplete={handleUploadComplete} />
           </Container>
         </div>

@@ -119,16 +119,31 @@ export default function ArchitecturePage({
   const tplCdkJson = useMemo(() => generateCdkJson(), []);
   const tplReadme = useMemo(() => generateReadme(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
 
-  const activePython = aiCode?.python ?? tplPython;
-  const activeRequirements = aiCode?.pythonRequirements ?? tplRequirements;
-  const activeTs = aiCode?.typescript ?? tplTs;
-  const activeTsPkg = aiCode?.typescriptPackageJson ?? tplTsPkg;
-  const activeCdk = aiCode?.cdk ?? tplCdk;
-  const activeLambda = aiCode?.cdkLambdaHandler ?? tplLambda;
-  const activeCdkApp = aiCode?.cdkAppEntry ?? tplCdkApp;
-  const activeCdkPkg = aiCode?.cdkPackageJson ?? tplCdkPkg;
-  const activeCdkJson = aiCode?.cdkJson ?? tplCdkJson;
-  const activeReadme = aiCode?.readme ?? tplReadme;
+  /**
+   * Choose ONE source for the whole bundle.
+   *
+   * Each file used to fall back independently (`aiCode?.python ?? tplPython`),
+   * so a partial LLM response produced a mixed bundle — AI-generated Python
+   * sitting next to a template CDK stack that wired up different methods. The
+   * files are meant to be one deployable project, so they must all come from the
+   * same generator. The AI bundle is used only when it is complete; otherwise the
+   * deterministic templates are used in full.
+   */
+  const aiBundleComplete = !!aiCode
+    && !!aiCode.python && !!aiCode.typescript && !!aiCode.cdk && !!aiCode.cdkLambdaHandler;
+
+  const bundle = aiBundleComplete ? aiCode : null;
+
+  const activePython = bundle?.python ?? tplPython;
+  const activeRequirements = bundle?.pythonRequirements ?? tplRequirements;
+  const activeTs = bundle?.typescript ?? tplTs;
+  const activeTsPkg = bundle?.typescriptPackageJson ?? tplTsPkg;
+  const activeCdk = bundle?.cdk ?? tplCdk;
+  const activeLambda = bundle?.cdkLambdaHandler ?? tplLambda;
+  const activeCdkApp = bundle?.cdkAppEntry ?? tplCdkApp;
+  const activeCdkPkg = bundle?.cdkPackageJson ?? tplCdkPkg;
+  const activeCdkJson = bundle?.cdkJson ?? tplCdkJson;
+  const activeReadme = bundle?.readme ?? tplReadme;
 
   const methodSummary = useMemo(() => {
     const methodMap = buildMethodMap(capabilities, processingResults, comparison, executedPipeline);
@@ -192,7 +207,7 @@ export default function ArchitecturePage({
       header={
         <Header
           variant="h1"
-          description={`Production-ready code for processing ${document.fileName} with ${capabilities.length} capabilities`}
+          description={`Step 4 of 4 · Production-ready code for ${document.fileName}, covering ${capabilities.length} capabilit${capabilities.length === 1 ? 'y' : 'ies'}`}
         >
           Architecture & Code Generation
         </Header>
@@ -360,7 +375,7 @@ export default function ArchitecturePage({
               variant="h2"
               description={codeGenLoading
                 ? 'Generating production-ready code from your benchmark results…'
-                : aiCode?.cdk
+                : aiBundleComplete
                   ? 'AI-generated from real benchmark data. Every file below is deployable as-is.'
                   : 'Deterministic template generated from your benchmark data. Deployable as-is.'}
               actions={
@@ -382,7 +397,7 @@ export default function ArchitecturePage({
               },
               {
                 id: 'python',
-                label: codeGenLoading ? 'process.py …' : aiCode?.python ? 'process.py (AI)' : 'process.py',
+                label: codeGenLoading ? 'process.py …' : aiBundleComplete ? 'process.py (AI)' : 'process.py',
                 content: <CodeBlock code={activePython} language="python" />,
               },
               {
@@ -392,7 +407,7 @@ export default function ArchitecturePage({
               },
               {
                 id: 'typescript',
-                label: codeGenLoading ? 'process.ts …' : aiCode?.typescript ? 'process.ts (AI)' : 'process.ts',
+                label: codeGenLoading ? 'process.ts …' : aiBundleComplete ? 'process.ts (AI)' : 'process.ts',
                 content: <CodeBlock code={activeTs} language="typescript" />,
               },
               {
@@ -402,7 +417,7 @@ export default function ArchitecturePage({
               },
               {
                 id: 'cdk-stack',
-                label: codeGenLoading ? 'cdk/lib/idp-stack.ts …' : aiCode?.cdk ? 'cdk/lib/idp-stack.ts (AI)' : 'cdk/lib/idp-stack.ts',
+                label: codeGenLoading ? 'cdk/lib/idp-stack.ts …' : aiBundleComplete ? 'cdk/lib/idp-stack.ts (AI)' : 'cdk/lib/idp-stack.ts',
                 content: <CodeBlock code={activeCdk} language="typescript" />,
               },
               {

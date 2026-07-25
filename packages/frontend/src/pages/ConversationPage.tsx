@@ -105,6 +105,20 @@ export default function ConversationPage({
     onStartProcessing(selectedMethod || undefined, preview);
   }, [onStartProcessing, selectedMethod, preview]);
 
+  /**
+   * Leave the interview and continue with a sensible default capability set.
+   *
+   * The advisor is instructed to ask 3-5 questions before recommending, and
+   * until it does the page offers no forward action at all — a user who just
+   * wants to see the comparison had no way out. These three cover what almost
+   * every document evaluation starts with, and the user can adjust them on the
+   * capability cards afterwards.
+   */
+  const handleSkipInterview = useCallback(() => {
+    const defaults: Capability[] = ['text_extraction', 'table_extraction', 'kv_extraction'];
+    onCapabilitiesSelected(defaults.filter((c) => isModelBackedCapability(c)));
+  }, [onCapabilitiesSelected]);
+
   if (!document) {
     return (
       <ContentLayout header={<Header variant="h1">Document Analysis</Header>}>
@@ -123,7 +137,7 @@ export default function ConversationPage({
       header={
         <Header
           variant="h1"
-          description={`Analyzing: ${document.fileName} (${document.pageCount} pages)`}
+          description={`Step 2 of 4 · ${document.fileName} · ${document.pageCount} page${document.pageCount === 1 ? '' : 's'}`}
           actions={
             selectedCapabilities.length > 0 ? (
               <SpaceBetween direction="horizontal" size="s">
@@ -145,7 +159,15 @@ export default function ConversationPage({
                   </Button>
                 )}
               </SpaceBetween>
-            ) : undefined
+            ) : (
+              // Before the advisor finishes its interview there was NO action at
+              // all, so the only way forward was to keep answering questions
+              // (the prompt asks for 3-5 exchanges) with no indication of how
+              // many remained. Offer an explicit escape hatch.
+              <Button onClick={handleSkipInterview} disabled={isStreaming}>
+                Skip questions, use defaults
+              </Button>
+            )
           }
         >
           Document Analysis

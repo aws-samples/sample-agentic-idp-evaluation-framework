@@ -275,7 +275,7 @@ export default function PipelinePage({
       header={
         <Header
           variant="h1"
-          description={`Optimized processing pipeline for ${document.fileName}`}
+          description={`Step 3 of 4 · Optimized processing pipeline for ${document.fileName}`}
         >
           Pipeline Builder
         </Header>
