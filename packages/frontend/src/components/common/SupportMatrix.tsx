@@ -168,6 +168,18 @@ export default function SupportMatrix() {
                           position="left"
                           size="medium"
                           triggerType="text"
+                          /*
+                            Rendered in a portal, or the scroll container clips it.
+                            The matrix lives in `overflow: auto` (it has to — every method
+                            column plus every capability row can overflow), and an absolutely-positioned child
+                            of a scrolling ancestor is clipped at that ancestor's edge.
+                            Since the popover opens LEFT from a column pinned to the
+                            container's left edge, it opened straight into the clip and
+                            lost its first ~40% — the reader saw "…nns, sections," with
+                            the beginning of every sentence cut off. No z-index can fix
+                            that; only escaping the overflow context does.
+                          */
+                          renderWithPortal
                           content={
                             <SpaceBetween size="xs">
                               <Box variant="strong">{cap?.name ?? capId}</Box>

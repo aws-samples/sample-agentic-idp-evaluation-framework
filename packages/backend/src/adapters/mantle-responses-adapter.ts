@@ -5,7 +5,7 @@ import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapte
 import { emitProgress } from './stream-adapter.js';
 import { invokeMantleResponses } from '../config/mantle.js';
 import { applyOutputCap, calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
-import { isOfficeFormat, convertOfficeDocument } from '../services/file-converter.js';
+import { isOfficeFormat, convertOfficeDocument, isBinaryOfficeBuffer } from '../services/file-converter.js';
 import {
   IMAGE_EXTENSIONS,
   PDF_EXTENSION,
@@ -72,14 +72,7 @@ export class MantleResponsesAdapter implements StreamAdapter {
         filename: 'document.pdf',
         file_data: `data:application/pdf;base64,${input.documentBuffer.toString('base64')}`,
       });
-    } else if (
-      isOfficeFormat(fileName) &&
-      input.documentBuffer.length > 4 &&
-      input.documentBuffer[0] === 0x50 &&
-      input.documentBuffer[1] === 0x4b &&
-      input.documentBuffer[2] === 0x03 &&
-      input.documentBuffer[3] === 0x04
-    ) {
+    } else if (isOfficeFormat(fileName) && isBinaryOfficeBuffer(input.documentBuffer)) {
       const converted = await convertOfficeDocument(input.documentBuffer, fileName);
       content.push({ type: 'input_text', text: `Document content:\n${converted.text}` });
     } else {

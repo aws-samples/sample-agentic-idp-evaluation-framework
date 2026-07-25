@@ -50,10 +50,19 @@ export const DOCUMENT_TYPE_INFO: Record<DocumentType, DocumentTypeInfo> = {
   pptx: {
     id: 'pptx',
     name: 'PowerPoint',
-    extensions: ['.pptx', '.ppt'],
+    /*
+     * `.ppt` (and its `application/vnd.ms-powerpoint` MIME) are deliberately absent.
+     *
+     * No pure-JS parser reads the legacy PowerPoint binary record stream, so a `.ppt`
+     * upload fell through to a UTF-8 decode of the container: the model was billed to
+     * read binary and the run was reported as a success. `.doc` IS still accepted —
+     * word-extractor parses the equivalent Word container, verified against a real file.
+     * The picker's accepted-formats text and the 415 body are both derived from these
+     * lists, so removing it here stops the app advertising it.
+     */
+    extensions: ['.pptx'],
     mimeTypes: [
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'application/vnd.ms-powerpoint',
     ],
     description: 'Presentation slides with text, charts, and diagrams',
     icon: 'file-ppt',

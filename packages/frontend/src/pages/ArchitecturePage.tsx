@@ -41,6 +41,7 @@ import {
   generateCdkAppEntry,
   generateCdkPackageJson,
   generateCdkJson,
+  generateCdkTsConfig,
   generateReadme,
 } from './architectureTemplates';
 
@@ -62,7 +63,7 @@ interface ArchitecturePageProps {
  */
 type FileKey =
   | 'readme' | 'python' | 'requirements' | 'typescript' | 'tsPkg'
-  | 'cdkStack' | 'cdkLambda' | 'cdkApp' | 'cdkPkg' | 'cdkJson' | 'pipelineConfig';
+  | 'cdkStack' | 'cdkLambda' | 'cdkApp' | 'cdkPkg' | 'cdkJson' | 'cdkTsConfig' | 'pipelineConfig';
 
 interface GeneratedFile {
   key: FileKey;
@@ -115,6 +116,7 @@ const FILE_GROUPS: Array<{
       { key: 'cdkApp', name: 'bin/idp.ts', language: 'typescript' },
       { key: 'cdkPkg', name: 'package.json', language: 'json' },
       { key: 'cdkJson', name: 'cdk.json', language: 'json' },
+      { key: 'cdkTsConfig', name: 'tsconfig.json', language: 'json' },
     ],
   },
 ];
@@ -144,6 +146,7 @@ const ZIP_PATHS: Record<FileKey, string> = {
   cdkApp: 'cdk/bin/idp.ts',
   cdkPkg: 'cdk/package.json',
   cdkJson: 'cdk/cdk.json',
+  cdkTsConfig: 'cdk/tsconfig.json',
 };
 
 /**
@@ -155,6 +158,25 @@ const ZIP_EXTRA_COPIES: Partial<Record<FileKey, string[]>> = {
   // Resolves `../process.js` from cdk/lambda/processor.ts.
   typescript: ['cdk/process.ts'],
 };
+
+/**
+ * Files whose extra copy needs DIFFERENT content from the original.
+ *
+ * `cdk/process.ts` is the same pipeline module as the root `process.ts`, minus the CLI
+ * entry point: that shim uses top-level `await` and `import.meta.url`, which are ESM-only.
+ * The root project is ESM (`"type": "module"`), but the CDK app compiles as CommonJS, and
+ * tsc rejects both there — three errors that stopped the generated CDK project building.
+ */
+const ZIP_COPY_OVERRIDES: Record<string, (args: CodeGenArgs) => string> = {
+  'cdk/process.ts': (a) => generateTypeScriptCode(a.capabilities, a.processingResults, a.comparison, a.executedPipeline, { cli: false }),
+};
+
+interface CodeGenArgs {
+  capabilities: Capability[];
+  processingResults: ProcessorResult[];
+  comparison?: ComparisonResult | null;
+  executedPipeline?: PipelineDefinition | null;
+}
 
 /** This page IS step 4. */
 const STEP = WORKFLOW_STEPS[3];
@@ -219,12 +241,13 @@ export default function ArchitecturePage({
   const tplPython = useMemo(() => generatePythonCode(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
   const tplRequirements = useMemo(() => generatePythonRequirements(), []);
   const tplTs = useMemo(() => generateTypeScriptCode(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
-  const tplTsPkg = useMemo(() => generateTypeScriptPackageJson(), []);
+  const tplTsPkg = useMemo(() => generateTypeScriptPackageJson(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
   const tplCdk = useMemo(() => generateCdkStack(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
   const tplLambda = useMemo(() => generateCdkLambdaHandler(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
   const tplCdkApp = useMemo(() => generateCdkAppEntry(), []);
-  const tplCdkPkg = useMemo(() => generateCdkPackageJson(), []);
+  const tplCdkPkg = useMemo(() => generateCdkPackageJson(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
   const tplCdkJson = useMemo(() => generateCdkJson(), []);
+  const tplCdkTsConfig = useMemo(() => generateCdkTsConfig(), []);
   const tplReadme = useMemo(() => generateReadme(capabilities, processingResults, comparison, executedPipeline), [capabilities, processingResults, comparison, executedPipeline]);
 
   /**
@@ -308,6 +331,7 @@ export default function ArchitecturePage({
     cdkApp: activeCdkApp,
     cdkPkg: activeCdkPkg,
     cdkJson: activeCdkJson,
+    cdkTsConfig: tplCdkTsConfig,
     pipelineConfig: pipelineConfigJson,
   };
   const fileFor = (key: FileKey) => fileContents[key];
@@ -340,9 +364,13 @@ export default function ArchitecturePage({
       for (const file of group.files) {
         const content = fileFor(file.key);
         zip.file(ZIP_PATHS[file.key], content);
-        // Same content at a second path where a generated import expects it.
+        // Same content at a second path where a generated import expects it — unless
+        // that path needs a variant (see ZIP_COPY_OVERRIDES).
         for (const extra of ZIP_EXTRA_COPIES[file.key] ?? []) {
-          zip.file(extra, content);
+          const override = ZIP_COPY_OVERRIDES[extra];
+          zip.file(extra, override
+            ? override({ capabilities, processingResults, comparison, executedPipeline })
+            : content);
         }
       }
     }

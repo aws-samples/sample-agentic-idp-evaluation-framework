@@ -13,7 +13,7 @@ import {
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
 import { textractClient, bedrockClient, config } from '../config/aws.js';
-import { isOfficeFormat, convertOfficeDocument } from '../services/file-converter.js';
+import { isOfficeFormat, convertOfficeDocument, isBinaryOfficeBuffer } from '../services/file-converter.js';
 
 // Bedrock ApplyGuardrail enforces a text cap per request. We keep a safety
 // margin under the documented 25 KB so multi-byte UTF-8 characters and
@@ -92,8 +92,8 @@ export class GuardrailsAdapter implements StreamAdapter {
       emitProgress(res, this.method, 'all', 45, `Received ${text.length} chars from upstream stage. Applying guardrail...`);
     } else {
       const isTextractSupported = /\.(pdf|jpg|jpeg|png|tiff|tif)$/i.test(fileName);
-      const isZipFile = input.documentBuffer.length > 4 && input.documentBuffer[0] === 0x50 && input.documentBuffer[1] === 0x4B && input.documentBuffer[2] === 0x03 && input.documentBuffer[3] === 0x04;
-      if (!isTextractSupported && isOfficeFormat(fileName) && isZipFile) {
+      // Covers OOXML (ZIP) and the legacy CFB container; see isBinaryOfficeBuffer.
+      if (!isTextractSupported && isOfficeFormat(fileName) && isBinaryOfficeBuffer(input.documentBuffer)) {
         emitProgress(res, this.method, 'all', 0, 'Converting Office document to text...');
         const converted = await convertOfficeDocument(input.documentBuffer, fileName);
         text = converted.text;

@@ -1178,7 +1178,71 @@ found, because the "why" is what makes it fixable.
       a comment inside that literal terminate the string — my first attempt did exactly
       that and broke the build with eight bogus TS1005 errors. Keep comments there
       backtick-free.
-25. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
+25. [x] **The generated project now genuinely builds and synthesises.** Previously it could
+      not, and no test could see that because the generator was only ever unit-tested on
+      the strings it produced. `scripts/verify-generated-code.mjs` writes the real 12-file
+      bundle to a temp dir, runs `npm install`, `tsc --noEmit`, `python3 -m py_compile` and
+      **`cdk synth`**, and it found four more defects beyond the five from the audit:
+      - **`cdk/package.json` listed none of the AWS SDK clients** its own bundled Lambda
+        imports — seven `Cannot find module '@aws-sdk/...'` errors. Both manifests also
+        hardcoded every SDK regardless of the pipeline; deps are now derived from the
+        methods in use (`runtimeDependencies`), so a Claude-only project no longer installs
+        the Textract and BDA clients it never calls.
+      - **No `tsconfig.json` shipped at all**, yet `npm run build` is just `tsc` and
+        `cdk.json` runs `ts-node --prefer-ts-exts`. Both need one. Added
+        `generateCdkTsConfig`.
+      - **`process.ts` carried an ESM-only CLI shim** (top-level `await`,
+        `import.meta.url`) into the `cdk/` copy, which compiles as CommonJS — three errors.
+        `generateTypeScriptCode` now takes `{ cli: false }` for that copy, wired through a
+        new `ZIP_COPY_OVERRIDES`.
+      - **`cdk synth` failed even after `tsc` passed:** `bin/idp.ts` imported
+        `'../lib/idp-stack.js'`, and ts-node's CommonJS resolution does not map a `.js`
+        specifier onto a sibling `.ts`. This is the important lesson — `tsc` accepted it
+        under Node16 resolution and only *running* synth surfaced it, exactly like the
+        `const process` shadowing that typechecked and then threw. **Compile-only gates are
+        not enough for generated code.** Imports are extensionless now and the tsconfig
+        declares CommonJS, matching how cdk.json actually invokes the app.
+      Result: **`cdk synth` renders a 34-resource CloudFormation template**, checked to
+      contain a Lambda, a bucket and a table rather than just "synth exited 0".
+26. [x] **Mermaid verified against the model's REAL output, not just my own test cases.**
+      `scripts/mermaid-probe.mjs` proves the sanitizer handles 26 shapes I chose; it does
+      not prove the model's actual diagrams survive. `scripts/verify-live-diagram.mjs` calls
+      `/api/architecture` on a live deployment, captures each `<diagram>` from the SSE
+      stream, and renders it through the shipped `sanitizeMermaid` in Chromium.
+      **4/4 real diagrams render, 0 needed repair** — the prompt rules are working upstream,
+      and the sanitizer is now a safety net rather than the thing holding it together.
+      Both probes compile the sanitizer with the real TypeScript transpiler; regex-stripping
+      the annotations mangles `const NEEDS_QUOTING = /[()[\]{}:&]/` (the `:&` inside the
+      character class looks like a type annotation) and throws an error that has nothing to
+      do with the code under test.
+27. [x] **Legacy binary Office formats: `.doc` implemented, `.ppt` rejected honestly.**
+      Two container formats — OOXML (`.docx/.pptx/.xlsx`) is a ZIP, `50 4B 03 04`; CFB
+      (`.doc/.ppt/.xls`) is legacy OLE, `D0 CF 11 E0`. All three generating adapters gated
+      conversion on an **inlined ZIP-only magic-byte test**, so every CFB file failed the
+      gate and fell through to `buffer.toString('utf-8')`.
+      Measured on a real `.xls`: the model received the raw OLE header as text and the run
+      was reported a **success with real token cost**. `.doc` was worse — advertised in the
+      picker, and officeparser cannot read CFB at all.
+      - `.doc` now parses via `word-extractor`. Verified **live end to end**: uploaded to
+        the deployed stack, previewed with Claude Haiku, every identifier and amount
+        extracted (264 input tokens — real text, not binary).
+      - `.xls` now reaches `convertExcel` instead of being decoded as noise.
+      - The three inlined gates are replaced by one `isBinaryOfficeBuffer`; a test fails if
+        any adapter reintroduces its own.
+      - `.ppt` is **removed from the accepted formats** (extension, MIME and resolver, since
+        the upload filter tests MIME first) and rejected with an actionable 415: *"Open it in
+        PowerPoint and save as .pptx."* No pure-JS parser reads that record stream and I
+        could not produce a `.ppt` fixture to verify against — shipping untested code that
+        claims the capability would repeat the original bug.
+28. [x] **The support-matrix popover was clipped, losing the start of every description.**
+      The matrix must live in `overflow: auto` (both axes can overflow), and an
+      absolutely-positioned child of a scrolling ancestor is clipped at that ancestor's
+      edge. The popover opens LEFT from a column pinned to the container's left edge, so it
+      opened straight into the clip — the reader saw "…nns, sections," with the beginning
+      cut off. No z-index fixes that; only escaping the overflow context does, via
+      Cloudscape's `renderWithPortal`. Verified: `inOverflowAncestor: false`, x=440 fully
+      on-screen, full sentence visible.
+29. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
       ideas from the accelerator study, listed in detail in the section above.
 
 ### Open questions / risks

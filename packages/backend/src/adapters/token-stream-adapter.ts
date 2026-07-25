@@ -12,7 +12,7 @@ import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapte
 import { emitProgress } from './stream-adapter.js';
 import { bedrockClient } from '../config/aws.js';
 import { applyOutputCap, calculateMaxTokens, isMediaCapability } from '../services/token-budget.js';
-import { isOfficeFormat, convertOfficeDocument } from '../services/file-converter.js';
+import { isOfficeFormat, convertOfficeDocument, isBinaryOfficeBuffer } from '../services/file-converter.js';
 import {
   IMAGE_EXTENSIONS,
   PDF_EXTENSION,
@@ -143,7 +143,7 @@ export class TokenStreamAdapter implements StreamAdapter {
       contentBlocks.push({
         document: { name: 'document', format: 'pdf', source: { bytes: input.documentBuffer } },
       });
-    } else if (isOfficeFormat(fileName) && input.documentBuffer.length > 4 && input.documentBuffer[0] === 0x50 && input.documentBuffer[1] === 0x4B && input.documentBuffer[2] === 0x03 && input.documentBuffer[3] === 0x04) {
+    } else if (isOfficeFormat(fileName) && isBinaryOfficeBuffer(input.documentBuffer)) {
       const converted = await convertOfficeDocument(input.documentBuffer, fileName);
       contentBlocks.push({ text: `Document content:\n${converted.text}` });
     } else if (converseVideoFormat(fileName)) {

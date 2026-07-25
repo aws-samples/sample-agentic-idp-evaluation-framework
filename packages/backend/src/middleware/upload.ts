@@ -30,6 +30,21 @@ export const upload = multer({
       cb(null, true);
       return;
     }
+    /*
+     * Name the fix for legacy binary Office formats.
+     *
+     * `.ppt` used to be accepted and then silently produced garbage — no pure-JS parser
+     * reads that container. "Not a supported document type" alongside a list containing
+     * `.pptx` is a puzzle for someone holding a `.ppt`; "save it as .pptx" is an
+     * instruction. (`.doc` is genuinely supported, so it is not listed here.)
+     */
+    if (/\.(ppt|pps)$/i.test(file.originalname ?? '')) {
+      cb(new UnsupportedFileTypeError(
+        `${file.originalname} uses the legacy binary PowerPoint format, which cannot be `
+        + 'read reliably. Open it in PowerPoint and save as .pptx, then upload again.',
+      ));
+      return;
+    }
     cb(new UnsupportedFileTypeError(
       `${file.originalname || 'This file'} is not a supported document type. `
       + `Accepted formats: ${getAllAcceptedExtensions().join(', ')}.`,
