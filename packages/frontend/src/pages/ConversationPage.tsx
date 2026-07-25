@@ -70,12 +70,17 @@ export default function ConversationPage({
     }
   }, [documentLanguages, onDocumentLanguagesDetected]);
 
-  // Auto-run preview once when capabilities are first selected from recommendations
+  // Auto-run preview once capabilities exist.
+  //
+  // This used to also require `recommendations`, which only appear after the
+  // advisor finishes its 3-5 question interview. That made "Skip questions" a
+  // dead end: it selected capabilities but nothing ran, because there were no
+  // recommendations. Capabilities are the real precondition — however they were
+  // chosen.
   useEffect(() => {
     if (
       document &&
       selectedCapabilities.length > 0 &&
-      recommendations &&
       !preview &&
       !isPreviewLoading &&
       !autoPreviewDone.current
@@ -83,7 +88,7 @@ export default function ConversationPage({
       autoPreviewDone.current = true;
       runPreview(document.documentId, document.s3Uri, selectedCapabilities, userInstruction, documentLanguages ?? undefined);
     }
-  }, [document, selectedCapabilities, recommendations, preview, isPreviewLoading, runPreview, userInstruction]);
+  }, [document, selectedCapabilities, preview, isPreviewLoading, runPreview, userInstruction, documentLanguages]);
 
   const handleToggleCapability = useCallback(
     (cap: Capability, enabled: boolean) => {

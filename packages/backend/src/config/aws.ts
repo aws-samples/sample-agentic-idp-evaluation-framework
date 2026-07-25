@@ -33,7 +33,20 @@ export const bdaClient = new BedrockDataAutomationRuntimeClient({ region });
 export const textractClient = new TextractClient({ region });
 export const agentCoreClient = new BedrockAgentCoreClient({ region });
 const ddbClient = new DynamoDBClient({ region });
-export const docClient = DynamoDBDocumentClient.from(ddbClient);
+/**
+ * `removeUndefinedValues` is required, not optional tuning.
+ *
+ * Run records embed whole processor results, which legitimately contain optional
+ * fields left undefined (no error, no token usage, no bounding boxes). Without
+ * this the marshaller rejects the entire write with
+ * "Pass options.removeUndefinedValues=true to remove undefined values from
+ * map/array/set", so no run was ever saved and Recent Runs stayed empty.
+ * Stripping the top-level keys before the call was not enough — the undefined
+ * values are nested inside those results.
+ */
+export const docClient = DynamoDBDocumentClient.from(ddbClient, {
+  marshallOptions: { removeUndefinedValues: true },
+});
 
 export const config = {
   region,
