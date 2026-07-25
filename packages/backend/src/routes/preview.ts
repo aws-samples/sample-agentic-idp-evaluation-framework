@@ -75,12 +75,31 @@ function estimatePageCount(buffer: Buffer): number {
 const PREVIEW_METHOD_TIMEOUT_MS = 60_000;
 
 /**
- * Output-token cap for preview runs. Healthy methods answer a single-page
- * document in 200-500 output tokens, so 4096 leaves generous room for dense
- * multi-table pages while preventing a model from generating to the full
- * anti-truncation budget (16k+) during an interactive comparison.
+ * Output-token cap for preview runs, scaled by document size.
+ *
+ * A flat cap is wrong in both directions: a single-page invoice needs only a few
+ * hundred output tokens, while a 30-page report legitimately produces many
+ * thousands and would be truncated mid-table. So the cap tracks page count and
+ * capability count, and only exists to stop a runaway — a model generating all
+ * the way to the model ceiling (16k+) while the user waits on the slowest method
+ * in a parallel comparison.
+ *
+ * Truncated preview output is still useful (it is a sample, and the Pipeline step
+ * runs untruncated), but it should not be the common case for a real document.
  */
-const PREVIEW_MAX_OUTPUT_TOKENS = 4096;
+const PREVIEW_TOKENS_PER_PAGE = 1_200;
+const PREVIEW_TOKENS_PER_CAPABILITY = 1_500;
+/** Ceiling for preview specifically; full runs may go to the model maximum. */
+const PREVIEW_MAX_OUTPUT_TOKENS = 32_000;
+
+function previewOutputCap(capabilityCount: number, pageCount: number): number {
+  // No floor: the per-capability and per-page terms already cover the smallest
+  // real request, and a floor cannot prevent truncation the formula would not
+  // have caused anyway — a model that needs fewer tokens simply emits fewer.
+  const scaled =
+    capabilityCount * PREVIEW_TOKENS_PER_CAPABILITY + pageCount * PREVIEW_TOKENS_PER_PAGE;
+  return Math.min(scaled, PREVIEW_MAX_OUTPUT_TOKENS);
+}
 
 class MethodTimeoutError extends Error {
   constructor(method: string, ms: number) {
@@ -137,11 +156,10 @@ router.post('/', async (req, res) => {
       capabilities: body.capabilities,
       pageCount,
       userInstruction: body.userInstruction,
-      // Preview is a side-by-side "quick look", not the authoritative run, so
-      // cap output well below the anti-truncation budget a full pipeline gets.
-      // Long answers here cost wall clock the user actively waits on, and the
-      // comparison only needs enough output to judge quality.
-      maxOutputTokens: PREVIEW_MAX_OUTPUT_TOKENS,
+      // Preview is a side-by-side "quick look", so the cap only guards against a
+      // runaway holding up the parallel comparison. It scales with the document
+      // so a 30-page report is not truncated mid-table.
+      maxOutputTokens: previewOutputCap(body.capabilities.length, pageCount),
     };
 
     const methods = getAvailableMethods(body.methods);
@@ -297,3 +315,6 @@ export default router;
 /** Test-only: lets processor-registry-parity.test.ts compare the three route
  * registries so they can never silently drift again. */
 export const PROCESSOR_FACTORY_FOR_TEST = PROCESSOR_FACTORY;
+
+/** Test-only: the preview output cap is latency-critical, so it needs coverage. */
+export { previewOutputCap as previewOutputCapForTest };

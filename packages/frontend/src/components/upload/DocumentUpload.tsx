@@ -14,9 +14,15 @@ import { uploadDocument } from '../../services/api';
 
 interface DocumentUploadProps {
   onUploadComplete: (doc: UploadResponse) => void;
+  /**
+   * Render without the surrounding Container/Header. The landing page supplies
+   * its own ("Upload a document to start"), and nesting both produced two
+   * stacked headings saying the same thing.
+   */
+  bare?: boolean;
 }
 
-export default function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
+export default function DocumentUpload({ onUploadComplete, bare = false }: DocumentUploadProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -54,17 +60,7 @@ export default function DocumentUpload({ onUploadComplete }: DocumentUploadProps
     }
   }, [files, onUploadComplete]);
 
-  return (
-    <Container
-      header={
-        <Header
-          variant="h2"
-          description="Upload a document (PDF, images, Word, PowerPoint, Excel) to begin intelligent processing"
-        >
-          Document Upload
-        </Header>
-      }
-    >
+  const body = (
       <SpaceBetween size="l">
         <FileUpload
           onChange={({ detail }) => {
@@ -145,6 +141,22 @@ export default function DocumentUpload({ onUploadComplete }: DocumentUploadProps
           </Alert>
         )}
       </SpaceBetween>
+  );
+
+  if (bare) return body;
+
+  return (
+    <Container
+      header={
+        <Header
+          variant="h2"
+          description="Upload a document (PDF, images, Word, PowerPoint, Excel) to begin intelligent processing"
+        >
+          Document Upload
+        </Header>
+      }
+    >
+      {body}
     </Container>
   );
 }

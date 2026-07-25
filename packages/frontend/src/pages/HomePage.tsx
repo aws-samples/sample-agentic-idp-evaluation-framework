@@ -6,8 +6,8 @@ import SpaceBetween from '@cloudscape-design/components/space-between';
 import Container from '@cloudscape-design/components/container';
 import Box from '@cloudscape-design/components/box';
 import ColumnLayout from '@cloudscape-design/components/column-layout';
-import Button from '@cloudscape-design/components/button';
 import Badge from '@cloudscape-design/components/badge';
+import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import type { UploadResponse } from '@idp/shared';
 import {
   CAPABILITIES,
@@ -108,15 +108,6 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
     navigate('/conversation');
   };
 
-  const scrollToUpload = () => {
-    uploadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    // Move focus to the upload control as well. Scrolling alone leaves keyboard
-    // and screen-reader users where they were, so the CTA appeared to do nothing.
-    uploadRef.current?.querySelector<HTMLElement>('input[type="file"], button')?.focus({
-      preventScroll: true,
-    });
-  };
-
   return (
     <ContentLayout
       header={
@@ -131,52 +122,57 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
       <SpaceBetween size="l">
 
         {/*
-          Hero. The page header already states the product and its purpose, so
-          this used to repeat both ("IDP Evaluation Framework" above
-          "Find the Right IDP Approach" above a paraphrase of the same
-          description) — three stacked headings before any content. It now
-          carries only the call to action.
+          Upload IS the hero.
+          The landing page used to open with a hero that only scrolled, then two
+          long reference catalogs (33 capabilities, 22 methods), and finally the
+          file input at the very bottom — the one thing the user came to do was
+          below three screens of documentation. Action first, reference after.
         */}
-        <Container>
-          <div style={{ textAlign: 'center', padding: '32px 0 24px' }}>
-            <SpaceBetween size="m">
-              <Box variant="h2" fontSize="display-l">Find the right IDP approach</Box>
-              <Box color="text-body-secondary" fontSize="heading-s" padding={{ horizontal: 'xxxl' }}>
-                Four steps, roughly a minute per document.
-              </Box>
-              <div style={{ paddingTop: 8 }}>
-                <Button variant="primary" iconName="upload" onClick={scrollToUpload}>
-                  Start evaluation
-                </Button>
-              </div>
-            </SpaceBetween>
-          </div>
-        </Container>
+        <div ref={uploadRef}>
+          <Container
+            header={
+              <Header
+                variant="h2"
+                description="Step 1 of 4 · PDF, image, Word, Excel, PowerPoint, audio or video · max 50 MB"
+              >
+                Upload a document to start
+              </Header>
+            }
+          >
+            <SpaceBetween size="l">
+              <DocumentUpload onUploadComplete={handleUploadComplete} bare />
 
-        {/* How It Works */}
-        <Container header={<Header variant="h2">How It Works</Header>}>
-          <ColumnLayout columns={4} minColumnWidth={200} variant="text-grid">
-            {STEPS.map((step, i) => (
-              <div key={i} style={{ textAlign: 'center' }}>
-                <SpaceBetween size="xs">
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 48, height: 48, borderRadius: 10,
-                    border: '1px solid var(--color-border-divider-default, #e9ebed)', color: 'var(--color-text-link-default, #0972d3)', margin: '0 auto',
-                  }}>
-                    {step.icon}
+              {/* What happens next — inline, so the flow is clear before committing. */}
+              <ColumnLayout columns={4} minColumnWidth={180} variant="text-grid">
+                {STEPS.map((step, i) => (
+                  <div key={step.title}>
+                    <SpaceBetween size="xxs">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Box color="text-status-info">{step.icon}</Box>
+                        <Box variant="awsui-key-label">{`${i + 1}. ${step.title}`}</Box>
+                      </div>
+                      <Box color="text-body-secondary" fontSize="body-s">{step.desc}</Box>
+                    </SpaceBetween>
                   </div>
-                  <Box variant="h3">{`${i + 1}. ${step.title}`}</Box>
-                  <Box color="text-body-secondary" fontSize="body-s">{step.desc}</Box>
-                </SpaceBetween>
-              </div>
-            ))}
-          </ColumnLayout>
-        </Container>
+                ))}
+              </ColumnLayout>
+            </SpaceBetween>
+          </Container>
+        </div>
 
         {/* Capabilities */}
+        {/*
+          Reference catalogs, collapsed by default. They are useful context but
+          they are not the task, and expanded they pushed the upload control
+          three screens down.
+        */}
         <div id="capabilities">
-          <Container header={<Header variant="h2" counter={`(${CAPABILITIES.length})`}>Capabilities</Header>}>
+          <ExpandableSection
+            variant="container"
+            headerText="Capabilities"
+            headerCounter={`(${CAPABILITIES.length})`}
+            headerDescription="What you can ask a method to extract. The advisor recommends a set for your document."
+          >
             <SpaceBetween size="m">
               {CAPABILITY_CATEGORIES.filter((c) => c !== 'industry_specific').map((catId) => {
                 const cat = CATEGORY_INFO[catId];
@@ -272,20 +268,15 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                 );
               })}
             </SpaceBetween>
-          </Container>
+          </ExpandableSection>
         </div>
 
         {/* Methods, grouped by role rather than as one flat list of peers */}
-        <Container
-          header={
-            <Header
-              variant="h2"
-              counter={`(${METHODS.length})`}
-              description="Grouped by the role each approach plays. Availability reflects this deployment's configuration."
-            >
-              Processing Methods
-            </Header>
-          }
+        <ExpandableSection
+          variant="container"
+          headerText="Processing methods"
+          headerCounter={`(${METHODS.length})`}
+          headerDescription="Grouped by the role each approach plays. Availability reflects this deployment's configuration."
         >
           <SpaceBetween size="l">
             {FAMILY_GROUPS.map((group) => {
@@ -349,7 +340,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
               );
             })}
           </SpaceBetween>
-        </Container>
+        </ExpandableSection>
 
         <Box color="text-body-secondary" fontSize="body-s" textAlign="center" padding={{ horizontal: 'l' }}>
           * Pricing shown as input / output per 1M tokens for LLM-based methods, and per-page for BDA.
@@ -361,12 +352,6 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
           for current rates.
         </Box>
 
-        {/* Upload */}
-        <div ref={uploadRef}>
-          <Container header={<Header variant="h2" description="Step 1 of 4">Get started</Header>}>
-            <DocumentUpload onUploadComplete={handleUploadComplete} />
-          </Container>
-        </div>
 
       </SpaceBetween>
     </ContentLayout>
