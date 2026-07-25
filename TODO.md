@@ -466,7 +466,7 @@ rated the SERVICE, but we only get what the adapter asks for.**
 ### Pricing grounded in the live model catalog
 - **Nine of 22 methods were priced wrong.** `METHOD_INFO` hardcodes token prices,
   and hardcoded prices rot. Cross-checking against the Bedrock model catalog
-  (`bedrock.sanghwa.people.aws.dev/v2`, repo `didhd/bedrock-model-catalog-api-v2`)
+  (an internal Bedrock model-catalog API; see `scripts/sync-model-catalog.mjs`)
   found: Nova 2 Lite **2x over** in all three places it appears (0.3/2.5 →
   0.15/1.25), Sonnet 5 50% over (3/15 → 2/10), every GPT tier ~10% under (5/30 →
   5.5/33, 2.5/15 → 2.75/16.5, 1/6 → 1.1/6.6), Nova Embeddings 0.135 → 0.02.
@@ -991,24 +991,116 @@ found, because the "why" is what makes it fixable.
       comparing one against a full extract-and-structure method understates it. Either
       compose them as two-stage methods (like `textract-llm`) or label the figure as
       stage-1-only in the UI.
-15. [ ] **Layout/copy items reviewed this pass but NOT changed** — recorded so the
-      review is not mistaken for complete:
-      - The docs (`packages/docs/content/docs/*.mdx`) still say "ONE IDP" in prose.
-        That reads fine as the short form, so it was left; but `architecture.mdx` still
-        describes an **App Runner backend**, which is wrong — it has been ECS Fargate
-        behind an ALB for some time. Docs prose was out of scope for this pass and
-        needs its own accuracy sweep.
-      - `/processing` (`ProcessingPage`) is still a dead route nothing links to. It now
-        compiles against the new families, but it duplicates step-2/3 UI and should be
-        deleted or wired up rather than quietly maintained.
-      - `README.md` header still reads "ONE IDP — Intelligent Document Processing
-        Evaluation Platform", a fourth phrasing. Harmless in a repo README but it is
-        the one remaining place the name is written by hand.
-      - Mermaid render failures BEYOND the two fixed here are unverified: I could not
-        run the parser standalone in this environment (it needs a DOM), so the
-        remaining shapes were reasoned about rather than measured. If a diagram still
-        fails, capture the source from the error panel — it is displayed verbatim.
-16. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
+15. [x] **Layout/copy items from the previous pass — now DONE.** All four items that
+      were "reviewed but not changed" are fixed, plus what a real step-1-2-3-4 walkthrough
+      and an audit turned up. Every claim below was measured, not reasoned about.
+      - **The served docs were wrong in ~30 places.** Note the trap: `packages/docs/**`
+        is a DEAD second copy (nothing builds or serves it — the root `build` script does
+        not include it), while `packages/frontend/public/docs-content/**` is what
+        `DocsPage` fetches at runtime. The previous pass audited the dead tree. Fixed in
+        the served tree: **App Runner → ECS Fargate + ALB** (7 files, including
+        `aws apprunner start-deployment` as a copy-pasteable command that would just
+        fail); **15/16 methods → 29**; **"5-step workflow" → 4**; **Nova 2 Pro removed**
+        (its preview id resolved in no region, so it was deleted from the catalog — the
+        docs still priced it); **Nova priced at 2x** ($0.30/$2.50 → $0.15/$1.25);
+        **9 broken cross-links** (`](/workflow)` 404s — the SPA serves `/docs/workflow`);
+        a dead **CloudFront distribution id**; and a reference to `CLAUDE.md`, which is
+        gitignored and holds account state. `docs-accuracy.test.ts` now pins all of it
+        against the catalog. `packages/docs/README.md` says plainly that it is not served.
+      - **`/processing` deleted.** It was a route nothing linked to, and with it went
+        `components/processing/` — MethodCard, ComparisonTable, MetricsChart,
+        StreamingResult — 5 files of UI unreachable by any user, still being typechecked
+        and maintained.
+      - **README rewritten from the catalog.** It claimed 16 methods / 6 families, listed
+        removed models, and promised "generated IaC in Terraform or CDK" when the
+        generator only emits CDK.
+      - **Mermaid: 12 of 26 realistic diagrams could not render.** Previously unverifiable
+        ("the parser needs a DOM this environment lacks") — but Playwright ships Chromium,
+        so `scripts/mermaid-probe.mjs` now asks the real parser and reports, per case,
+        whether the RAW source parses and whether the SANITIZED source parses. That
+        distinction caught a **regression in the old sanitizer**: it mangled already-valid
+        `A[[Batch]]` into `A["[Batch"]]`, breaking diagrams that had merely been ugly.
+        Rewritten as a delimiter-aware scanner (longest-delimiter-first, balanced nesting)
+        and now **26/26 parse with 0 regressions**. The old unit test re-implemented the
+        sanitizer inline, so it passed against a copy while the shipped code was broken;
+        it now loads and executes the real source.
+      - The diagram failure state is an `Alert` with a copy-source button instead of a
+        hardcoded light-grey `<pre>` that was unreadable in dark mode.
+16. [x] **The generated project could not build — five separate defects.** This is the
+      artifact a customer is told is "deployable as-is", so each of these is worse than a
+      UI bug. Found by audit, each verified by reading the emitted template:
+      - `const process = api.root.addResource('process')` **shadowed Node's global
+        `process`** in a block that reads `process.env.BDA_PROFILE_ARN` above it — a
+        temporal-dead-zone `ReferenceError`, so `cdk synth` died before emitting a single
+        resource.
+      - `cdk/lambda/processor.ts` imported `../process.js`, which resolves to
+        `cdk/process.js` — but the file was only written to the ZIP root, so bundling
+        failed on an unresolved import.
+      - `bin/idp.ts` imported `PRODUCT_NAME` from **`@idp/shared`**, this repo's internal
+        workspace package, which can never exist in a customer's project (and it was
+        unused).
+      - The dispatcher guessed a method's family from an id **prefix** and recognised only
+        3 of 10 families, so **9 of 29 methods** — embeddings, guardrails, Pegasus and all
+        six SageMaker OCR models — silently fell through to a Bedrock Converse call that
+        cannot invoke them. Now emitted from the catalog, and an unsupported family throws
+        a message naming the reason instead of failing opaquely at runtime.
+      - The IAM policy built foundation-model ARNs by concatenating every method's
+        `modelId`, including routing keys like `bedrock-guardrails-apply` and
+        `sagemaker:unlimited-ocr` — the latter contains a colon, producing a malformed ARN
+        CloudFormation rejects outright.
+17. [x] **"Compare with the AI's own projection" compared a table with itself.** The
+      backend parsed the model's `<costs>` block and then **overwrote `costData.methods`**
+      with `estimateMonthlyCost(...)` — the same formula the deterministic calculator above
+      it already used. The UI invited the user to compare two tables that were computed
+      identically and could never disagree, which manufactures corroboration rather than
+      providing a second opinion. The model's numbers are now passed through (filtered to
+      methods actually benchmarked, so it cannot invent rows).
+18. [x] **The code-gen prompt contradicted itself on Textract, in the expensive
+      direction.** One requirement said "sync `analyze_document` for single-page/images"
+      while three other rules in the same prompt forbade the AnalyzeDocument family. The
+      model resolved the contradiction by emitting the expensive call, so a generated
+      project could cost **up to 43x more per page** ($0.065 FORMS vs $0.0015
+      DetectDocumentText) than this tool reports. The existing guard missed it because it
+      stripped comments and only inspected code *we* run — a prompt is neither. Now pinned
+      by a test that reads the prompt text itself.
+19. [x] **Six tests were failing on `main` before this pass, describing bugs that did not
+      exist — and masking one that did.** `config` in `config/aws.ts` reads the environment
+      once at module load, and nothing in the test run loads a `.env`; static imports are
+      hoisted, so a `beforeAll` setting `BEDROCK_GUARDRAIL_ID` ran far too late.
+      Guardrails was filtered out as unconfigured and PII fell through to Claude Haiku, so
+      the assertions failed against **correct** routing logic. Fixed with a vitest
+      `setupFiles` entry, which is the only place that ordering can be fixed.
+      The bug it hid: with BDA filtered away, **audio routed to Pegasus** — rated `good`
+      at `audio_transcription` because it transcribes the audio track *of a video*, but
+      its API takes a video media source, so a bare `.mp3` fails inside the adapter. Audio
+      now reports unroutable rather than charging for a run that cannot succeed.
+      Also: `npm run build` compiles the tests into `packages/backend/dist/__tests__/`, and
+      vitest collected **both copies** — 23 phantom ENOENT failures whose only cause was
+      having run a build first. The new root `vitest.config.ts` excludes `dist`.
+      And setting placeholder service ids made nine `*.live.test.ts` cases stop skipping
+      and start failing against real AWS; they now gate on an explicit
+      `LIVE_TESTS_DISABLED` flag.
+20. [x] **An internal hostname carrying a personal alias was committed to this public
+      repo** in four files (`scripts/sync-model-catalog.mjs`, the catalog snapshot's
+      `_source`, `infrastructure/terraform.tfvars.example`, `TODO.md`), plus a stale
+      CloudFront distribution id and an internal reference deployment URL in the docs. The
+      catalog URL is now `MODEL_CATALOG_URL`, unset by default — which also makes the
+      script work for anyone who clones this, instead of pointing at a host they cannot
+      reach. `docs-accuracy.test.ts` fails on any account id, distribution id,
+      `*.cloudfront.net` host or internal domain in the served docs.
+21. [x] **The landing-page method catalog was redesigned** after review of the rendered
+      pixels, not the code. The 3-column grid of variable-height cards had four defects on
+      one screen: a 6-method family left two columns blank; the same "needs a SageMaker
+      endpoint" sentence repeated verbatim on all six OCR rows (18 lines saying one
+      thing); narrow columns broke words mid-token ("T hese", "deplo yment"); and the
+      family heading came from a **partial** name map, so the two newest families rendered
+      with **no title at all** — a group of six methods under a bare count badge. Now one
+      row per method, the shared unavailable reason stated once per family, and
+      `FAMILY_FULL_NAMES` is a total `Record<MethodFamily, …>` so a missing name is a
+      compile error. `scripts/shoot-catalog.mjs` screenshots it and asserts no
+      "undefined", no repetition, and every family named.
+
+22. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
       ideas from the accelerator study, listed in detail in the section above.
 
 ### Open questions / risks

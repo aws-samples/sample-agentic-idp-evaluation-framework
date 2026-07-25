@@ -10,11 +10,15 @@
  * 2x over, every GPT tier ~10% under, Sonnet 5 50% over — which directly corrupts
  * the cost comparison this whole tool exists to provide.
  *
- * Source: https://bedrock.sanghwa.people.aws.dev/v2/models.json
- *   repo: https://github.com/didhd/bedrock-model-catalog-api-v2
- * It exposes fields the AWS SDK drops (pricing, media support, per-region
- * availability). Unofficial, so treat it as a cross-check that a human reviews —
- * never as something that silently rewrites prices in CI.
+ * Source: set `MODEL_CATALOG_URL` to a catalog endpoint that exposes the fields the AWS
+ * SDK drops (pricing, media support, per-region availability). Unofficial by nature, so
+ * treat it as a cross-check a human reviews — never as something that silently rewrites
+ * prices in CI.
+ *
+ * The URL is NOT hardcoded: it previously pointed at an internal host containing a
+ * personal alias, in a public repository, where it was both a needless disclosure and
+ * unreachable for anyone who cloned this. With the variable unset the script simply
+ * reports against the committed snapshot, which is the useful default.
  */
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -22,7 +26,7 @@ import { fileURLToPath } from 'url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SNAPSHOT = join(ROOT, 'packages/shared/data/bedrock-model-catalog.json');
-const SOURCE = 'https://bedrock.sanghwa.people.aws.dev/v2/models.json';
+const SOURCE = process.env.MODEL_CATALOG_URL ?? '';
 
 const write = process.argv.includes('--write');
 
@@ -31,14 +35,20 @@ const { METHODS, METHOD_INFO } = await import(
 );
 
 let catalog;
-try {
-  const res = await fetch(SOURCE, { signal: AbortSignal.timeout(90_000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  catalog = await res.json();
-  console.log(`fetched ${catalog.models.length} models (updated ${catalog.lastUpdated})`);
-} catch (err) {
-  console.warn(`could not reach the catalog (${err.message}); using the committed snapshot`);
+if (!SOURCE) {
+  // The common case for anyone who cloned this: report against what is committed.
+  console.log('MODEL_CATALOG_URL not set — checking against the committed snapshot.');
   catalog = JSON.parse(readFileSync(SNAPSHOT, 'utf-8'));
+} else {
+  try {
+    const res = await fetch(SOURCE, { signal: AbortSignal.timeout(90_000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    catalog = await res.json();
+    console.log(`fetched ${catalog.models.length} models (updated ${catalog.lastUpdated})`);
+  } catch (err) {
+    console.warn(`could not reach the catalog (${err.message}); using the committed snapshot`);
+    catalog = JSON.parse(readFileSync(SNAPSHOT, 'utf-8'));
+  }
 }
 
 const byId = new Map(catalog.models.map((m) => [m.modelId, m]));
@@ -101,10 +111,13 @@ const video = catalog.models.filter((m) => {
 console.log(`\n${video.length} catalog model(s) accept video input:`);
 for (const m of video) console.log(`  ${m.modelId}`);
 
+if (write && !SOURCE) {
+  console.error('--write needs MODEL_CATALOG_URL; refusing to rewrite the snapshot with itself.');
+  process.exit(2);
+}
 if (write) {
   const trimmed = {
-    _source: SOURCE,
-    _repo: 'https://github.com/didhd/bedrock-model-catalog-api-v2',
+    _source: SOURCE || '(committed snapshot; set MODEL_CATALOG_URL to refresh)',
     _note: JSON.parse(readFileSync(SNAPSHOT, 'utf-8'))._note,
     lastUpdated: catalog.lastUpdated,
     totalModels: catalog.totalModels ?? catalog.models.length,

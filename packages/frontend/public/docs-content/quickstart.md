@@ -41,12 +41,12 @@ When all methods finish, you get:
 Architecture & Code stage does two things:
 
 1. Streams an **architecture recommendation** (text + Mermaid diagram + cost table at 1 k / 10 k / 100 k docs/month).
-2. Generates a **10-file deployable project**: `process.py`, `requirements.txt`, `process.ts`, `package.json`, CDK stack (`lib/idp-stack.ts`, `lambda/processor.ts`, `bin/idp.ts`, `cdk.json`, `cdk/package.json`), and a `README.md`.
+2. Generates a **deployable project (11 files)**: `process.py`, `requirements.txt`, `process.ts`, `package.json`, CDK stack (`lib/idp-stack.ts`, `lambda/processor.ts`, `bin/idp.ts`, `cdk.json`, `cdk/package.json`), and a `README.md`.
 
 Click **Download All Code** — you get a single markdown file with path-hinted sections you can split into a real project tree, then `cd cdk && npm install && npx cdk deploy`.
 
 ## What to try next
 
-- [Methods](/methods) — when to prefer BDA vs LLM-only vs the hybrids.
-- [Pricing](/pricing) — what these numbers mean at 100 k documents/month.
-- [Generated code](/codegen) — what each of the 10 files actually contains.
+- [Methods](/docs/methods) — when to prefer BDA vs LLM-only vs the hybrids.
+- [Pricing](/docs/pricing) — what these numbers mean at 100 k documents/month.
+- [Generated code](/docs/codegen) — what each of the 10 files actually contains.

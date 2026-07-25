@@ -24,12 +24,12 @@ Build order: `shared → backend + frontend + docs` (the three after `shared` ar
 
 ## Live deployment (default)
 
-The reference deployment at `idp.sanghwa.people.aws.dev` looks like this:
+A deployment looks like this:
 
 ```
                      ┌──────────────────────┐
 Route 53 ◄──────────►│  CloudFront          │
-  (A + AAAA)         │  E36RCDEC932TZP      │
+  (A + AAAA)         │  <your-distribution-id>      │
                      │                      │
                      │  /*         → S3     │
                      │  /docs/*    → S3     │
@@ -55,7 +55,7 @@ DynamoDB  one-idp-activity-dev  (PK=userId, SK=timestamp#type, PAY_PER_REQUEST)
 
 | Component | Resource | Purpose |
 |---|---|---|
-| **Edge** | CloudFront distribution `E36RCDEC932TZP` | HTTPS termination, SPA caching, path-based origin routing, 60 s read / 30 s keepalive to App Runner. |
+| **Edge** | CloudFront distribution `<your-distribution-id>` | HTTPS termination, SPA caching, path-based origin routing, 60 s read / 30 s keepalive to App Runner. |
 | **SPA** | S3 `one-idp-static-dev` | Vite-built React bundle at the root. |
 | **Docs** | S3 `one-idp-static-dev/docs/*` | Fumadocs static export (this site). |
 | **API** | App Runner `one-idp-backend-dev` | Express server, pluggable auth, adapters. |
@@ -139,6 +139,6 @@ Backend (App Runner):
 | `BDA_PROJECT_ARN` | `public-default` | Optional custom BDA project. |
 | `CLAUDE_MODEL_ID` | `us.anthropic.claude-sonnet-4-6` | Default model for architecture + code gen. |
 | `AGENTCORE_RUNTIME_ARN` | — | Preferred path for conversation endpoint. |
-| `ADMIN_USERS` | `sanghwa` | Comma-separated aliases with admin access. |
+| `ADMIN_USERS` | `alice,bob` | Comma-separated aliases with admin access. |
 
 See [Deploy](/deploy) for the full procedure, and [Authentication](/auth) for the auth matrix.

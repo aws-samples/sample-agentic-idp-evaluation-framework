@@ -1,93 +1,172 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { transpileModule, ScriptTarget, ModuleKind } from 'typescript';
 
 /**
- * Diagram rendering failed on two shapes an LLM produces constantly, both verified
- * against the real Mermaid parser:
+ * Generated architecture diagrams failed to render on a whole family of shapes an LLM
+ * produces constantly. Measured against the real parser (Chromium + mermaid@11 via
+ * `node scripts/mermaid-probe.mjs`), **12 of 26 realistic cases were unrenderable**:
+ * unquoted parens in every node shape, a ```mermaid fence, a prose preamble, a subgraph
+ * title with a paren, `end` used as a node id, and nested brackets. Each showed the user
+ * "Diagram render failed" with raw source dumped below it.
  *
- *   1. a ```mermaid fence inside the <diagram> tags -> "No diagram type detected"
- *   2. unquoted parentheses in a label, e.g. A[Textract (OCR)] -> hard parse error
+ * Two lessons are encoded here, both learned the hard way:
  *
- * Either produced "Diagram render failed" with the raw source dumped below it, which
- * reads as a broken feature rather than a formatting slip. Both ends are now fixed:
- * the prompt states the rules, and `sanitizeMermaid` repairs the output anyway
- * because the model will still get it wrong sometimes.
- *
- * The sanitizer logic is re-implemented here from the component source so it can be
- * exercised without a DOM (mermaid itself needs one, and importing the component
- * would drag in React). Asserting the SOURCE still contains the same regex keeps the
- * copy honest.
+ *  1. **The previous version of this file re-implemented the sanitizer inline.** It
+ *     passed against its own copy of the logic while the shipped function had a
+ *     different, broken implementation — one that mangled *already valid* `A[[Batch]]`
+ *     into `A["[Batch"]]`. A test that duplicates its subject verifies nothing, so this
+ *     file loads and EXECUTES the real source.
+ *  2. Reasoning about a grammar is not evidence. Every case below was confirmed against
+ *     the actual parser first; this file is the fast regression net, and
+ *     `scripts/mermaid-probe.mjs` is the ground truth it came from. Re-run the probe
+ *     when changing the sanitizer — it reports, per case, whether the RAW source parses
+ *     and whether the SANITIZED source parses, which is what catches a "fix" that
+ *     breaks working input.
  */
 const COMPONENT = join(
   import.meta.dirname, '..', '..', '..', 'frontend',
   'src', 'components', 'common', 'MermaidDiagram.tsx',
 );
 
-function sanitizeMermaid(chart: string): string {
-  let out = chart.trim();
-  const fenced = out.match(/^```(?:mermaid)?\s*\n([\s\S]*?)\n?```$/i);
-  if (fenced) out = fenced[1].trim();
-  out = out.replace(/\[([^\]\n"]*)\]/g, (match, label: string) => {
-    if (!/[()/:&]/.test(label)) return match;
-    return `["${label.trim()}"]`;
+const source = readFileSync(COMPONENT, 'utf-8');
+
+/**
+ * Load the REAL sanitizer out of the component and evaluate it.
+ *
+ * Mermaid itself needs a DOM and importing the component would drag in React, but
+ * `sanitizeMermaid` is deliberately pure string-to-string, so the block from `SHAPES`
+ * to `let counter` runs standalone once compiled.
+ *
+ * Compiled with the actual TypeScript transpiler rather than regex-stripped: hand-rolled
+ * annotation removal mangled `const NEEDS_QUOTING = /[()[\]{}/:&<>#;]/` (the `/:` inside
+ * the character class looks like a type annotation) and left `const SHAPES: Array =`
+ * behind. Both produced a syntax error that had nothing to do with the code under test.
+ */
+function loadSanitizer(): (chart: string) => string {
+  const start = source.indexOf('const SHAPES');
+  const end = source.indexOf('let counter = 0;');
+  expect(start, 'SHAPES table not found — did the sanitizer move?').toBeGreaterThan(-1);
+  expect(end, 'counter marker not found — did the sanitizer move?').toBeGreaterThan(start);
+
+  const ts = source.slice(start, end).replace(/export function/g, 'function');
+  const { outputText } = transpileModule(ts, {
+    compilerOptions: { target: ScriptTarget.ES2022, module: ModuleKind.None },
   });
-  return out;
+
+  return new Function(`${outputText}; return sanitizeMermaid;`)() as (chart: string) => string;
 }
 
-describe('sanitizeMermaid', () => {
+const sanitizeMermaid = loadSanitizer();
+
+describe('sanitizeMermaid repairs what a model actually writes', () => {
   it('strips a code fence the tags already made redundant', () => {
-    const out = sanitizeMermaid('```mermaid\ngraph TD\n  A[Upload] --> B[S3]\n```');
-    expect(out.startsWith('graph TD')).toBe(true);
-    expect(out).not.toMatch(/```/);
+    // Mermaid only inspects the first non-empty line, so one stray fence loses the
+    // entire diagram to "No diagram type detected".
+    expect(sanitizeMermaid('```mermaid\ngraph TD\n  A[Upload] --> B[S3]\n```'))
+      .toBe('graph TD\n  A[Upload] --> B[S3]');
+    expect(sanitizeMermaid('```\ngraph TD\n  A[Upload]\n```')).toBe('graph TD\n  A[Upload]');
   });
 
-  it('quotes labels containing Mermaid syntax characters', () => {
-    // The exact case that failed: parentheses in a model name.
-    expect(sanitizeMermaid('graph TD\n  A[Textract (OCR)] --> B[Claude]'))
-      .toContain('A["Textract (OCR)"]');
-    expect(sanitizeMermaid('graph TD\n  A[BDA/LLM] --> B[Out]')).toContain('A["BDA/LLM"]');
-    expect(sanitizeMermaid('graph TD\n  A[Step 1: Upload] --> B[S3]'))
-      .toContain('A["Step 1: Upload"]');
-    expect(sanitizeMermaid('graph TD\n  A[Extract & Redact] --> B[Out]'))
-      .toContain('A["Extract & Redact"]');
-    expect(sanitizeMermaid('graph TD\n  A[Cost $0.0015/pg] --> B[Out]'))
-      .toContain('A["Cost $0.0015/pg"]');
+  it('drops prose before the diagram declaration', () => {
+    expect(sanitizeMermaid('Here is the diagram:\n\ngraph TD\n  A[Upload] --> B[S3]'))
+      .toBe('graph TD\n  A[Upload] --> B[S3]');
   });
 
-  it('does not misplace the quote when the label itself contains a paren', () => {
+  /*
+   * Parentheses are the single most common failure, because the model is describing AWS
+   * services and prices and "Textract (OCR)" is the natural phrasing. Previously only
+   * the rectangle form was repaired; the other five shapes still hard-failed.
+   */
+  it.each([
+    ['rectangle', 'graph TD\n  A[Textract (OCR)] --> B[C]', 'A["Textract (OCR)"]'],
+    ['rounded', 'graph TD\n  A(Textract (OCR)) --> B[C]', 'A("Textract (OCR)")'],
+    ['stadium', 'graph TD\n  A([Textract (OCR)]) --> B[C]', 'A(["Textract (OCR)"])'],
+    ['rhombus', 'graph TD\n  A{Confidence (high)?} --> B[C]', 'A{"Confidence (high)?"}'],
+    ['subroutine', 'graph TD\n  A[[Batch (async)]] --> B[C]', 'A[["Batch (async)"]]'],
+    ['cylinder', 'graph TD\n  A[(DynamoDB (results))] --> B[C]', 'A[("DynamoDB (results)")]'],
+  ])('quotes a parenthesised label in a %s node', (_shape, input, expected) => {
+    expect(sanitizeMermaid(input)).toContain(expected);
+  });
+
+  it('quotes the other characters that are syntax elsewhere in the grammar', () => {
+    // `:` starts a `:::` class assignment and `&` joins multiple nodes on one edge.
+    // Both parse inside a plain rectangle, but quoting them is lossless insurance.
+    expect(sanitizeMermaid('graph TD\n  A[Step 1: Upload] --> B[S3]')).toContain('A["Step 1: Upload"]');
+    expect(sanitizeMermaid('graph TD\n  A[Extract & Redact] --> B[Out]')).toContain('A["Extract & Redact"]');
+  });
+
+  it('does NOT quote a bare slash, so <br/> keeps working', () => {
     /*
-     * The first implementation matched a character class of opening delimiters, so the
-     * `(` inside the label was taken as the opener and it emitted
-     * A["Textract (OCR")] — still broken, just differently. Anchoring on [ … ] fixed
-     * it, and this is the regression that would otherwise be invisible.
+     * A slash needs no repair — measured. This assertion exists because quoting it
+     * would silently disable `<br/>`, the one way to get a line break in a label:
+     * `A["Textract<br/>OCR"]` renders the tag as literal text. A "safe" over-broad
+     * character class is how that regression got written in the first place.
      */
-    const out = sanitizeMermaid('graph TD\n  A[Textract (OCR)] --> B[Claude]');
-    expect(out).not.toContain('(OCR")');
-    expect(out).toContain('(OCR)"]');
+    expect(sanitizeMermaid('graph TD\n  A[BDA/LLM] --> B[Out]')).toBe('graph TD\n  A[BDA/LLM] --> B[Out]');
+    expect(sanitizeMermaid('graph TD\n  A[$0.0015/page] --> B[Out]')).toBe('graph TD\n  A[$0.0015/page] --> B[Out]');
   });
 
-  it('leaves an already-valid diagram byte-identical', () => {
-    // A repair pass that rewrites correct input is a new source of bugs.
-    for (const valid of [
-      'graph TD\n  A[Upload] --> B[S3]',
-      'graph TD\n  A["Textract (OCR)"] --> B["Claude"]',
-    ]) {
-      expect(sanitizeMermaid(valid)).toBe(valid);
-    }
+  it('handles a label containing a nested bracket pair', () => {
+    // Scanning to the FIRST closing bracket cut the label short and produced
+    // `A["Bedrock [Converse"]]`, which still failed to parse.
+    expect(sanitizeMermaid('graph TD\n  A[Bedrock [Converse]] --> B[Done]'))
+      .toContain('A["Bedrock [Converse]"]');
   });
 
-  it('leaves a label containing a double quote alone', () => {
-    // Quoting it would terminate the string early; there is no safe auto-repair.
-    const input = 'graph TD\n  A[say "hi" (now)] --> B[Out]';
-    expect(sanitizeMermaid(input)).toBe(input);
+  it('quotes a subgraph title containing syntax characters', () => {
+    expect(sanitizeMermaid('graph TD\n  subgraph Ingest (S3)\n    A[Upload]\n  end'))
+      .toContain('subgraph "Ingest (S3)"');
   });
 
-  it('the component still uses this exact logic', () => {
-    const src = readFileSync(COMPONENT, 'utf-8');
-    expect(src).toContain('export function sanitizeMermaid');
-    // Anchored on [ … ], not a delimiter class — see the misplaced-quote test above.
-    expect(src).toContain('out.replace(/\\[([^\\]\\n"]*)\\]/g');
-    expect(src).toContain('sanitizeMermaid(chart)');
+  it('renames `end` used as a node id', () => {
+    // `end` closes a subgraph, so `A --> end` is a parse error with no escape hatch.
+    expect(sanitizeMermaid('graph TD\n  A[Upload] --> end')).toBe('graph TD\n  A[Upload] --> end_');
+  });
+
+  /*
+   * The other half of the contract, and the half that regressed: a diagram that ALREADY
+   * parses must come back byte-identical. The earlier sanitizer broke valid subroutine
+   * nodes, turning a working diagram into an error message — invisible to a test that
+   * only checked the repair cases.
+   */
+  it.each([
+    ['plain', 'graph TD\n  A[Upload] --> B[Extract]'],
+    ['subroutine', 'graph TD\n  A[[Batch]] --> B[Done]'],
+    ['cylinder', 'graph TD\n  A[(Database)] --> B[Done]'],
+    ['stadium', 'graph TD\n  A([Start]) --> B[Done]'],
+    ['already-quoted', 'graph TD\n  A["Textract (OCR)"] --> B[Claude]'],
+    ['class-def', 'graph TD\n  A[Upload]:::hot --> B[Done]\n  classDef hot fill:#f96'],
+    ['semicolons', 'graph TD;\n  A[Upload]-->B[Extract];'],
+    ['br-tag', 'graph TD\n  A[Textract<br/>OCR] --> B[Claude]'],
+    ['percent', 'graph TD\n  A[98% confidence] --> B[Done]'],
+    ['comma', 'graph TD\n  A[Sonnet 4.6, Haiku 4.5] --> B[Done]'],
+  ])('leaves valid %s source untouched', (_name, chart) => {
+    expect(sanitizeMermaid(chart)).toBe(chart.trim());
+  });
+
+  it('never re-quotes an already-quoted label', () => {
+    // A second `"` would terminate the string early — worse than the original problem.
+    const out = sanitizeMermaid('graph TD\n  A["S3: uploads"] --> B[Lambda (proc)]');
+    expect(out).toContain('A["S3: uploads"]');
+    expect(out).not.toContain('""');
+  });
+
+  it('orders the shape table longest-delimiter-first', () => {
+    /*
+     * Load-bearing invariant: if `[` were tried before `[[`, the inner bracket of a
+     * subroutine node would be taken as the opener. That exact ordering bug shipped.
+     */
+    const table = source.slice(source.indexOf('const SHAPES'), source.indexOf('NEEDS_QUOTING'));
+    expect(table.indexOf("['['"), 'the [[ shape must be listed before [')
+      .toBeGreaterThan(table.indexOf("['[['"));
+    expect(table.indexOf("['('"), 'the ([ shape must be listed before (')
+      .toBeGreaterThan(table.indexOf("['(['"));
+  });
+
+  it('is the function the component actually renders with', () => {
+    // The repair is useless if render() is called with the raw chart.
+    expect(source).toContain('mermaid.render(id, sanitizeMermaid(chart))');
   });
 });

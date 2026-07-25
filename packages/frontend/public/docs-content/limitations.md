@@ -17,16 +17,20 @@ The rule (`isMethodLanguageCompatible` in `packages/shared/src/types/processing.
 
 If your document is primarily Korean, Japanese, Arabic, or any non-Latin script, the comparison will show only Claude and Nova methods. This is not a limitation of the platform — it's a limitation of BDA and Textract on those scripts.
 
-## Gated-preview models
+## Model availability
 
-**Nova 2 Pro** (`us.amazon.nova-2-pro-preview-20251202-v1:0`) is a **Gated Preview**:
+Not every method in the catalog can run on every deployment, and the tool says so rather
+than failing mid-run. `GET /api/methods` reports each method's availability and why:
 
-- No GA SLA.
-- Limited regional availability.
-- 100 RPM (requests per minute) quota.
-- May be rate-limited or temporarily unavailable.
+- **`bda-not-configured`** — no data-automation profile is set, so the BDA and BDA+LLM
+  families are unavailable.
+- **`bda-custom-not-configured`** — BDA Custom additionally needs a blueprint project.
+- **`unsupported-region`** — Nova Multimodal Embeddings is offered only in us-east-1.
+- **`sagemaker-endpoint-not-configured`** — the six specialist OCR models each need a
+  self-hosted GPU endpoint, which is off by default because it bills hourly even when idle.
 
-Nova 2 Lite is **GA** and is the default Nova choice. Prefer it unless you specifically need Nova Pro's native bounding-box support or its structural-reasoning bump.
+Nova 2 Lite is the GA Nova tier and the only one in the catalog. Nova 2 Pro was removed:
+its preview model id was not resolvable in any region, so every run using it failed.
 
 ## Regional constraints
 
@@ -48,7 +52,6 @@ Nova 2 Lite is **GA** and is the default Nova choice. Prefer it unless you speci
 | Claude Opus 4.6 | 1 M tokens |
 | Claude Haiku 4.5 | 200 K tokens |
 | Nova 2 Lite | large (per Nova docs) |
-| Nova 2 Pro | large (per Nova docs) |
 | Nova Multimodal Embeddings | 8 K tokens per text segment |
 
 For very long documents, Haiku's smaller window can cause truncation. The `calculateMaxTokens()` helper bumps output tokens to `1000/cap + 800/page (min 4096, max 16384)` to give models enough room to finish tables in HTML, which tends to be the common truncation mode for CJK tables.
@@ -65,7 +68,7 @@ For very long documents, Haiku's smaller window can cause truncation. The `calcu
 ## Rate limiting
 
 - Per-IP in-memory with per-user override (when authenticated).
-- Resets when the App Runner container restarts.
+- Resets when the ECS task restarts.
 - For multi-instance or multi-region deployments, swap in Redis or AWS WAF — the middleware is a straight drop-in.
 
 ## Deployment quirks
@@ -73,7 +76,7 @@ For very long documents, Haiku's smaller window can cause truncation. The `calcu
 - **Don't run Terraform and CDK against the same account+region.** They provision the same resources and will fight over state.
 - **`manage_activity_table` defaults to `false`** in Terraform so existing deployments don't destroy their DynamoDB table on apply. Set to `true` for a fresh install.
 - Frontend deploys are separate from backend — `npm run build -w packages/frontend` → `aws s3 sync` → CloudFront invalidation.
-- Backend deploys go through CodeBuild: `git archive HEAD` → S3 → CodeBuild → ECR → `aws apprunner start-deployment`.
+- Backend deploys go through CodeBuild: `git archive HEAD` → S3 → CodeBuild → ECR → `aws ecs update-service --force-new-deployment`.
 
 ## FAQ
 
@@ -83,7 +86,7 @@ Partially. Upload, conversation (in-process fallback), and any LLM adapter still
 
 ### Can I add a new capability?
 
-Yes — create a markdown file under `packages/shared/skills/<category>/<id>.md` with the standard frontmatter + support matrix, run `npm run build:skills -w packages/shared`, and rebuild. See [Capabilities](/capabilities).
+Yes — create a markdown file under `packages/shared/skills/<category>/<id>.md` with the standard frontmatter + support matrix, run `npm run build:skills -w packages/shared`, and rebuild. See [Capabilities](/docs/capabilities).
 
 ### Can I add a new method?
 

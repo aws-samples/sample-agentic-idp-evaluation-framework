@@ -20,7 +20,6 @@ import FeedbackModal from './components/feedback/FeedbackModal';
 // Lazy-loaded pages for bundle splitting (#20)
 const ConversationPage = lazy(() => import('./pages/ConversationPage'));
 const PipelinePage = lazy(() => import('./pages/PipelinePage'));
-const ProcessingPage = lazy(() => import('./pages/ProcessingPage'));
 const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage'));
 const RecentRunsPage = lazy(() => import('./pages/RecentRunsPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
@@ -309,15 +308,6 @@ export default function App() {
     navigate('/pipeline');
   }, [navigate]);
 
-  const handleProcessingComplete = useCallback(
-    (results: ProcessorResult[], comp: ComparisonResult) => {
-      setProcessingResults(results);
-      setComparison(comp);
-      navigate('/architecture');
-    },
-    [navigate],
-  );
-
   const handlePipelineComplete = useCallback(
     (
       results: ProcessorResult[],
@@ -507,17 +497,6 @@ export default function App() {
                       documentLanguages={documentLanguages}
                       onViewArchitecture={handleViewArchitecture}
                       onPipelineComplete={handlePipelineComplete}
-                    />
-                  }
-                />
-                <Route
-                  path="/processing"
-                  element={
-                    <ProcessingPage
-                      document={document}
-                      capabilities={selectedCapabilities}
-                      onComplete={handleProcessingComplete}
-                      onViewArchitecture={handleViewArchitecture}
                     />
                   }
                 />

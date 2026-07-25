@@ -121,7 +121,17 @@ const FILE_GROUPS: Array<{
 
 const TOTAL_GENERATED_FILES = FILE_GROUPS.reduce((n, g) => n + g.files.length, 0);
 
-/** Where each file lands in the downloaded ZIP. The tab labels are relative names. */
+/**
+ * Where each file lands in the downloaded ZIP. The tab labels are relative names.
+ *
+ * `process.ts` is deliberately written TWICE — once at the root as the standalone
+ * Node.js entry point, and once inside `cdk/` next to the Lambda that imports it.
+ * The generated Lambda does `import { processDocument } from '../process.js'`, and
+ * CDK's NodejsFunction bundles from `cdk/lambda/processor.ts`, so that specifier
+ * resolves to `cdk/process.js`. With one copy at the ZIP root only, `cdk deploy`
+ * failed at bundling with an unresolved import — the generated project could not
+ * build at all, which is the worst possible outcome for a "deployable as-is" artifact.
+ */
 const ZIP_PATHS: Record<FileKey, string> = {
   readme: 'README.md',
   pipelineConfig: 'pipeline.json',
@@ -134,6 +144,16 @@ const ZIP_PATHS: Record<FileKey, string> = {
   cdkApp: 'cdk/bin/idp.ts',
   cdkPkg: 'cdk/package.json',
   cdkJson: 'cdk/cdk.json',
+};
+
+/**
+ * Extra copies of a generated file, keyed by the primary file it duplicates.
+ * Kept as data (rather than a special case in the zip loop) so the reason a file is
+ * duplicated stays next to the path that needs it.
+ */
+const ZIP_EXTRA_COPIES: Partial<Record<FileKey, string[]>> = {
+  // Resolves `../process.js` from cdk/lambda/processor.ts.
+  typescript: ['cdk/process.ts'],
 };
 
 /** This page IS step 4. */
@@ -318,7 +338,12 @@ export default function ArchitecturePage({
      */
     for (const group of FILE_GROUPS) {
       for (const file of group.files) {
-        zip.file(ZIP_PATHS[file.key], fileFor(file.key));
+        const content = fileFor(file.key);
+        zip.file(ZIP_PATHS[file.key], content);
+        // Same content at a second path where a generated import expects it.
+        for (const extra of ZIP_EXTRA_COPIES[file.key] ?? []) {
+          zip.file(extra, content);
+        }
       }
     }
 
@@ -326,7 +351,13 @@ export default function ArchitecturePage({
     const url = URL.createObjectURL(blob);
     const a = window.document.createElement('a');
     a.href = url;
-    a.download = `idp-project-${Date.now()}.zip`;
+    /*
+     * Named after the document it was generated from rather than `Date.now()`: a folder
+     * of `idp-project-1761423...zip` files is unidentifiable, and someone comparing two
+     * documents ends up with exactly that.
+     */
+    const stem = (document?.fileName ?? 'pipeline').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-');
+    a.download = `idp-${stem}-${new Date().toISOString().slice(0, 10)}.zip`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -519,11 +550,19 @@ export default function ArchitecturePage({
               variant="h2"
               description={codeGenLoading
                 ? 'Generating production-ready code from your benchmark results…'
-                : aiBundleComplete
-                  ? 'AI-generated from real benchmark data. Every file below is deployable as-is.'
-                  : 'Deterministic template generated from your benchmark data. Deployable as-is.'}
+                : `${aiBundleComplete
+                  ? 'AI-generated from your real benchmark data'
+                  : 'Generated from your benchmark data'} — ${TOTAL_GENERATED_FILES} files: `
+                  + 'a README, the pipeline config, the processing logic in Python and '
+                  + 'TypeScript, and a CDK app that deploys it. Download the ZIP and run it as-is.'}
               actions={
-                <Button iconName="download" onClick={handleDownloadZip}>
+                <Button
+                  iconName="download"
+                  onClick={handleDownloadZip}
+                  // Say what is in it before the user commits to a download. The button
+                  // previously stated nothing about the contents.
+                  ariaLabel={`Download ${TOTAL_GENERATED_FILES} generated files as a ZIP archive`}
+                >
                   Download ZIP
                 </Button>
               }

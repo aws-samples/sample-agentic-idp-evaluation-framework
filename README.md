@@ -1,10 +1,14 @@
-# ONE IDP — Intelligent Document Processing Evaluation Platform
+# ONE IDP Evaluation Framework
 
-Evaluate, compare, and recommend the optimal AWS document processing approach for your use case.
+Find the best AWS document processing method for your documents — by running them all
+and comparing real cost, speed and accuracy.
 
-Upload a sample document, answer a few targeted questions, and watch 16 processing methods run in parallel across 33 capabilities — with real accuracy, cost, and speed comparisons, then generate a production-ready architecture (Terraform or CDK).
+Upload one real document. An advisor reads it and suggests what to extract, then every
+applicable method runs **in parallel on your document** — 29 methods across 33
+capabilities — so the comparison is measured rather than assumed. Finish with a
+deployable project (Python, TypeScript and CDK) wired to the methods you picked.
 
-![ONE IDP Architecture](docs/images/architecture.png)
+![The four steps: upload, analyze and compare, build a pipeline, generate architecture and code](docs/images/walkthrough.gif)
 
 ## Architecture at a glance
 
@@ -13,7 +17,7 @@ Upload a sample document, answer a few targeted questions, and watch 16 processi
 | **01 Edge** | TLS termination, DNS, CDN, SPA delivery | Route 53 · ACM · CloudFront · WAF · S3 (SPA bucket) |
 | **02 Web** — ECS Fargate | Stateless Express API, SSE streaming, Cognito auth, HPA on CPU &amp; RPS | ALB · ECS Fargate (2–10 tasks, 1 vCPU / 2 GB, `awsvpc`) · ECR · Secrets Manager · CloudWatch Logs · X-Ray |
 | **03 Agent** — Strands on AgentCore | Socratic advisor; closure-bound tools `analyze_document()`, `recommend_capabilities()`, `generate_architecture()` — invoked via SigV4 only | Bedrock AgentCore Runtime (arm64, SSE) |
-| **04 AI Services** | 6 families · 16 methods · language-aware routing · sequential Guardrails composition for PII | Amazon Bedrock (Claude Sonnet / Haiku / Opus 4.6, Nova 2 Lite / Pro, Nova Embeddings, Guardrails) · Bedrock Data Automation (up to 3 000 pages per job) · Amazon Textract (sync + async, tables / forms) |
+| **04 AI Services** | 10 families · 29 methods · script-aware routing · sequential Guardrails composition for PII | Amazon Bedrock (Claude Sonnet 4.6/5, Haiku 4.5, Opus 4.6/4.7/4.8/5, Nova 2 Lite, GPT-5.5/5.6 via Mantle, Nova Embeddings, Guardrails, TwelveLabs Pegasus for video) · Bedrock Data Automation (up to 3 000 pages per job) · Amazon Textract (`DetectDocumentText` only, by design — see below) · optional self-hosted OCR on SageMaker |
 | **05 Data** | Uploads, activity tracking, Terraform state, KMS encryption, async fan-out | S3 Uploads · DynamoDB · SQS · S3 TF State · KMS |
 
 Three architectural principles worth calling out:
@@ -25,13 +29,32 @@ Three architectural principles worth calling out:
 ## Features
 
 - **33 capabilities** across 8 categories: Core Extraction, Visual Analysis, Document Intelligence, Compliance & Security, Industry-Specific, Media Processing, Advanced AI, Document Conversion
-- **16 processing methods** across 6 families: BDA (Standard / + LLM hybrids), Claude (Sonnet 4.6 / Haiku 4.5 / Opus 4.6), Nova (2 Lite GA / 2 Pro Preview), Textract+LLM, Nova Embeddings, Bedrock Guardrails (PII specialist)
-- **Pipeline builder** — ReactFlow node graph for custom processing pipelines; chat interface to modify pipelines conversationally
+- **29 processing methods** across 10 families:
+  - **BDA** — Standard, plus three BDA→LLM structuring hybrids
+  - **Claude** — Sonnet 4.6, Sonnet 5, Haiku 4.5, Opus 4.6, Opus 4.7, Opus 4.8, Opus 5
+  - **Nova** — Nova 2 Lite · **GPT** — GPT-5.5 and three GPT-5.6 tiers via Bedrock Mantle
+  - **Textract+LLM** — OCR then structuring, with Sonnet 4.6 / Haiku 4.5 / Nova 2 Lite
+  - **Nova Embeddings** · **Bedrock Guardrails** (PII specialist)
+  - **TwelveLabs Pegasus 1.2** — video understanding, offered only for video input
+  - **Specialist OCR on SageMaker** — six self-hosted models (Infinity-Parser2, Baidu,
+    Surya 2, Chandra 2, dots.ocr, Qwen3-VL), **off by default** because each needs a
+    GPU endpoint billed by the hour even when idle
+- **Measured, not assumed** — a method that returns nothing is reported as a failure, and
+  a response cut off at the token ceiling is flagged rather than shown as complete
+- **Script-aware routing** — Korean, Japanese, Chinese, Arabic and other non-Latin
+  documents are routed on detected script, because OCR-first methods measured 32–42%
+  token recall on Hangul where direct-vision methods measured 100%
+- **Pipeline builder** — ReactFlow node graph for custom processing pipelines; chat
+  interface to modify pipelines conversationally
 - **Real-time SSE streaming** — token-level progress for every method, 15s keepalive
-- **Architecture recommendations** — cost projections at scale, generated IaC in Terraform or CDK
-- **Recent Runs** — save and reload past evaluation sessions with full journey detail (upload, analysis, preview, pipeline, architecture). User-separated; admin can view all users' runs.
-- **Admin dashboard** — usage stats, evaluation runs with click-to-detail, activity log with type-specific detail panels
+- **Architecture & code** — cost projections at scale plus an 11-file deployable project
+  (Python, TypeScript, CDK). The framework itself ships both Terraform and CDK.
+- **Admin dashboard** — usage stats, evaluation runs with click-to-detail, activity log
 - **Pluggable auth** — `none` (demo), Amazon Cognito (real JWT verifier against a user pool)
+- **Run history** — save and reload past sessions. **Disabled by default**
+  (`DISABLE_RUN_HISTORY=true`) and refused server-side, because with `AUTH_PROVIDER=none`
+  every visitor shares one alias and would otherwise see each other's documents. Enable
+  it only on a deployment with real per-user auth.
 
 ## Quick Start (local dev)
 
@@ -108,14 +131,34 @@ one-idp/
 
 ## Processing methods
 
-| Family | Models | Pricing |
-|--------|--------|---------|
+29 methods in 10 families. The catalog is the single source of truth
+(`packages/shared/src/types/processing.ts`); `GET /api/methods` reports what a given
+deployment can actually run, and why anything is unavailable.
+
+| Family | Methods | Pricing |
+|--------|---------|---------|
 | **BDA** | Standard, Custom Blueprint | $0.01 / $0.04 per page |
-| **BDA + LLM** | +Sonnet, +Haiku, +Nova Lite | BDA page + LLM tokens |
-| **Claude** | Sonnet 4.6, Haiku 4.5, Opus 4.6 | $1 – $5 input / $5 – $25 output per 1M tokens |
-| **Nova** | 2 Lite (GA), 2 Pro (Preview) | $0.30 – $1.25 / 1M input tokens |
-| **Textract + LLM** | +Sonnet, +Haiku, +Nova Lite, +Nova Pro | $0.0015/page + LLM tokens |
-| **Comprehend / Guardrails** | PII detection only | pay-per-request |
+| **BDA + LLM** | +Sonnet 4.6, +Haiku 4.5, +Nova 2 Lite | BDA page fee + LLM tokens |
+| **Claude** | Sonnet 4.6, Sonnet 5, Haiku 4.5, Opus 4.6, Opus 4.7, Opus 4.8, Opus 5 | $1 – $5 in / $5 – $25 out per 1M tokens |
+| **Nova** | Nova 2 Lite | $0.30 / 1M input tokens |
+| **GPT** (Bedrock Mantle) | GPT-5.5, GPT-5.6 Sol / Terra / Luna | per-tier token pricing |
+| **Textract + LLM** | +Sonnet 4.6, +Haiku 4.5, +Nova 2 Lite | $0.0015/page + LLM tokens |
+| **Nova Embeddings** | embedding generation | per 1M tokens |
+| **Guardrails** | PII detection / redaction only | pay-per-request |
+| **Video understanding** | TwelveLabs Pegasus 1.2 | per second of video |
+| **Specialist OCR** (SageMaker, opt-in) | Infinity-Parser2, Baidu, Surya 2, Chandra 2, dots.ocr, Qwen3-VL | GPU-hours ≈ $0.0085/page |
+
+Two deliberate constraints worth knowing before you read the cost numbers:
+
+- **Textract is called with `DetectDocumentText` only** ($0.0015/page). The far pricier
+  `AnalyzeDocument` TABLES/FORMS paths are not used and not granted in IAM, so the
+  Textract+LLM methods are rated on plain OCR plus an LLM — not on Textract's own
+  table extraction.
+- **Specialist OCR is off unless you configure an endpoint.** Each model needs its own
+  GPU endpoint billed hourly *even when idle* (ml.g6e.2xlarge ≈ $2.24/hr), so all six
+  would add roughly $10–30k/month. Left off, they stay visible in the catalog and
+  report `sagemaker-endpoint-not-configured`. The `sagemaker:InvokeEndpoint` grant is
+  scoped to the endpoints you actually configure.
 
 ## Environment variables
 

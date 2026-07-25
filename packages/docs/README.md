@@ -1,42 +1,26 @@
-# @idp/docs
+# packages/docs — NOT the docs the app serves
 
-Customer-facing documentation site for ONE IDP. Built with [Fumadocs](https://fumadocs.dev/) + Next.js (static export) and served at `/docs` on the same domain as the main app.
+> **This package is not built, not deployed, and not referenced by the root `build`
+> script.** It is a standalone Next.js/fumadocs site that was never wired up.
 
-## Dev (two options)
+**The documentation users actually read lives in
+[`packages/frontend/public/docs-content/`](../frontend/public/docs-content/).**
+`DocsPage.tsx` fetches those `.md` files at runtime and renders them at `/docs/<slug>`.
 
-**Option 1 — standalone Next dev server.** Hot reload, richest DX.
+## Why this matters
 
-```bash
-npm install                       # from repo root, installs this workspace too
-npm run dev -w packages/docs      # http://localhost:3001/docs
-```
+The content here is a **stale copy**. When it was last audited it still described an App
+Runner backend (the backend has been ECS Fargate behind an ALB for some time), claimed 15
+processing methods (there are 29), called the workflow "5-step" (it has 4 steps), and
+documented a Nova 2 Pro model that was removed because its id was not resolvable in any
+region. None of that reached users — because nothing serves this directory — but anyone
+reading the repo would reasonably assume it was current.
 
-**Option 2 — bundled into the backend at `http://localhost:3001/docs`.** The backend's `express.static` picks up `packages/docs/out` when it exists. Good for end-to-end local testing across the SPA + API + docs.
+## If you are editing documentation
 
-```bash
-npm run build -w packages/docs    # one-time (or after content edits)
-npm run dev                       # repo-root: starts backend and SPA, docs available at :3001/docs
-```
+Edit `packages/frontend/public/docs-content/*.md`. Nothing else is served.
 
-## Build
-
-```bash
-npm run build -w packages/docs    # emits packages/docs/out/ with basePath=/docs
-# Optional: embed the canonical domain in OG/canonical/llms.txt URLs.
-NEXT_PUBLIC_SITE_URL="https://your-domain.example" npm run build -w packages/docs
-```
-
-When `NEXT_PUBLIC_SITE_URL` is unset the site works on any host — canonical URLs are emitted as relative paths.
-
-## Deploy
-
-```bash
-aws s3 sync packages/docs/out s3://<your-static-bucket>/docs/ --delete
-aws cloudfront create-invalidation --distribution-id <your-distribution-id> --paths '/docs/*'
-```
-
-## Adding a page
-
-1. Create `content/docs/<slug>.mdx` with frontmatter `title` + `description`.
-2. Add the slug to `content/docs/meta.json` to control sidebar order.
-3. Run `npm run dev -w packages/docs` and verify the page renders.
+If you want a standalone docs site, this package is a reasonable starting point, but treat
+its content as an old snapshot and re-derive the facts from the code first. Duplicating
+prose across two trees is what produced the drift above; prefer generating this site from
+`docs-content/` over maintaining a second copy by hand.

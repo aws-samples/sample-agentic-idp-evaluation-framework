@@ -8,7 +8,7 @@ Two supported paths: **Terraform** (the reference live deployment) and **CDK v2 
 ## Prerequisites
 
 - AWS account with Bedrock enabled in your target region (`us-west-2` is the default).
-- Claude Sonnet 4.6, Haiku 4.5, Opus 4.6, Nova 2 Lite (and optionally Nova 2 Pro preview, Nova Multimodal Embeddings in us-east-1) enabled in the Bedrock console.
+- Model access enabled in the Bedrock console for the tiers you intend to compare: Claude (Sonnet 4.6/5, Haiku 4.5, Opus 4.6/4.7/4.8/5), Nova 2 Lite, the GPT tiers via Bedrock Mantle, and TwelveLabs Pegasus if you plan to evaluate video.
 - For BDA methods: a Bedrock Data Automation **profile ARN** (and optional project ARN).
 - Node.js 20+, Python 3.11+, Docker (for CodeBuild locally or container builds).
 - For custom-domain deployments: a Route 53 hosted zone + ACM certificate in `us-east-1`.
@@ -50,7 +50,7 @@ make plan
 make apply
 ```
 
-The plan should show **0 adds / 2 safe in-place / 0 destroys** against an already-deployed environment. For a fresh install it will provision S3 buckets, DynamoDB, CloudFront, App Runner, AgentCore runtime, ECR, CodeBuild, and IAM.
+The plan should show **0 adds / 2 safe in-place / 0 destroys** against an already-deployed environment. For a fresh install it will provision S3 buckets, DynamoDB, CloudFront, ALB + ECS Fargate, AgentCore runtime, ECR, CodeBuild, and IAM.
 
 ### 4. Build and push the backend image
 
@@ -58,8 +58,8 @@ The plan should show **0 adds / 2 safe in-place / 0 destroys** against an alread
 git archive --format=zip HEAD -o /tmp/source.zip
 aws s3 cp /tmp/source.zip s3://<your-uploads-bucket>/codebuild/source.zip
 aws codebuild start-build --project-name one-idp-build
-# Wait for SUCCEEDED, then trigger App Runner redeploy:
-aws apprunner start-deployment --service-arn <your-app-runner-arn>
+# Wait for SUCCEEDED, then force a new ECS deployment:
+aws ecs update-service --cluster <cluster> --service <service> --force-new-deployment
 ```
 
 ### 5. Deploy the frontend and docs
@@ -91,11 +91,11 @@ CDK stacks under `lib/`:
 - `storage-stack.ts` — S3 buckets.
 - `ecr-stack.ts` — container registry.
 - `agent-runtime-stack.ts` — `CfnRuntime` construct.
-- `app-runner-stack.ts` — backend service + IAM.
+- `ecs-backend.ts` — ALB + ECS Fargate service, task role and IAM.
 - `edge-stack.ts` — CloudFront + Route 53.
 - `activity-table-stack.ts` — DynamoDB.
 
-After `cdk deploy` the ECR repo exists but is empty — push the first backend image via CodeBuild (same as the Terraform path), then trigger App Runner deployment.
+After `cdk deploy` the ECR repo exists but is empty — push the first backend image via CodeBuild (same as the Terraform path), then force a new ECS deployment.
 
 ## Post-deploy verification
 

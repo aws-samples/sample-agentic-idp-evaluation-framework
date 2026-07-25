@@ -11,11 +11,11 @@ It's aimed at **AWS Solutions Architects and customers** who need to answer one 
 
 Instead of running a dozen proofs-of-concept by hand, you get:
 
-- A single upload evaluated against up to **15 processing methods** (Bedrock Data Automation, Claude, Nova, and Amazon Textract in hybrid configurations).
+- A single upload evaluated against up to **29 processing methods** (Bedrock Data Automation, Claude, Nova, GPT, Amazon Textract hybrids, TwelveLabs Pegasus for video, and optional self-hosted OCR).
 - Real measurements: latency, token usage, cost, and self-reported confidence per method per capability.
 - A side-by-side **comparison dashboard** ranked by speed, cost, confidence, and overall score.
 - An **AI-generated architecture recommendation** with a Mermaid diagram and cost projections at three scales.
-- A **10-file production project** — Python, TypeScript, and a deployable CDK stack — that you can drop into a repo and `cdk deploy`.
+- A **production project (11 files)** — Python, TypeScript, and a deployable CDK stack — that you can drop into a repo and `cdk deploy`.
 
 ## What ONE IDP is *not*
 
@@ -31,6 +31,6 @@ If you skip the platform and build the adapters yourself, you end up writing rou
 
 ## Where to go next
 
-- [Quickstart](/quickstart) — upload a document and run the benchmark.
-- [The 5-step workflow](/workflow) — what each step does.
-- [Methods](/methods) — the 15 processing methods and when to pick each.
+- [Quickstart](/docs/quickstart) — upload a document and run the benchmark.
+- [The 4-step workflow](/docs/workflow) — what each step does.
+- [Methods](/docs/methods) — every processing method and when to pick each.

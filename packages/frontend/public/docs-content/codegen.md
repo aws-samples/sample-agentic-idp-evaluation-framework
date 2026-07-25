@@ -1,9 +1,9 @@
 ---
 title: Production-ready project output
-description: The 10-file project produced at the end of the pipeline.
+description: The deployable project produced at the end of the workflow.
 ---
 
-At the Architecture & Code stage, the platform generates a **10-file deployable project** based on your actual benchmark results. This page tells you what each file is and what to expect.
+At the Architecture & Code stage, the platform generates a **deployable project (11 files)** based on your actual benchmark results. This page tells you what each file is and what to expect.
 
 ## Why real files, not boilerplate
 

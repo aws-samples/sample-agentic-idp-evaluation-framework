@@ -163,3 +163,6 @@ export {
   stepSubtitle,
 } from './constants/steps.js';
 export type { WorkflowStep } from './constants/steps.js';
+
+// Count formatting, so no panel says "1 pages" next to a header that says "1 page".
+export { plural, countOf } from './utils/plural.js';

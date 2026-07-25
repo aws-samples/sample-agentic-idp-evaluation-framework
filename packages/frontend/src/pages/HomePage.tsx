@@ -35,21 +35,33 @@ import SupportMatrix from '../components/common/SupportMatrix';
 import OnboardingBanner from '../components/common/OnboardingBanner';
 import { getCapabilityIcon } from '../components/common/icons';
 import { useMethodAvailability } from '../hooks/useMethodAvailability';
+import { FAMILY_COLORS, FAMILY_FULL_NAMES } from '../theme/family-colors';
+import { token } from '../theme/tokens';
 
 interface HomePageProps {
   onUploadComplete: (doc: UploadResponse) => void;
 }
 
-const FAMILY_NAMES: Record<string, string> = {
-  bda: 'Bedrock Data Automation',
-  'bda-llm': 'BDA + LLM Hybrid',
-  claude: 'Claude (LLM)',
-  nova: 'Nova (LLM)',
-  gpt: 'OpenAI GPT (LLM)',
-  'textract-llm': 'Textract + LLM',
-  embeddings: 'Nova Embeddings',
-  guardrails: 'Bedrock Guardrails',
-};
+/**
+ * What a method costs, in the unit that method is actually billed in.
+ *
+ * Three different billing shapes, and showing the wrong one is worse than showing
+ * nothing: token models are per-MTok, the two-stage hybrids add a per-page service fee
+ * on top of tokens, and the page-priced methods (Guardrails, embeddings, self-hosted
+ * OCR) have no token price at all.
+ */
+function priceLabel(m: { family: string; tokenPricing: { inputPer1MTokens: number; outputPer1MTokens: number }; estimatedCostPerPage: number }): string {
+  const tokens = `$${m.tokenPricing.inputPer1MTokens} / $${m.tokenPricing.outputPer1MTokens} per MTok`;
+  if (m.family === 'bda-llm') return `$0.01/page + ${tokens}`;
+  if (m.family === 'textract-llm') return `$0.0015/page + ${tokens}`;
+  if (m.tokenPricing.inputPer1MTokens > 0) return tokens;
+  /*
+   * 4 decimals, not 2: Guardrails is $0.0016/page and Nova Embeddings $0.0005/page,
+   * both of which toFixed(2) rendered as "$0.00/page" — advertising a billed method
+   * as free.
+   */
+  return `$${m.estimatedCostPerPage.toFixed(4)}/page`;
+}
 
 /**
  * Families grouped by the ROLE they play, because they are not interchangeable
@@ -280,7 +292,7 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                            */
                           const supportEntries = METHOD_FAMILIES.map((family) => ({
                             family,
-                            label: FAMILY_NAMES[family] || family,
+                            label: FAMILY_FULL_NAMES[family],
                             level: (cap.support?.[family] ?? 'none') as SupportLevel,
                           }));
 
@@ -384,64 +396,119 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
             />
           }
         >
+          {/*
+            One row per method in a single-column list per family, rather than a
+            3-column grid of variable-height cards.
+            The grid version had four concrete problems, all visible on one screen:
+              - a family with 6 methods left two columns blank beside it, so a third of
+                the panel was empty while the content scrolled;
+              - the same "needs a SageMaker endpoint" sentence was repeated verbatim on
+                all six OCR rows, three lines each — 18 lines saying one thing;
+              - narrow columns broke words mid-token ("T hese", "deplo yment");
+              - the family heading came from a partial name map, so the two newest
+                families rendered with no title at all.
+            A per-family note carries the shared reason once, and rows carry only what
+            differs: the name, the price, and (rarely) a per-method status.
+          */}
           <SpaceBetween size="l">
             {ALL_FAMILY_GROUPS.map((group) => {
               const families = group.families.filter((f) => getMethodsByFamily(f).length > 0);
               if (families.length === 0) return null;
               return (
                 <div key={group.title}>
-                  <SpaceBetween size="xs">
-                    <Box variant="h3">{group.title}</Box>
-                    <Box color="text-body-secondary" fontSize="body-s">{group.blurb}</Box>
-                    <ColumnLayout columns={3} minColumnWidth={250} variant="text-grid">
+                  <SpaceBetween size="s">
+                    <div>
+                      <Box variant="h3">{group.title}</Box>
+                      <Box color="text-body-secondary" fontSize="body-s">{group.blurb}</Box>
+                    </div>
+                    <ColumnLayout columns={families.length > 1 ? 2 : 1} minColumnWidth={340}>
                       {families.map((family) => {
                         const methods = getMethodsByFamily(family);
+                        /*
+                         * When every method in a family is unavailable for the SAME
+                         * reason, say it once above the list. That is the normal case
+                         * for the self-hosted OCR family (no endpoint configured), and
+                         * repeating it per row buried the actual content.
+                         */
+                        const reasons = new Set(methods.map((m) => reasonFor(m.id) ?? ''));
+                        const allUnavailable = methods.every((m) => isUnavailable(m.id));
+                        const sharedReason = allUnavailable && reasons.size === 1
+                          ? [...reasons][0] || 'Not available in this deployment'
+                          : null;
+                        /*
+                         * Skip the family header when it would restate the group heading
+                         * directly above it. A one-family group named after that family
+                         * printed "Specialist OCR (self-hosted)" twice in a row, as did
+                         * its blurb and role note — three lines saying the same thing
+                         * before a single row of content.
+                         */
+                        const familyName = FAMILY_FULL_NAMES[family];
+                        const redundantHeader = families.length === 1
+                          && (group.title === familyName || group.title.startsWith(familyName));
                         return (
-                          <SpaceBetween key={family} size="xxs">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <Box variant="awsui-key-label">{FAMILY_NAMES[family]}</Box>
-                              <Badge>{methods.length}</Badge>
-                            </div>
-                            {FAMILY_ROLE_NOTES[family] && (
-                              <Box color="text-body-secondary" fontSize="body-s">
+                          <div key={family} style={{ minWidth: 0 }}>
+                            {!redundantHeader && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                                <div style={{
+                                  width: 3, height: 14, borderRadius: 2,
+                                  background: FAMILY_COLORS[family], flexShrink: 0,
+                                }} />
+                                <Box variant="awsui-key-label">{familyName}</Box>
+                                <Badge>{methods.length}</Badge>
+                              </div>
+                            )}
+                            {/*
+                              The role note repeats the group blurb when the group holds a
+                              single family — the blurb is written for the group and the
+                              note for the family, and for a 1:1 group they say the same
+                              thing. Keep the blurb (it is higher up and larger).
+                            */}
+                            {FAMILY_ROLE_NOTES[family] && !redundantHeader && (
+                              <Box color="text-body-secondary" fontSize="body-s" padding={{ bottom: 'xxs' }}>
                                 {FAMILY_ROLE_NOTES[family]}
                               </Box>
                             )}
-                            {methods.map((m) => (
-                              <div
-                                key={m.id}
-                                style={{
-                                  padding: '4px 0',
-                                  borderBottom: '1px solid var(--color-border-divider-secondary, #f2f3f3)',
-                                  opacity: isUnavailable(m.id) ? 0.65 : 1,
-                                }}
-                              >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                            {sharedReason && (
+                              <Box padding={{ bottom: 'xxs' }}>
+                                <StatusIndicator type="stopped">
+                                  <Box variant="span" fontSize="body-s">
+                                    {methods.length > 1 ? `None available here — ${sharedReason}` : sharedReason}
+                                  </Box>
+                                </StatusIndicator>
+                              </Box>
+                            )}
+                            <div style={{ opacity: sharedReason ? 0.7 : 1 }}>
+                              {methods.map((m) => (
+                                <div
+                                  key={m.id}
+                                  style={{
+                                    display: 'flex', justifyContent: 'space-between',
+                                    alignItems: 'baseline', gap: 12,
+                                    padding: '3px 0',
+                                    borderBottom: `1px solid ${token.borderSubtle}`,
+                                    // Only dim individually when the family as a whole
+                                    // is fine — otherwise the shared note already says it.
+                                    opacity: !sharedReason && isUnavailable(m.id) ? 0.6 : 1,
+                                  }}
+                                >
                                   <Box fontSize="body-s" fontWeight="bold">{m.shortName}</Box>
-                                  <Box fontSize="body-s" color="text-body-secondary">
-                                    {m.family === 'bda-llm'
-                                      ? `BDA $0.01/pg + $${m.tokenPricing.inputPer1MTokens}/$${m.tokenPricing.outputPer1MTokens} MTok`
-                                      : m.family === 'textract-llm'
-                                        ? `Textract $0.0015/pg + $${m.tokenPricing.inputPer1MTokens}/$${m.tokenPricing.outputPer1MTokens} MTok`
-                                        : m.tokenPricing.inputPer1MTokens > 0
-                                          ? `$${m.tokenPricing.inputPer1MTokens} / $${m.tokenPricing.outputPer1MTokens} MTok`
-                                          // 4 decimals, not 2: Guardrails is $0.0016/page and
-                                          // Nova Embeddings $0.0005/page, both of which
-                                          // toFixed(2) rendered as "$0.00/page" — advertising a
-                                          // billed method as free.
-                                          : `$${m.estimatedCostPerPage.toFixed(4)}/page`}
+                                  <Box fontSize="body-s" color="text-body-secondary" textAlign="right">
+                                    {priceLabel(m)}
                                   </Box>
                                 </div>
-                                {isUnavailable(m.id) && (
-                                  <Box fontSize="body-s">
-                                    <StatusIndicator type="stopped">
-                                      {reasonFor(m.id) ?? 'Not available in this deployment'}
-                                    </StatusIndicator>
+                              ))}
+                            </div>
+                            {/* A one-off unavailable method inside an otherwise usable family. */}
+                            {!sharedReason && methods.filter((m) => isUnavailable(m.id)).map((m) => (
+                              <Box key={`${m.id}-why`} padding={{ top: 'xxs' }} fontSize="body-s">
+                                <StatusIndicator type="stopped">
+                                  <Box variant="span" fontSize="body-s">
+                                    {m.shortName}: {reasonFor(m.id) ?? 'not available in this deployment'}
                                   </Box>
-                                )}
-                              </div>
+                                </StatusIndicator>
+                              </Box>
                             ))}
-                          </SpaceBetween>
+                          </div>
                         );
                       })}
                     </ColumnLayout>

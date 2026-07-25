@@ -37,10 +37,13 @@ The constants come from `packages/shared/src/types/processing.ts:METHOD_INFO[...
 |---|---|---|
 | Claude Sonnet 4.6 | $3.00 | $15.00 |
 | Claude Haiku 4.5 | $1.00 | $5.00 |
-| Claude Opus 4.6 | $5.00 | $25.00 |
-| Nova 2 Lite | $0.30 | $2.50 |
-| Nova 2 Pro (Preview) | $1.25 | $10.00 |
-| Nova Multimodal Embeddings | $0.135 | — |
+| Claude Opus 4.6 / 4.7 / 4.8 / 5 | $5.00 | $25.00 |
+| Claude Sonnet 5 | $2.00 | $10.00 |
+| GPT-5.6 Sol / GPT-5.5 | $5.50 | $33.00 |
+| GPT-5.6 Terra | $2.75 | $16.50 |
+| GPT-5.6 Luna | $1.10 | $6.60 |
+| Nova 2 Lite | $0.15 | $1.25 |
+| Nova Multimodal Embeddings | $0.02 | — |
 
 Nova 2 Lite charges a fixed **230 tokens/image** (resolution-independent) since 2026-03-30.
 
@@ -76,7 +79,7 @@ ONE IDP only shows *extraction cost*. You'll also pay for:
 
 - **S3 storage** — documents + BDA outputs. Pennies per GB per month.
 - **DynamoDB** — activity tracking + results. PAY_PER_REQUEST, typically < $1/month at small scale.
-- **App Runner** — the backend container. Fixed at ~$50/month at minimum spec when idle.
+- **ALB + ECS Fargate** — the backend. Roughly $18/month for the ALB plus ~$30/month for two 1 vCPU / 2 GB ARM64 tasks when idle.
 - **CloudFront + Route 53** — edge delivery of the SPA. ~$1/month at small traffic.
 - **Bedrock AgentCore Runtime** — billed per invocation like Lambda.
 

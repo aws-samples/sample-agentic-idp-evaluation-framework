@@ -1,5 +1,5 @@
 {
-  "_source": "https://bedrock.sanghwa.people.aws.dev/v2/models.json",
+  "_source": "set MODEL_CATALOG_URL when refreshing; see scripts/sync-model-catalog.mjs",
   "_repo": "https://github.com/didhd/bedrock-model-catalog-api-v2",
   "_note": "Snapshot of the Bedrock model catalog, used to cross-check METHOD_INFO pricing/modality/region claims against reality. Prices are USD per 1K tokens (multiply by 1000 for the per-1M figures METHOD_INFO uses). Refresh with scripts/sync-model-catalog.mjs.",
   "lastUpdated": "2026-07-25T06:00:32.738723+00:00",

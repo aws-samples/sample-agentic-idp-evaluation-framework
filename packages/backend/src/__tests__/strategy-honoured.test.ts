@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { PipelineGenerateRequest, ProcessingMethod } from '@idp/shared';
 import { METHOD_INFO } from '@idp/shared';
 import { generatePipeline } from '../services/pipeline-generator.js';
@@ -132,13 +132,13 @@ describe('media documents route to methods that can actually read them', () => {
 describe('PII always routes to the deterministic specialist when available', () => {
   const PII = ['pii_detection', 'pii_redaction'] as const;
 
-  // The routing rule is conditional on Guardrails being configured, and vitest
-  // loads the repo-root .env — so on a machine without BEDROCK_GUARDRAIL_ID these
-  // assertions would pass for the wrong reason (Guardrails filtered out before
-  // the rule is reached). State the precondition rather than assume it.
-  beforeAll(() => {
-    process.env.BEDROCK_GUARDRAIL_ID ||= 'test-guardrail';
-  });
+  /*
+   * The precondition (a configured guardrail id) is applied by the vitest setup file,
+   * not here: `config` in config/aws.ts reads the environment at module evaluation, and
+   * static imports are hoisted, so a `beforeAll` in this file would run too late. That
+   * is exactly how these assertions used to fail against correct routing logic — see
+   * src/__tests__/setup-env.ts.
+   */
 
   it('picks Guardrails under every strategy', () => {
     for (const capability of PII) {

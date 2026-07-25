@@ -157,13 +157,26 @@ router.post('/', async (req, res) => {
       try {
         const costData = JSON.parse(match[1]);
 
-        // Enhance with actual calculated costs
-        if (costData.docsPerMonth) {
-          const avgPages = 5;
-          costData.methods = (body.comparison?.methods ?? []).map((m) => ({
-            method: m.method,
-            monthlyCost: estimateMonthlyCost(m.method, costData.docsPerMonth, avgPages),
-          }));
+        /*
+         * Keep the model's OWN numbers.
+         *
+         * This used to overwrite `costData.methods` with `estimateMonthlyCost(...)` —
+         * the same formula the deterministic calculator on the page already uses. The UI
+         * presents this panel as "the AI's own projection", "independent", "a second
+         * opinion", so the user was invited to compare two tables that were computed
+         * identically and could never disagree. That is worse than showing nothing: it
+         * manufactures corroboration.
+         *
+         * Only methods that were actually benchmarked are kept, so the model cannot
+         * invent a row for a method the user never ran. Anything the model reports about
+         * a real method is passed through untouched, and the frontend labels it as an
+         * estimate rather than a measurement.
+         */
+        if (Array.isArray(costData.methods)) {
+          const benchmarked = new Set((body.comparison?.methods ?? []).map((m) => m.method));
+          costData.methods = costData.methods.filter(
+            (m: { method?: string }) => typeof m?.method === 'string' && benchmarked.has(m.method as never),
+          );
         }
 
         const costEvent: ArchitectureEvent = {

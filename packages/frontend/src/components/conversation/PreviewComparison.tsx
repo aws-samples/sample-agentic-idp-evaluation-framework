@@ -10,7 +10,7 @@ import Button from '@cloudscape-design/components/button';
 import Table from '@cloudscape-design/components/table';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import type { PreviewResponse } from '../../hooks/usePreview';
-import { CAPABILITY_INFO } from '@idp/shared';
+import { CAPABILITY_INFO, countOf } from '@idp/shared';
 import ExtractionView from '../common/ExtractionView';
 import { token } from '../../theme/tokens';
 
@@ -357,7 +357,7 @@ export default function PreviewComparison({
               headerText={`${shownResult.shortName} — extracted output`}
               headerDescription={
                 shownCapabilities.length > 1
-                  ? `${shownCapabilities.length} capabilities extracted. Pick one below; switch to Source for the verbatim response.`
+                  ? `${countOf(shownCapabilities.length, 'capability')} extracted. Pick one below; switch to Source for the verbatim response.`
                   : "Rendered from the model's response. Switch to Source to see it verbatim."
               }
             >

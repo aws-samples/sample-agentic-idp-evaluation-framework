@@ -63,8 +63,8 @@ Internet
 CloudFront  ◄──── HTTPS termination, origin routing
    │
    ▼  (HTTPS + TLS)
-App Runner  ◄──── auth middleware runs here, not at the edge
+ECS Fargate ◄──── auth middleware runs here, not at the edge
    │
    ▼
-Strands agent on AgentCore  ◄──── invoked with SigV4 by App Runner, not by the browser
+Strands agent on AgentCore  ◄──── invoked with SigV4 by the backend, not by the browser
 ```

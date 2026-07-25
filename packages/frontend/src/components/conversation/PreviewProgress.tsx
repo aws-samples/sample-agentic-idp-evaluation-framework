@@ -9,6 +9,7 @@ import Button from '@cloudscape-design/components/button';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import type { PreviewResponse } from '../../hooks/usePreview';
 import { token } from '../../theme/tokens';
+import { countOf } from '@idp/shared';
 
 /**
  * Collapse failures with the same message into one entry.
@@ -74,7 +75,7 @@ export default function PreviewProgress({ preview, isLoading, onContinue }: Prev
           variant="h2"
           description={
             done
-              ? `${succeeded} of ${total} methods returned a result${failed > 0 ? `, ${failed} failed` : ''}.`
+              ? `${succeeded} of ${countOf(total, 'method')} returned a result${failed > 0 ? `, ${failed} failed` : ''}.`
               : 'Every method runs at the same time. Results appear as each one finishes.'
           }
           actions={
@@ -86,7 +87,7 @@ export default function PreviewProgress({ preview, isLoading, onContinue }: Prev
           {done ? 'Preview complete' : (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <Spinner size="normal" />
-              Running {total} methods in parallel
+              Running {countOf(total, 'method')} in parallel
             </span>
           )}
         </Header>

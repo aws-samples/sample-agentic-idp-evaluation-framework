@@ -22,7 +22,15 @@ import type { AdapterInput } from '../adapters/stream-adapter.js';
 
 const liveGuardrail = process.env.BEDROCK_GUARDRAIL_ID;
 const liveBucket = config.s3Bucket;
-const describeLive = (liveGuardrail && liveBucket) ? describe : describe.skip;
+/*
+ * `LIVE_TESTS_DISABLED` is set by the vitest setup file, which supplies placeholder
+ * service ids so the pure-logic routing tests can exercise the "is it configured?"
+ * branch. Those placeholders are indistinguishable from real ids here, so without this
+ * check these suites stopped skipping and started failing against AWS with credentials
+ * that cannot work. Gate on the explicit flag, not just on presence.
+ */
+const liveEnabled = process.env.LIVE_TESTS_DISABLED !== 'true';
+const describeLive = (liveEnabled && liveGuardrail && liveBucket) ? describe : describe.skip;
 
 // A minimal, synthetic "document" expressed as plain text. Uploaded to S3 as
 // a .txt file so the Claude direct adapter will accept it (fallback path).

@@ -8,7 +8,14 @@ import Spinner from '@cloudscape-design/components/spinner';
 import Box from '@cloudscape-design/components/box';
 import { marked } from 'marked';
 import SafeHtml from '../components/common/SafeHtml';
-import { PRODUCT_NAME, PRODUCT_NAME_SHORT } from '@idp/shared';
+import {
+  PRODUCT_NAME,
+  PRODUCT_NAME_SHORT,
+  METHODS,
+  CAPABILITIES,
+  CAPABILITY_CATEGORIES,
+  TOTAL_STEPS,
+} from '@idp/shared';
 
 interface DocItem {
   slug: string;
@@ -35,9 +42,9 @@ const DOCS_INDEX: DocSection[] = [
   {
     title: 'Concepts',
     items: [
-      { slug: 'workflow', title: 'The 5-step workflow', description: 'What happens at each step.' },
-      { slug: 'capabilities', title: 'Capabilities', description: '33 capabilities across 8 categories.' },
-      { slug: 'methods', title: 'Processing methods', description: '15 methods spanning BDA, Claude, Nova, Textract.' },
+      { slug: 'workflow', title: `The ${TOTAL_STEPS}-step workflow`, description: 'What happens at each step.' },
+      { slug: 'capabilities', title: 'Capabilities', description: `${CAPABILITIES.length} capabilities across ${CAPABILITY_CATEGORIES.length} categories.` },
+      { slug: 'methods', title: 'Processing methods', description: `${METHODS.length} methods spanning BDA, Claude, Nova, GPT, Textract and more.` },
       { slug: 'pricing', title: 'Pricing & cost model', description: 'How costs are calculated and what to expect at scale.' },
     ],
   },
@@ -53,7 +60,7 @@ const DOCS_INDEX: DocSection[] = [
   {
     title: 'Generated code',
     items: [
-      { slug: 'codegen', title: 'Production-ready project output', description: 'The 10-file project produced at the end of the pipeline.' },
+      { slug: 'codegen', title: 'Production-ready project output', description: 'The deployable project produced at the end of the workflow.' },
       { slug: 'limitations', title: 'Limitations & FAQ', description: 'Known constraints and common questions.' },
     ],
   },
@@ -157,26 +164,31 @@ export default function DocsPage() {
             {error && (
               <Alert type="error" header="Document not found">{error}</Alert>
             )}
-            {!loading && !error && html && (
-              <>
-                <Header variant="h1" description={description}>{title}</Header>
-                <article
-                  className="docs-markdown"
-                  onClick={(e) => {
-                    const target = e.target as HTMLElement;
-                    const anchor = target.closest('a') as HTMLAnchorElement | null;
-                    if (!anchor) return;
-                    const href = anchor.getAttribute('href') ?? '';
-                    if (href.startsWith('/docs/')) {
-                      e.preventDefault();
-                      navigate(href);
-                    }
-                  }}
-                >
-                  <SafeHtml profile="markdown" html={html} />
-                </article>
-              </>
-            )}
+            {/*
+              An array rather than a fragment: Cloudscape flattens fragment children
+              inside SpaceBetween on React 18 but will not on React 19+, and it warned
+              about the missing keys in the browser console on every docs page. An
+              explicitly keyed array is stable across both.
+            */}
+            {!loading && !error && html && [
+              <Header key="title" variant="h1" description={description}>{title}</Header>,
+              <article
+                key="body"
+                className="docs-markdown"
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  const anchor = target.closest('a') as HTMLAnchorElement | null;
+                  if (!anchor) return;
+                  const href = anchor.getAttribute('href') ?? '';
+                  if (href.startsWith('/docs/')) {
+                    e.preventDefault();
+                    navigate(href);
+                  }
+                }}
+              >
+                <SafeHtml profile="markdown" html={html} />
+              </article>,
+            ]}
           </SpaceBetween>
         </div>
       </main>

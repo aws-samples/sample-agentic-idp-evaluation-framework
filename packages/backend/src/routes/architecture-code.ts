@@ -271,8 +271,11 @@ explicit tags so a downstream parser can split them. No prose outside tags.
    - Track per-call token usage and emit a per-method cost using the exact pricing from above.
    - For BDA: use \`bedrock-data-automation-runtime\` client, poll every 5s up to 60 attempts, read
      \`job_metadata.json\` then follow \`output_metadata[].segment_metadata[].standard_output_path\` to the result JSON.
-   - For Textract: sync \`analyze_document\` for single-page/images, async \`start_document_analysis\` + poll
-     \`get_document_analysis\` with NextToken pagination for multi-page PDFs.
+   - For Textract: TEXT DETECTION ONLY — sync \`detect_document_text\` for single-page/images,
+     async \`start_document_text_detection\` + poll \`get_document_text_detection\` with NextToken
+     pagination for multi-page PDFs. Never use the AnalyzeDocument family: the LLM does the
+     structuring, so Textract's TABLES/FORMS features are redundant and cost up to 43x more per
+     page ($0.0015 vs $0.065).
    - For images, resize with Pillow if >4.5MB; pass PDF bytes directly via Converse \`document\` block.
    - A \`__main__\` block that reads \`sys.argv[1]\` (path to document) and prints JSON results.
    - Robust error handling (\`ClientError\`), structured \`logging\` (NOT \`print\` for non-result output).

@@ -1,6 +1,6 @@
 ---
 title: Processing methods
-description: 15 methods spanning BDA, Claude, Nova, and Textract.
+description: 29 methods spanning BDA, Claude, Nova, GPT, Textract, Pegasus and self-hosted OCR.
 ---
 
 Fifteen methods are available, in six families. The full table lives in `packages/shared/src/types/processing.ts:METHOD_INFO` — the numbers below are copied verbatim.
@@ -49,7 +49,7 @@ All prices are Standard Tier, US regions, as of 2026-03.
 |---|---|---|---|---|
 | `nova-lite` | `us.amazon.nova-2-lite-v1:0` | $0.30 | $2.50 | $0.001 |
 
-Nova 2 Pro is a **Gated Preview** (no GA SLA, 100 RPM, limited regions). Nova 2 Lite prices images at a fixed **230 tokens/image** regardless of resolution.
+Nova 2 Lite prices images at a fixed **230 tokens/image** regardless of resolution.
 
 ### Textract + LLM (2-phase)
 

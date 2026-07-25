@@ -3,7 +3,7 @@ title: System architecture
 description: How ONE IDP is deployed on AWS.
 ---
 
-ONE IDP runs as a monorepo with three deployable tiers: a CloudFront-fronted SPA, an App Runner backend, and a Bedrock AgentCore runtime for the Strands agent.
+ONE IDP runs as a monorepo with three deployable tiers: a CloudFront-fronted SPA, an ECS Fargate backend behind an Application Load Balancer, and a Bedrock AgentCore runtime for the Strands agent.
 
 ## Monorepo layout
 
@@ -29,7 +29,7 @@ The reference deployment at `your-domain.example.com` looks like this:
 ```
                      ┌──────────────────────┐
 Route 53 ◄──────────►│  CloudFront          │
-  (A + AAAA)         │  E36RCDEC932TZP      │
+  (A + AAAA)         │  <your-distribution-id>      │
                      │                      │
                      │  /*         → S3     │
                      │  /docs/*    → S3     │
@@ -40,7 +40,7 @@ Route 53 ◄──────────►│  CloudFront          │
                             ├──── /*       ─────►  S3  one-idp-static-dev  (SPA bundle)
                             ├──── /docs/*  ─────►  S3  one-idp-static-dev/docs  (Fumadocs static export)
                             │
-                            └──── /api/*  ──────►  App Runner  one-idp-backend-dev
+                            └──── /api/*  ──────►  ALB ──► ECS Fargate
                                                      │
                                                      │  AgentCore SDK
                                                      ▼
@@ -55,12 +55,12 @@ DynamoDB  one-idp-activity-dev  (PK=userId, SK=timestamp#type, PAY_PER_REQUEST)
 
 | Component | Resource | Purpose |
 |---|---|---|
-| **Edge** | CloudFront distribution `E36RCDEC932TZP` | HTTPS termination, SPA caching, path-based origin routing, 60 s read / 30 s keepalive to App Runner. |
+| **Edge** | CloudFront distribution `<your-distribution-id>` | HTTPS termination, SPA caching, path-based origin routing, 60 s read / 30 s keepalive to the ALB. |
 | **SPA** | S3 `one-idp-static-dev` | Vite-built React bundle at the root. |
 | **Docs** | S3 `one-idp-static-dev/docs/*` | Fumadocs static export (this site). |
-| **API** | App Runner `one-idp-backend-dev` | Express server, pluggable auth, adapters. |
+| **API** | ECS Fargate service behind an ALB | Express server, pluggable auth, adapters. |
 | **Agent** | Bedrock AgentCore Runtime `one_idp_dev-2iwFLG8S4q` | Strands agent with closure-bound tools, HTTP protocol on port 8080. |
-| **Image** | ECR `one-idp-backend` | Multi-arch (amd64 for App Runner + arm64 for AgentCore) via `docker buildx`. |
+| **Image** | ECR `one-idp-backend` | Multi-arch (arm64 for both ECS Fargate and AgentCore) via `docker buildx`. |
 | **Build** | CodeBuild `one-idp-build` | Pulls source.zip from `s3://one-idp-uploads-dev/codebuild/source.zip`, builds and pushes images. |
 | **Uploads** | S3 `one-idp-uploads-dev` | User documents + BDA output prefixes. |
 | **Activity** | DynamoDB `one-idp-activity-dev` | Non-blocking activity tracking (upload/conversation/preview events). |
@@ -72,7 +72,7 @@ Browser  ──HTTPS──►  CloudFront  ──path split──►  S3 /docs  
                                               │
                                               ├── S3 /    (SPA bundle)
                                               │
-                                              └── App Runner /api/*
+                                              └── ALB ──► ECS Fargate /api/*
                                                         │
                                                         ├─ auth middleware (cognito|none)
                                                         ├─ rate limit
@@ -126,7 +126,7 @@ npx cdk deploy -c projectName=one-idp -c environment=dev -c authProvider=cognito
 
 ## Environment variables
 
-Backend (App Runner):
+Backend (ECS Fargate):
 
 | Var | Default | Purpose |
 |---|---|---|
@@ -141,4 +141,4 @@ Backend (App Runner):
 | `AGENTCORE_RUNTIME_ARN` | — | Preferred path for conversation endpoint. |
 | `ADMIN_USERS` | `your-alias` | Comma-separated aliases with admin access. |
 
-See [Deploy](/deploy) for the full procedure, and [Authentication](/auth) for the auth matrix.
+See [Deploy](/docs/deploy) for the full procedure, and [Authentication](/docs/auth) for the auth matrix.

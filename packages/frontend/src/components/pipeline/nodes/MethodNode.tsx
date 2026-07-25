@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { MethodNodeConfig, MethodFamily } from '@idp/shared';
-import { METHOD_INFO } from '@idp/shared';
+import { METHOD_INFO, countOf } from '@idp/shared';
 import Box from '@cloudscape-design/components/box';
 import Badge from '@cloudscape-design/components/badge';
 import Spinner from '@cloudscape-design/components/spinner';
@@ -61,7 +61,7 @@ export default memo(function MethodNode({ data }: { data: MethodNodeData }) {
       {capabilities.length > 0 && (
         <div style={{ marginTop: '8px', borderTop: nodeDivider, paddingTop: '6px' }}>
           <Box variant="small" color="text-body-secondary" fontWeight="bold">
-            {capabilities.length} capabilities:
+            {countOf(capabilities.length, 'capability')}:
           </Box>
           <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {capabilities.filter(Boolean).map((cap: string) => (

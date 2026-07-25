@@ -142,8 +142,24 @@ function selectMethod(
    * NOT included — see VIDEO_CAPABLE_FAMILIES; all 7 tiers reject the block.
    */
   if (documentType === 'audio') {
+    /*
+     * Audio is BDA-only, and this filter is DELIBERATELY not a soft preference.
+     *
+     * The `if (length > 0)` idiom used by the other media/format filters means "prefer
+     * these, but keep the rest rather than route nothing". That is wrong for audio: when
+     * BDA is unconfigured the remaining candidate was Pegasus — rated `good` at
+     * audio_transcription because it transcribes the audio track OF A VIDEO — and its
+     * API takes a video media source, so a bare .mp3 fails inside the adapter. "Can
+     * transcribe speech" and "can accept an audio container" are different questions and
+     * the capability rating only answers the first.
+     *
+     * Returning undefined reports the capability as unroutable, which is the truth and
+     * is what the caller already knows how to surface. A method node that cannot run is
+     * strictly worse: the user pays for a failed run to learn the same thing.
+     */
     const audioCapable = candidates.filter((m) => m.startsWith('bda-'));
-    if (audioCapable.length > 0) candidates = audioCapable;
+    if (audioCapable.length === 0) return undefined;
+    candidates = audioCapable;
   } else if (documentType === 'video') {
     const videoCapable = candidates.filter(
       (m) => m.startsWith('bda-') || VIDEO_CAPABLE_FAMILIES.has(getMethodFamily(m)),

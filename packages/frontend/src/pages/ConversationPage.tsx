@@ -8,7 +8,7 @@ import Button from '@cloudscape-design/components/button';
 import Box from '@cloudscape-design/components/box';
 import Alert from '@cloudscape-design/components/alert';
 import type { UploadResponse, Capability } from '@idp/shared';
-import { isModelBackedCapability, WORKFLOW_STEPS, stepSubtitle} from '@idp/shared';
+import { isModelBackedCapability, WORKFLOW_STEPS, stepSubtitle, countOf } from '@idp/shared';
 import ChatPanel from '../components/conversation/ChatPanel';
 import CapabilityCards from '../components/conversation/CapabilityCards';
 import PreviewComparison from '../components/conversation/PreviewComparison';
@@ -182,7 +182,7 @@ export default function ConversationPage({
               <SpaceBetween direction="horizontal" size="s">
                 {!preview && !isPreviewLoading && (
                   <Button onClick={handleRunPreview}>
-                    Run quick preview ({selectedCapabilities.length} capabilities)
+                    Run quick preview ({countOf(selectedCapabilities.length, 'capability')})
                   </Button>
                 )}
                 {/*
@@ -290,7 +290,7 @@ export default function ConversationPage({
               </div>
             )}
             <Box textAlign="center" padding={{ top: 'xs' }} color="text-body-secondary" fontSize="body-s">
-              {document.fileName} | {document.pageCount} pages | {(document.fileSize / 1024).toFixed(1)} KB
+              {document.fileName} · {countOf(document.pageCount, 'page')} · {(document.fileSize / 1024).toFixed(1)} KB
             </Box>
           </Container>
         </Grid>

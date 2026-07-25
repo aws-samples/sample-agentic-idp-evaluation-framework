@@ -5,7 +5,7 @@ ecr_image_tag = "latest"
 
 # Custom domain (optional; leave empty to use CloudFront default domain)
 # Example: "idp.example.com" — the Route53 hosted zone must already exist.
-# AWS internal note: for *.people.aws.dev, the zone is pre-created per alias.
+# If your organisation pre-creates a hosted zone per user, the zone already exists.
 domain_name      = ""
 route53_zone_id  = ""
 

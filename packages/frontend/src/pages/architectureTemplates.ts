@@ -97,11 +97,29 @@ function tsAssignmentsLiteral(methodMap: Map<ProcessingMethod, Capability[]>): s
   return `{\n${parts.join(',\n')},\n}`;
 }
 
+/**
+ * Model ids that are genuinely Bedrock foundation models or inference profiles.
+ *
+ * `METHOD_INFO[m].modelId` is a routing key, not always a Bedrock model id: Guardrails
+ * carries `bedrock-guardrails-apply`, the SageMaker OCR methods carry
+ * `sagemaker:unlimited-ocr`, and BDA carries `us.data-automation-v1`. Concatenating
+ * those into `arn:aws:bedrock:…::foundation-model/<id>` produced ARNs for models that
+ * do not exist — and the `sagemaker:` one contains a colon, so it was a malformed ARN
+ * that CloudFormation rejects outright. The IAM policy is only ever used to grant
+ * `bedrock:InvokeModel`, so anything that is not invoked that way is excluded here and
+ * granted by its own scoped statement instead.
+ */
 function modelIdsInUse(methodMap: Map<ProcessingMethod, Capability[]>): string[] {
   const ids = new Set<string>();
+  const CONVERSE_FAMILIES = new Set(['claude', 'nova', 'gpt', 'bda-llm', 'textract-llm']);
   for (const m of methodMap.keys()) {
     const info = METHOD_INFO[m];
-    if (info?.modelId) ids.add(info.modelId);
+    if (!info?.modelId) continue;
+    if (!CONVERSE_FAMILIES.has(info.family)) continue;
+    // Belt and braces: a routing key would produce a malformed ARN.
+    if (info.modelId.includes(':') && !/^[a-z0-9.-]+\.[a-z0-9-]+-v\d+:\d+$/.test(info.modelId)
+        && !info.modelId.startsWith('us.')) continue;
+    ids.add(info.modelId);
   }
   return Array.from(ids);
 }
@@ -946,11 +964,39 @@ async function runTextractLlm(method: string, docBytes: Buffer, fileName: string
 
 // ─── Dispatcher ──────────────────────────────────────────────────────────
 
-function familyOf(method: string): 'bda' | 'bda-llm' | 'textract-llm' | 'direct' {
-  if (method === 'bda-standard' || method === 'bda-custom') return 'bda';
-  if (method.startsWith('bda-')) return 'bda-llm';
-  if (method.startsWith('textract-')) return 'textract-llm';
-  return 'direct';
+/*
+ * Emitted from the catalog rather than re-derived from the method id.
+ *
+ * The previous version guessed the family from an id prefix and recognised only three
+ * of the catalog's ten families, so everything else fell through to \`'direct'\` — a
+ * plain Bedrock Converse call. Nine of the 29 methods were affected: nova-embeddings,
+ * bedrock-guardrails, twelvelabs-pegasus and all six sagemaker-ocr models. None of them
+ * is a Converse model, so the generated project failed at runtime with an opaque
+ * Bedrock error rather than saying what was wrong.
+ */
+const METHOD_FAMILIES: Record<string, string> = ${JSON.stringify(
+    Object.fromEntries([...methodMap.keys()].map((m) => [m, METHOD_INFO[m].family])),
+    null,
+    2,
+  ).replace(/\n/g, '\n')};
+
+/** Families this generated project has a runner for. */
+type RunnableFamily = 'bda' | 'bda-llm' | 'textract-llm' | 'direct';
+
+function familyOf(method: string): RunnableFamily | 'unsupported' {
+  const family = METHOD_FAMILIES[method];
+  if (family === 'bda') return 'bda';
+  if (family === 'bda-llm') return 'bda-llm';
+  if (family === 'textract-llm') return 'textract-llm';
+  // Converse-compatible text/vision models.
+  if (family === 'claude' || family === 'nova' || family === 'gpt') return 'direct';
+  /*
+   * Everything else needs an invocation path this template does not emit:
+   * embeddings (InvokeModel), guardrails (ApplyGuardrail), video-understanding
+   * (InvokeModel + S3 media source), sagemaker-ocr (InvokeEndpoint). Naming that is
+   * far more useful than silently calling Converse and failing.
+   */
+  return 'unsupported';
 }
 
 export async function processDocument(docBytes: Buffer, fileName: string, s3Uri?: string): Promise<PipelineResult> {
@@ -971,8 +1017,15 @@ export async function processDocument(docBytes: Buffer, fileName: string, s3Uri?
         out.methods[method] = ${families.has('bda-llm') ? 'await runBdaLlm(method, s3Uri, caps)' : 'await runDirectLlm(method, docBytes, fileName, caps)'};
       } else if (family === 'textract-llm') {
         out.methods[method] = ${families.has('textract-llm') ? 'await runTextractLlm(method, docBytes, fileName, caps, s3Uri)' : 'await runDirectLlm(method, docBytes, fileName, caps)'};
-      } else {
+      } else if (family === 'direct') {
         out.methods[method] = await runDirectLlm(method, docBytes, fileName, caps);
+      } else {
+        throw new Error(
+          \`\${method} (family "\${METHOD_FAMILIES[method]}") needs an invocation path this \`
+          + \`generated project does not include. Embeddings, Guardrails, video models and \`
+          + \`self-hosted SageMaker OCR each use a different API than Bedrock Converse. \`
+          + \`Re-generate with a Converse-compatible method, or add the runner by hand.\`,
+        );
       }
     } catch (err) {
       out.methods[method] = {
@@ -1204,8 +1257,15 @@ ${usesTextract ? `
         allowMethods: apigw.Cors.ALL_METHODS,
       },
     });
-    const process = api.root.addResource('process');
-    process.addMethod('POST', new apigw.LambdaIntegration(processorFn, { proxy: true }), {
+    /*
+     * NOT named \`process\`: this block reads \`process.env.BDA_PROFILE_ARN\` above, and a
+     * \`const process\` anywhere in the same block puts the global in a temporal dead
+     * zone for the whole block — so \`cdk synth\` died with
+     * "ReferenceError: Cannot access 'process' before initialization" before it emitted
+     * a single resource. The generated project did not build at all.
+     */
+    const processResource = api.root.addResource('process');
+    processResource.addMethod('POST', new apigw.LambdaIntegration(processorFn, { proxy: true }), {
       requestValidator: new apigw.RequestValidator(this, 'BodyValidator', {
         restApi: api,
         validateRequestBody: true,
@@ -1314,12 +1374,18 @@ export async function handler(event: Event): Promise<APIGatewayProxyResultV2 | v
 }
 
 export function generateCdkAppEntry(): string {
+  /*
+   * Must NOT import `@idp/shared`: that is this repo's internal workspace package. It
+   * is not (and cannot be) a dependency of the downloaded project, so `npm install`
+   * followed by `cdk deploy` failed with an unresolved import. It was not even used —
+   * PRODUCT_NAME is interpolated at generation time below, not imported at runtime.
+   */
   return `#!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { IdpStack } from '../lib/idp-stack.js';
-import { PRODUCT_NAME } from '@idp/shared';
 
+// Generated by ${PRODUCT_NAME}.
 const app = new cdk.App();
 new IdpStack(app, 'IdpStack', {
   env: {

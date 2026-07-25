@@ -169,3 +169,34 @@ describe('video is routable', () => {
     for (const m of methods) expect(METHOD_INFO[m]).toBeTruthy();
   });
 });
+
+/**
+ * Pegasus must never be selected for a bare audio file.
+ *
+ * It is rated `good` at audio_transcription — correctly, because it transcribes the audio
+ * track OF A VIDEO — so it appeared among the audio candidates. With BDA unconfigured it
+ * was the only survivor, and the audio filter's `if (length > 0)` soft-preference kept it:
+ * a pipeline whose single node fails inside the adapter, because the Pegasus API takes a
+ * video media source. "Can transcribe speech" and "can accept an audio container" are
+ * different questions.
+ *
+ * The fix returns undefined instead, so the capability reports as unroutable rather than
+ * charging the user for a run that cannot succeed.
+ */
+describe('audio never routes to a video-only model', () => {
+  it('reports unroutable rather than selecting Pegasus when BDA is unavailable', () => {
+    for (const capability of ['audio_transcription', 'audio_summarization'] as const) {
+      for (const optimizeFor of STRATEGIES) {
+        const methods = methodsFor('audio', capability, optimizeFor);
+        expect(
+          methods,
+          `${capability}/${optimizeFor} must not include a video-only model`,
+        ).not.toContain('twelvelabs-pegasus');
+        // Whatever IS selected must be able to accept an audio container.
+        for (const method of methods) {
+          expect(method.startsWith('bda-'), `${capability}/${optimizeFor} -> ${method}`).toBe(true);
+        }
+      }
+    }
+  });
+});
