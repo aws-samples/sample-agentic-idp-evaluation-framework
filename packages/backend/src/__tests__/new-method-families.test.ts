@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { METHODS, METHOD_INFO, METHOD_FAMILIES, getSupportLevel } from '@idp/shared';
-import { isMethodConfigured } from '../services/method-availability.js';
+import { isMethodConfigured, getMethodAvailability } from '../services/method-availability.js';
 import { PROCESSOR_FACTORY_FOR_TEST } from '../routes/preview.js';
 
 const SAGEMAKER = METHODS.filter((m) => m.startsWith('sagemaker-'));
@@ -86,6 +86,31 @@ describe('new method families are wired end to end', () => {
     for (const cap of ['kv_extraction', 'document_summarization', 'pii_detection'] as const) {
       const level = getSupportLevel(method, cap);
       expect(level ?? 'none', `${cap} must not be claimed by a raw OCR model`).toBe('none');
+    }
+  });
+
+  it('never offers Pegasus for a document — it has no document input path', () => {
+    /*
+     * Pegasus takes TEXT + VIDEO only. The format gate excluded non-video methods FROM
+     * video but had no converse rule, so Pegasus was offered on every PDF and image
+     * upload: it ran, was billed, and could not have said anything useful about a
+     * document it cannot see. Being video-capable and document-capable are independent.
+     */
+    for (const extension of ['pdf', 'png', 'jpg', 'docx', 'csv']) {
+      const r = getMethodAvailability('twelvelabs-pegasus', { extension });
+      expect(r.available, `pegasus must not run on .${extension}`).toBe(false);
+      expect(r.reason, extension).toBe('unsupported-format');
+      expect(r.detail, extension).toMatch(/video only/i);
+    }
+  });
+
+  it('still offers Pegasus for video', () => {
+    // The exclusion must not overshoot into the case it exists to serve.
+    for (const extension of ['mp4', 'mov']) {
+      expect(
+        getMethodAvailability('twelvelabs-pegasus', { extension }).available,
+        `pegasus for .${extension}`,
+      ).toBe(true);
     }
   });
 

@@ -32,6 +32,17 @@ const VIDEO_EXTENSIONS = new RegExp(`\\.(${Object.keys(CONVERSE_VIDEO_FORMATS).j
 const VIDEO_CAPABLE_FAMILIES: ReadonlySet<string> = new Set(['nova', 'video-understanding']);
 
 /**
+ * Families that can read ONLY video — nothing else.
+ *
+ * Pegasus takes TEXT + VIDEO inputs (per the catalog); it has no document or image
+ * path at all. The gate below excluded non-video methods FROM video but had no
+ * converse rule, so Pegasus was offered for every PDF and image: it ran, was billed,
+ * and produced nothing useful about a document it could not see. Being video-capable
+ * and being document-capable are independent properties and both need checking.
+ */
+const VIDEO_ONLY_FAMILIES: ReadonlySet<string> = new Set(['video-understanding']);
+
+/**
  * Single source of truth for "can this method run right now, and if not, why?".
  *
  * This logic used to be copy-pasted into /preview, /pipeline and /process with
@@ -241,6 +252,21 @@ export function getMethodAvailability(
         available: false,
         reason: 'unsupported-format',
         detail: `${METHOD_INFO[method].name} cannot read video. Use a multimodal LLM or a Bedrock Data Automation method.`,
+      };
+    }
+    /*
+     * The converse rule: a video-only model must not be offered for a document.
+     *
+     * Without this, Pegasus was run on every PDF and image upload — a real charge for
+     * a model that has no document input path, so the result could only ever be
+     * useless. The video gate above is not symmetric on its own.
+     */
+    if (!VIDEO_EXTENSIONS.test(`.${ext}`) && VIDEO_ONLY_FAMILIES.has(METHOD_INFO[method].family)) {
+      return {
+        method,
+        available: false,
+        reason: 'unsupported-format',
+        detail: `${METHOD_INFO[method].name} reads video only — it has no document or image input path. Upload a video to compare it.`,
       };
     }
 

@@ -42,6 +42,19 @@ function MetricRow({
   );
 }
 
+/**
+ * One capability's extracted value, as a string ExtractionView can render.
+ *
+ * A capability's `data` is already HTML, CSV, JSON or text depending on the
+ * capability's default format, so a string passes through untouched and anything
+ * structured is pretty-printed rather than stringified onto one line.
+ */
+function formatCapabilityData(data: unknown): string {
+  if (data == null) return '';
+  if (typeof data === 'string') return data;
+  return JSON.stringify(data, null, 2);
+}
+
 interface PreviewComparisonProps {
   preview: PreviewResponse;
   selectedMethod: string;
@@ -58,10 +71,36 @@ export default function PreviewComparison({
   onBuildPipeline,
   isStreaming = false,
 }: PreviewComparisonProps) {
-  const [showRaw, setShowRaw] = useState<string | null>(null);
+  /*
+   * The output panel shows the SELECTED method, not an independently-toggled one.
+   *
+   * `showRaw` used to be its own piece of state, so the panel and the selection drifted
+   * apart: you could have GPT-5.6 Luna selected while the panel was headed
+   * "Opus 4.7 — extracted output". The card you picked and the output you were reading
+   * were different models, which makes the comparison actively misleading — you would
+   * judge one model's extraction and then build a pipeline with another.
+   *
+   * Now the panel is derived from `selectedMethod`, and the per-card control only
+   * expands/collapses it. Selecting a card therefore switches the output to that card.
+   */
   const completedResults = preview.results.filter((r) => r.status === 'complete');
   const selectedName = preview.results.find((m) => m.method === selectedMethod)?.shortName;
-  const shownResult = completedResults.find((r) => r.method === showRaw) ?? null;
+  const shownResult = completedResults.find((r) => r.method === selectedMethod) ?? null;
+
+  /*
+   * Which capability's output is on screen.
+   *
+   * The panel used to dump every capability's result into one blob, so with
+   * table_extraction AND bounding_box requested you could not tell which one you were
+   * looking at — the header said "extracted output" and the body began
+   * "table_extraction: format: html..." only if you happened to notice. Capabilities
+   * are separate answers and get separate tabs.
+   */
+  const [activeCapability, setActiveCapability] = useState<string | null>(null);
+  const shownCapabilities = shownResult ? Object.keys(shownResult.results) : [];
+  const activeCap = activeCapability && shownCapabilities.includes(activeCapability)
+    ? activeCapability
+    : shownCapabilities[0] ?? null;
 
   return (
     <Container
@@ -72,7 +111,7 @@ export default function PreviewComparison({
           description={
             isStreaming
               ? 'Results are still arriving — methods appear here as each one finishes. You can select one already.'
-              : "Select a card to choose the method to build your pipeline with. Confidence is self-reported by each model, so use 'View output' to judge the extraction yourself."
+              : 'Select a method to build your pipeline with — its extracted output appears below. Confidence is self-reported by each model, so judge the extraction itself.'
           }
           actions={
             // Label states the target instead of "selected method": the button used
@@ -101,21 +140,69 @@ export default function PreviewComparison({
                 },
                 width: 180,
               },
-              ...completedResults.map((r) => ({
-                id: r.method,
-                header: r.shortName,
-                cell: (item: { capability: string; [key: string]: unknown }) => {
-                  const capResult = r.results[item.capability];
-                  if (!capResult) return <Box color="text-body-secondary">-</Box>;
-                  return (
-                    <div style={{ fontSize: '12px' }}>
-                      <StatusIndicator type={capResult.confidence > 0.7 ? 'success' : capResult.confidence > 0.4 ? 'warning' : 'error'}>
-                        {Math.round(capResult.confidence * 100)}%
-                      </StatusIndicator>
-                    </div>
-                  );
-                },
-              })),
+              /*
+                One column per method, and the SELECTED one is marked.
+                
+                Without this the table was a wall of percentages with no indication of
+                which method you had chosen — you could read "Bounding Box 0%" without
+                realising it was the column you were about to build a pipeline with.
+                The header is also a button, because this table is where the per-capability
+                evidence lives, so it should be possible to choose from here rather than
+                having to scroll to the cards and match names up.
+              */
+              ...completedResults.map((r) => {
+                const isSel = r.method === selectedMethod;
+                return {
+                  id: r.method,
+                  header: (
+                    <button
+                      type="button"
+                      onClick={() => onMethodSelect(r.method)}
+                      title={isSel ? `${r.shortName} is selected` : `Select ${r.shortName}`}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        font: 'inherit',
+                        color: isSel ? token.link : 'inherit',
+                        fontWeight: isSel ? 700 : 'inherit',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      {isSel && <span aria-hidden="true">✓</span>}
+                      {r.shortName}
+                    </button>
+                  ) as unknown as string,
+                  cell: (item: { capability: string; [key: string]: unknown }) => {
+                    const capResult = r.results[item.capability];
+                    const content = !capResult
+                      ? <Box color="text-body-secondary">-</Box>
+                      : (
+                        <StatusIndicator type={capResult.confidence > 0.7 ? 'success' : capResult.confidence > 0.4 ? 'warning' : 'error'}>
+                          {Math.round(capResult.confidence * 100)}%
+                        </StatusIndicator>
+                      );
+                    return (
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          // Tint the whole selected column so the eye can follow it down
+                          // the rows without re-reading the header each time.
+                          background: isSel ? token.surfaceSelected : undefined,
+                          fontWeight: isSel ? 600 : undefined,
+                          margin: '-4px -8px',
+                          padding: '4px 8px',
+                        }}
+                      >
+                        {content}
+                      </div>
+                    );
+                  },
+                };
+              }),
             ]}
             items={preview.capabilities.map((cap) => ({ capability: cap }))}
             trackBy="capability"
@@ -239,50 +326,66 @@ export default function PreviewComparison({
                       <MetricRow label="OCR confidence (measured)" value={`${Math.round(r.ocrConfidence * 100)}%`} />
                     )}
                   </div>
-
-                  {/*
-                    Opens the viewer BELOW the grid, not inside this card. Expanding
-                    it in place gave a ~240px-wide column to a wide extracted table
-                    and stretched one card to several times the height of its
-                    neighbours, wrecking the side-by-side comparison the grid exists
-                    for.
-                  */}
-                  {/*
-                    stopPropagation: the card itself is now a radio, so without this
-                    "View output" would also change the selection — inspecting a
-                    method's extraction would silently commit you to it.
-                  */}
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    <Button
-                      variant="inline-link"
-                      onClick={() => setShowRaw(showRaw === r.method ? null : r.method)}
-                      iconName={showRaw === r.method ? 'angle-up' : 'angle-down'}
-                    >
-                      {showRaw === r.method ? 'Hide output' : 'View output'}
-                    </Button>
-                  </div>
                 </SpaceBetween>
               </div>
             );
           })}
         </div>
 
-        {/* Full-width output viewer for the selected card. */}
+        {/*
+          Output for the SELECTED method, one capability at a time.
+
+          Always rendered (not conditional on a separate toggle) so the panel and the
+          highlighted card can never disagree about which model you are looking at.
+        */}
         {shownResult && (
           <div className="idp-stream-in">
             <ExpandableSection
               variant="container"
               defaultExpanded
               headerText={`${shownResult.shortName} — extracted output`}
-              headerDescription="Rendered from the model's response. Switch to Source to see it verbatim."
+              headerDescription={
+                shownCapabilities.length > 1
+                  ? `${shownCapabilities.length} capabilities extracted. Pick one below; switch to Source for the verbatim response.`
+                  : "Rendered from the model's response. Switch to Source to see it verbatim."
+              }
             >
-              <ExtractionView
-                data={shownResult.rawOutput || JSON.stringify(shownResult.results, null, 2)}
-                maxHeight={480}
-              />
+              {shownCapabilities.length > 1 ? (
+                <Tabs
+                  activeTabId={activeCap ?? undefined}
+                  onChange={({ detail }) => setActiveCapability(detail.activeTabId)}
+                  tabs={shownCapabilities.map((cap) => {
+                    const info = CAPABILITY_INFO[cap as keyof typeof CAPABILITY_INFO];
+                    const capResult = shownResult.results[cap];
+                    return {
+                      id: cap,
+                      // Name + confidence per tab: with two capabilities the useful
+                      // question is "which of these did it do well", and that was
+                      // unanswerable from one merged blob.
+                      label: `${info?.name ?? cap}${
+                        capResult?.confidence != null
+                          ? ` (${Math.round(capResult.confidence * 100)}%)`
+                          : ''
+                      }`,
+                      content: (
+                        <ExtractionView
+                          data={formatCapabilityData(capResult?.data)}
+                          maxHeight={480}
+                        />
+                      ),
+                    };
+                  })}
+                />
+              ) : (
+                <ExtractionView
+                  data={
+                    activeCap
+                      ? formatCapabilityData(shownResult.results[activeCap]?.data)
+                      : shownResult.rawOutput || JSON.stringify(shownResult.results, null, 2)
+                  }
+                  maxHeight={480}
+                />
+              )}
             </ExpandableSection>
           </div>
         )}
