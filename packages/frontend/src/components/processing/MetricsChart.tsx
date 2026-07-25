@@ -4,8 +4,9 @@ import Header from '@cloudscape-design/components/header';
 import Container from '@cloudscape-design/components/container';
 import SegmentedControl from '@cloudscape-design/components/segmented-control';
 import Box from '@cloudscape-design/components/box';
-import { METHOD_INFO, getMethodFamily } from '@idp/shared';
+import { METHOD_INFO, getMethodFamily , METHOD_FAMILIES } from '@idp/shared';
 import type { ComparisonResult, MethodFamily } from '@idp/shared';
+import { FAMILY_COLORS, FAMILY_LABELS } from '../../theme/family-colors';
 
 interface MetricsChartProps {
   comparison: ComparisonResult | null;
@@ -29,28 +30,16 @@ export default function MetricsChart({ comparison }: MetricsChartProps) {
   const items = comparison.methods;
 
   // Color mapping by family
-  const familyColors: Record<MethodFamily, string> = {
-    bda: '#0972d3',
-    'bda-llm': '#0891b2',
-    claude: '#8b5cf6',
-    nova: '#ec7211',
-    gpt: '#10a37f',
-    'textract-llm': '#037f0c',
-    embeddings: '#2563eb',
-    guardrails: '#d13212',
-  };
 
-  // Group by family for multiple series
-  const familyGroups: Record<MethodFamily, typeof items> = {
-    bda: [],
-    'bda-llm': [],
-    claude: [],
-    nova: [],
-    gpt: [],
-    'textract-llm': [],
-    embeddings: [],
-    guardrails: [],
-  };
+  /*
+    Group by family, derived from METHOD_FAMILIES rather than an inline literal.
+    The literal listed 8 families and silently became incomplete when two more were
+    added — a missing key here means a whole family's results vanish from the chart
+    with no error, so the accumulator is now built from the catalog itself.
+  */
+  const familyGroups = Object.fromEntries(
+    METHOD_FAMILIES.map((f) => [f, [] as typeof items]),
+  ) as Record<MethodFamily, typeof items>;
 
   for (const item of items) {
     const family = getMethodFamily(item.method);
@@ -70,7 +59,7 @@ export default function MetricsChart({ comparison }: MetricsChartProps) {
       .map(([family, methods]) => ({
         title: family,
         type: 'bar' as const,
-        color: familyColors[family as MethodFamily],
+        color: FAMILY_COLORS[family as MethodFamily],
         data: methods.map((m) => ({
           x: METHOD_INFO[m.method]?.shortName ?? m.method,
           y: Number((m.metrics.latencyMs / 1000).toFixed(1)),
@@ -81,7 +70,7 @@ export default function MetricsChart({ comparison }: MetricsChartProps) {
       .map(([family, methods]) => ({
         title: family,
         type: 'bar' as const,
-        color: familyColors[family as MethodFamily],
+        color: FAMILY_COLORS[family as MethodFamily],
         data: methods.map((m) => ({
           x: METHOD_INFO[m.method]?.shortName ?? m.method,
           y: Number(m.metrics.cost.toFixed(4)),
@@ -92,7 +81,7 @@ export default function MetricsChart({ comparison }: MetricsChartProps) {
       .map(([family, methods]) => ({
         title: family,
         type: 'bar' as const,
-        color: familyColors[family as MethodFamily],
+        color: FAMILY_COLORS[family as MethodFamily],
         data: methods.map((m) => ({
           x: METHOD_INFO[m.method]?.shortName ?? m.method,
           y: Number((m.metrics.confidence * 100).toFixed(0)),

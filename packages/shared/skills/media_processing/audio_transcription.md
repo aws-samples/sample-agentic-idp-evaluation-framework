@@ -10,9 +10,9 @@ tags: ["audio", "transcript", "speech", "speaker", "wav", "mp3", "flac"]
 exampleInput: "Customer support call recording (WAV/MP3)"
 exampleOutput: "Timestamped transcript with speaker labels (spk_0, spk_1)"
 support:
-  bda: "excellent"
+  bda: "limited"
   bda-llm: "excellent"
-  nova: "excellent"
+  video-understanding: "good"
 ---
 
 # Audio Transcription
@@ -37,6 +37,6 @@ Returns structured JSON with typed fields.
 
 ## Method support
 
-- **bda**: excellent
+- **bda**: limited
 - **bda-llm**: excellent
-- **nova**: excellent
+- **video-understanding**: good

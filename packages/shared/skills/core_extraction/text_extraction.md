@@ -16,6 +16,7 @@ support:
   gpt: "excellent"
   nova: "good"
   textract-llm: "excellent"
+  sagemaker-ocr: "excellent"
 ---
 
 # Text Extraction
@@ -45,3 +46,4 @@ Returns plain text with preserved structure and formatting.
 - **claude**: excellent
 - **nova**: good
 - **textract-llm**: excellent
+- **sagemaker-ocr**: excellent

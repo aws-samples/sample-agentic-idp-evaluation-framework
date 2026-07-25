@@ -6,6 +6,8 @@
  * This is the 3rd cost optimization: response length optimization.
  */
 
+import { catalogMaxOutputTokens } from '@idp/shared';
+
 const MEDIA_CAPABILITIES = new Set([
   'video_summarization',
   'video_chapter_extraction',
@@ -19,23 +21,31 @@ export function isMediaCapability(cap: string): boolean {
 }
 
 /**
- * Per-model output-token ceilings, verified live against Bedrock Converse
- * (us-west-2). Requesting more than a model allows is a hard ValidationException
- * ("The maximum tokens you requested exceeds the model limit of N"), so the
- * budget must be clamped per model rather than to one global constant.
+ * Conservative ceiling for a model the catalog does not describe.
  *
- * Every model currently routed to accepts 64,000, so this map is empty — but it
- * stays as the single place to record a lower ceiling. Nova 1 Pro used to sit
- * here at 10,000 before it was removed from the catalog; a future model with a
- * smaller output limit belongs here rather than in a caller.
+ * Applies to the non-Converse entries — BDA, Guardrails, and the GPT tiers served
+ * through Mantle — none of which publish an output ceiling in the Bedrock catalog.
+ * 64,000 is the lowest ceiling among the Converse models we route to, so it is
+ * safe for anything unknown.
  */
-const MODEL_MAX_OUTPUT_TOKENS: Record<string, number> = {};
-
 const DEFAULT_MODEL_MAX = 64_000;
 
+/**
+ * Output-token ceiling for a model. Requesting more than a model allows is a hard
+ * ValidationException ("The maximum tokens you requested exceeds the model limit
+ * of N"), so the budget must be clamped per model rather than to one constant.
+ *
+ * Ceilings come from the committed Bedrock catalog snapshot via generated code
+ * (`MODEL_MAX_OUTPUT_TOKENS`), not from a hand-maintained map. The map here used
+ * to be EMPTY, with a comment asserting "every model currently routed to accepts
+ * 64,000" — true when written, but unverifiable without re-reading the docs by
+ * hand, and it left the Opus tiers and Sonnet 5 bounded at 64,000 when they accept
+ * 128,000. It is also one id away from a real trap: `amazon.nova-lite-v1:0`
+ * (Nova 1, still in the catalog) caps at 5,120, so a future edit routing to it
+ * would have requested 64,000 and failed outright.
+ */
 export function modelMaxOutputTokens(modelId?: string): number {
-  if (!modelId) return DEFAULT_MODEL_MAX;
-  return MODEL_MAX_OUTPUT_TOKENS[modelId] ?? DEFAULT_MODEL_MAX;
+  return catalogMaxOutputTokens(modelId) ?? DEFAULT_MODEL_MAX;
 }
 
 /**

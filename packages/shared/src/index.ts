@@ -61,8 +61,12 @@ export {
   getCapabilitiesByCategory,
   searchCapabilities,
   isModelBackedCapability,
+  CAPABILITY_UNAVAILABLE_REASON,
+  getUnavailableReason,
   filterModelBackedCapabilities,
 } from './types/capabilities.js';
+export type { RunStage, RunStageInfo, RunStageInput } from './types/runs.js';
+export { getRunStage } from './types/runs.js';
 export {
   DOCUMENT_TYPES,
   DOCUMENT_TYPE_INFO,
@@ -78,13 +82,18 @@ export {
   getMethodFamily,
   getMethodsByFamily,
   getBestMethodsForCapability,
+  getSupportLevel,
+  CAPABILITY_SUPPORT_OVERRIDES,
   isMethodLanguageCompatible,
+  TYPICAL_PAGE_TOKENS,
+  estimateCostPerPage,
 } from './types/processing.js';
 export {
   CONVERSE_API_LIMITS,
   BDA_LIMITS,
   BDA_STANDARD_OUTPUT,
   TEXTRACT_LIMITS,
+  TEXTRACT_PAGE_PRICING,
   METHOD_CONSTRAINTS,
   getMethodConstraints,
   getMethodLimitsSummary,
@@ -127,3 +136,11 @@ export type {
   DocumentClassSchema,
   DocumentFieldSchema,
 } from './schemas/index.js';
+
+// Model output ceilings, generated from the committed Bedrock catalog snapshot.
+export { MODEL_MAX_OUTPUT_TOKENS, catalogMaxOutputTokens } from './generated/model-limits.js';
+
+// Script detection from extracted text, so non-English routing does not depend on
+// the advisor interview having run.
+export { detectScripts } from './utils/script-detect.js';
+export type { ScriptDetection } from './utils/script-detect.js';

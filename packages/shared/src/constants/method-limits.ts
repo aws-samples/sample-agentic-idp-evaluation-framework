@@ -170,18 +170,51 @@ export const BDA_STANDARD_OUTPUT = {
 
 // ─── Textract ───────────────────────────────────────────────────────────────
 
+/**
+ * Textract price per page.
+ *
+ * Textract pricing is NOT flat: `AnalyzeDocument` costs up to 43x plain OCR
+ * depending on the FeatureTypes requested. Both `TEXTRACT_LIMITS` entries below
+ * once read `0.0015`, with the AnalyzeDocument one even *labelled* "$/page for
+ * AnalyzeDocument" — which is in fact the DetectDocumentText price.
+ *
+ * **This app deliberately uses DetectDocumentText only.** In a Textract+LLM
+ * pipeline the LLM does the structuring, so paying for TABLES/FORMS detection and
+ * then discarding it is waste; Guardrails likewise only needs a flat string of
+ * text. The analyzeDocument figures are retained for the cost-comparison
+ * documentation and to keep the trade-off explicit — nothing in the codebase
+ * issues those calls.
+ *
+ * Cross-checked against the AWS Solutions Library IDP accelerator's centralized
+ * pricing table (config_library/pricing.yaml, MIT-0). Verify against the Textract
+ * pricing page for the deployment region before quoting.
+ */
+export const TEXTRACT_PAGE_PRICING = {
+  /** DetectDocumentText — plain OCR. The only Textract API this app calls. */
+  detectText: 0.0015,
+  /** AnalyzeDocument, per feature combination. Reference only; not called here. */
+  analyzeDocument: {
+    LAYOUT: 0.004,
+    SIGNATURES: 0.0035,
+    TABLES: 0.015,
+    FORMS: 0.05,
+    'TABLES+FORMS': 0.065,
+  },
+} as const;
+
 export const TEXTRACT_LIMITS = {
   analyzeDocument: {
     maxFileSizeMB: 10,
     maxPageCount: 1, // single page per call
     supportedFormats: ['jpeg', 'png', 'pdf', 'tiff'],
     features: ['TABLES', 'FORMS', 'SIGNATURES', 'LAYOUT'] as const,
-    pricing: 0.0015, // $/page for AnalyzeDocument
+    /** Reference price for the cheapest analysis feature; not used at runtime. */
+    pricing: TEXTRACT_PAGE_PRICING.analyzeDocument.LAYOUT,
   },
   detectText: {
     maxFileSizeMB: 10,
     supportedFormats: ['jpeg', 'png', 'pdf', 'tiff'],
-    pricing: 0.0015, // $/page
+    pricing: TEXTRACT_PAGE_PRICING.detectText, // $/page, plain OCR
   },
   startDocumentAnalysis: {
     maxFileSizeMB: 500,

@@ -18,7 +18,13 @@ export interface MethodResult {
   rawOutput?: string;
   latencyMs: number;
   estimatedCost?: number;
+  /** Mean confidence the MODEL reported about its own output. */
   confidence?: number;
+  /**
+   * Mean OCR confidence measured by Textract, for two-stage methods only.
+   * The one confidence figure here that is not self-reported.
+   */
+  ocrConfidence?: number;
   tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
   error?: string;
 }
@@ -35,6 +41,24 @@ export interface PreviewResponse {
   capabilities: Capability[];
   methods: MethodInfo[];
   results: MethodResult[];
+  /**
+   * Server-side run id, emitted with `preview_start`. Persisted by App so a
+   * preview run stays recoverable from DynamoDB after a refresh.
+   */
+  runId?: string;
+  /**
+   * Writing systems detected in the extracted text, when the advisor interview did
+   * not already supply a language.
+   *
+   * This exists because non-English routing was silently dependent on the
+   * interview: `isMethodLanguageCompatible` correctly excludes BDA and
+   * Textract+LLM for non-Latin documents, but it only fires when
+   * `documentLanguages` is populated, and only the interview populated it. A user
+   * who clicked "Skip questions" had a Korean document routed to methods that
+   * measured 32-42% recall against known content.
+   */
+  detectedLanguages?: string[];
+  detectedScripts?: string[];
 }
 
 export interface UsePreviewResult {
@@ -44,8 +68,14 @@ export interface UsePreviewResult {
   runPreview: (documentId: string, s3Uri: string, capabilities: Capability[], userInstruction?: string, documentLanguages?: string[]) => Promise<void>;
 }
 
-export function usePreview(): UsePreviewResult {
-  const [preview, setPreview] = useState<PreviewResponse | null>(null);
+/**
+ * @param initialPreview Previously completed preview to start from, so a page
+ *   refresh shows the results that were already paid for instead of silently
+ *   re-running every method. App persists this; without it, reloading
+ *   /conversation re-billed all ~19 methods on every refresh.
+ */
+export function usePreview(initialPreview?: PreviewResponse | null): UsePreviewResult {
+  const [preview, setPreview] = useState<PreviewResponse | null>(initialPreview ?? null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -98,11 +128,22 @@ export function usePreview(): UsePreviewResult {
                 capabilities: event.capabilities,
                 methods: event.methods,
                 results: [],
+                runId: event.runId,
               };
               setPreview({ ...currentPreview });
             } else if (event.type === 'method_result' && currentPreview) {
               currentPreview.results.push(event as MethodResult);
-              setPreview({ ...currentPreview });
+              // New array identity, not just a new wrapper: consumers memoise on
+              // `results`, and mutating the same array in place meant a pushed
+              // result could be missed until the next event forced a re-render.
+              setPreview({ ...currentPreview, results: [...currentPreview.results] });
+            } else if (event.type === 'languages_detected' && currentPreview) {
+              currentPreview.detectedLanguages = event.data?.languages;
+              currentPreview.detectedScripts = event.data?.scripts;
+              setPreview({ ...currentPreview, results: [...currentPreview.results] });
+            } else if (event.type === 'preview_done' && currentPreview) {
+              if (event.runId) currentPreview.runId = event.runId;
+              setPreview({ ...currentPreview, results: [...currentPreview.results] });
             } else if (event.type === 'preview_error') {
               throw new Error(event.error);
             }

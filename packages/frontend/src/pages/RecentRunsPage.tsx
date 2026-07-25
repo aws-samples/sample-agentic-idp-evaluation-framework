@@ -7,6 +7,7 @@ import Button from '@cloudscape-design/components/button';
 import Badge from '@cloudscape-design/components/badge';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
+import { getRunStage, type RunStage } from '@idp/shared';
 import Alert from '@cloudscape-design/components/alert';
 import Toggle from '@cloudscape-design/components/toggle';
 import Container from '@cloudscape-design/components/container';
@@ -24,6 +25,11 @@ interface RunSummary {
   methods: string[];
   timestamp: string;
   status: 'complete' | 'error';
+  /**
+   * How far the run got, derived server-side. `status` alone reported a
+   * preview-only run and a finished evaluation both as "complete".
+   */
+  stage?: RunStage;
   source: 'preview' | 'pipeline';
   fileType?: string;
   fileSize?: number;
@@ -258,28 +264,59 @@ export default function RecentRunsPage({ onLoadRun, isAdmin = false, embedded = 
     },
     {
       id: 'status',
-      header: 'Status',
-      cell: (item: RunSummary) => (
-        <StatusIndicator type={item.status === 'complete' ? 'success' : 'error'}>
-          {item.status === 'complete' ? 'Complete' : 'Error'}
-        </StatusIndicator>
-      ),
-      width: 110,
+      header: 'Progress',
+      // Reports what the run actually contains, not just success/failure: a
+      // preview-only run and a finished evaluation were both labelled "Complete",
+      // so the list mixed complete and incomplete work with no way to tell them
+      // apart. `getRunStage` derives this from the record, so old runs classify
+      // correctly too.
+      cell: (item: RunSummary) => {
+        const info = getRunStage(item);
+        return (
+          <SpaceBetween size="xxs">
+            <StatusIndicator
+              type={
+                info.stage === 'failed' ? 'error'
+                  : info.isComplete ? 'success'
+                    : 'in-progress'
+              }
+            >
+              {info.label}
+            </StatusIndicator>
+            {info.stage !== 'failed' && (
+              <Box fontSize="body-s" color="text-body-secondary">
+                {`reached step ${info.step} of 4`}
+              </Box>
+            )}
+          </SpaceBetween>
+        );
+      },
+      width: 150,
     },
     {
       id: 'actions',
       header: 'Actions',
-      cell: (item: RunSummary) => (
-        <Button
-          variant="inline-link"
-          onClick={() => handleLoadRun(item.runId)}
-          loading={loadingRunId === item.runId}
-          disabled={loadingRunId !== null}
-        >
-          Load results
-        </Button>
-      ),
-      width: 130,
+      // The label states where you land, because "Load results" gave no clue
+      // which step would open — and for an incomplete run the useful action is to
+      // continue it, not to view it.
+      cell: (item: RunSummary) => {
+        const info = getRunStage(item);
+        if (info.stage === 'failed') {
+          return <Box fontSize="body-s" color="text-body-secondary">No results</Box>;
+        }
+        return (
+          <Button
+            variant={info.isComplete ? 'inline-link' : 'normal'}
+            iconName={info.isComplete ? undefined : 'redo'}
+            onClick={() => handleLoadRun(item.runId)}
+            loading={loadingRunId === item.runId}
+            disabled={loadingRunId !== null}
+          >
+            {info.resumeLabel}
+          </Button>
+        );
+      },
+      width: 190,
     },
   ];
 

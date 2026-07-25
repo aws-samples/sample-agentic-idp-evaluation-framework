@@ -15,7 +15,7 @@ support:
   claude: "excellent"
   gpt: "excellent"
   nova: "good"
-  textract-llm: "excellent"
+  textract-llm: "good"
 ---
 
 # Receipt Parsing
@@ -44,4 +44,4 @@ Returns structured JSON with typed fields.
 - **bda-llm**: excellent
 - **claude**: excellent
 - **nova**: good
-- **textract-llm**: excellent
+- **textract-llm**: good

@@ -14,8 +14,9 @@ support:
   bda-llm: "excellent"
   claude: "excellent"
   gpt: "excellent"
-  nova: "excellent"
+  nova: "good"
   textract-llm: "excellent"
+  sagemaker-ocr: "good"
 ---
 
 # Handwriting Recognition
@@ -43,5 +44,6 @@ Returns plain text with preserved structure and formatting.
 - **bda**: excellent
 - **bda-llm**: excellent
 - **claude**: excellent
-- **nova**: excellent
+- **nova**: good
 - **textract-llm**: excellent
+- **sagemaker-ocr**: good

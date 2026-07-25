@@ -9,6 +9,7 @@ import type {
   ProcessorResult,
   CapabilityResult,
 } from '@idp/shared';
+import { CAPABILITY_INFO, filterModelBackedCapabilities } from '@idp/shared';
 import { generatePipeline } from '../services/pipeline-generator.js';
 import { buildComparison } from '../services/comparison.js';
 import { aggregateResults, type AggregationStrategy, type MethodContribution } from '../services/aggregator.js';
@@ -46,6 +47,15 @@ import {
   TextractNovaLiteProcessor,
 } from '../processors/textract-llm.js';
 import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
+import { TwelveLabsPegasusProcessor } from '../processors/pegasus.js';
+import {
+  SageMakerInfinityParser2Processor,
+  SageMakerBaiduOcrProcessor,
+  SageMakerSuryaOcrProcessor,
+  SageMakerChandraOcrProcessor,
+  SageMakerDotsOcrProcessor,
+  SageMakerQwen3VlProcessor,
+} from '../processors/sagemaker-ocr.js';
 import { combineUpstreamText } from '../services/pipeline-text-extractor.js';
 import { trackRunResults } from '../services/activity-tracker.js';
 import { randomUUID } from 'crypto';
@@ -74,6 +84,16 @@ const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Re
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
   'textract-nova-lite': () => new TextractNovaLiteProcessor(),
   'bedrock-guardrails': () => new BedrockGuardrailsProcessor(),
+  // Purpose-built video understanding (InvokeModel + inference profile).
+  'twelvelabs-pegasus': () => new TwelveLabsPegasusProcessor(),
+  // Specialist OCR on self-hosted SageMaker endpoints. Registered so they can run
+  // when configured; availability gating reports them unavailable until then.
+  'sagemaker-infinity-parser2': () => new SageMakerInfinityParser2Processor(),
+  'sagemaker-baidu-ocr': () => new SageMakerBaiduOcrProcessor(),
+  'sagemaker-surya-ocr': () => new SageMakerSuryaOcrProcessor(),
+  'sagemaker-chandra-ocr': () => new SageMakerChandraOcrProcessor(),
+  'sagemaker-dots-ocr': () => new SageMakerDotsOcrProcessor(),
+  'sagemaker-qwen3-vl': () => new SageMakerQwen3VlProcessor(),
 };
 
 function estimatePageCount(buffer: Buffer): number {
@@ -99,6 +119,36 @@ router.post('/generate', (req, res) => {
       return;
     }
 
+    // Reject unknown capability ids up front.
+    //
+    // An id that is not in the catalog has no candidate methods, so selectMethod
+    // returned undefined and generation died deep inside layout with
+    // "Cannot read properties of undefined (reading 'shortName')" — surfaced to
+    // the caller as an opaque HTTP 500. A bad request should say which id is bad.
+    const unknownCapabilities = request.capabilities.filter(
+      (c) => !(c in CAPABILITY_INFO),
+    );
+    if (unknownCapabilities.length > 0) {
+      res.status(400).json({
+        error: `Unknown capabilities: ${unknownCapabilities.join(', ')}`,
+      });
+      return;
+    }
+
+    // Capabilities with no model support (pdf_conversion, format_standardization,
+    // knowledge_base_ingestion) are preprocessing/reference entries — no method
+    // can be assigned to them, which is the same crash by another route.
+    const routable = filterModelBackedCapabilities(request.capabilities);
+    if (routable.length === 0) {
+      res.status(400).json({
+        error:
+          'None of the requested capabilities can be performed by a processing method. '
+          + 'Preprocessing capabilities run as pipeline steps, not as model extractions.',
+      });
+      return;
+    }
+    request.capabilities = routable;
+
     if (!request.optimizeFor) {
       request.optimizeFor = 'balanced';
     }
@@ -109,12 +159,25 @@ router.post('/generate', (req, res) => {
 
     const response: PipelineGenerateResponse = generatePipeline(request);
 
+    if (response.skippedCapabilities?.length) {
+      console.log(
+        `[Pipeline] skipped ${response.skippedCapabilities.map((s) => s.capability).join(', ')}`,
+      );
+    }
+
     res.json(response);
   } catch (err) {
+    // "nothing routable" is a client-correctable request, not a server fault.
+    // It reaches here when every requested capability maps only to methods this
+    // deployment cannot run (e.g. embedding_generation alone, where Nova
+    // Multimodal Embeddings is region-limited and has no processor).
+    const message = err instanceof Error ? err.message : 'Pipeline generation failed';
+    if (/^No processing method supports/.test(message)) {
+      res.status(400).json({ error: message });
+      return;
+    }
     console.error('[Pipeline Generation Error]', err);
-    res.status(500).json({
-      error: err instanceof Error ? err.message : 'Pipeline generation failed',
-    });
+    res.status(500).json({ error: message });
   }
 });
 

@@ -31,6 +31,31 @@ new OneIdpStack(app, `${projectName}-${environment}`, {
   manageGuardrail: app.node.tryGetContext('manageGuardrail') !== 'false',
   bedrockGuardrailId: app.node.tryGetContext('bedrockGuardrailId') ?? '',
   bedrockGuardrailVersion: app.node.tryGetContext('bedrockGuardrailVersion') ?? 'DRAFT',
+  /*
+   * Run history stays OFF unless explicitly enabled.
+   *
+   * `-c disableRunHistory=false` turns it on, and should only be used on a
+   * deployment with real per-user authentication. With authProvider 'none' every
+   * visitor shares one alias, so a shared run list is document disclosure between
+   * strangers plus cross-contamination of one person's evaluation with another's
+   * file. Enforced server-side; the UI hiding is cosmetic.
+   */
+  disableRunHistory: app.node.tryGetContext('disableRunHistory') !== 'false',
+  /*
+   * Specialist OCR endpoints, opt-in. Pass only the ones you have deployed, e.g.
+   *   -c sagemakerOcrInfinity=multi-ocr-infinity-parser2
+   * Each is a GPU endpoint billed hourly even when idle (~$2.24-$7.09/hr), so an
+   * unset entry leaves the method reporting "not configured" instead of failing.
+   */
+  sagemakerOcrEndpoints: {
+    SAGEMAKER_OCR_INFINITY: app.node.tryGetContext('sagemakerOcrInfinity') ?? '',
+    SAGEMAKER_OCR_BAIDU: app.node.tryGetContext('sagemakerOcrBaidu') ?? '',
+    SAGEMAKER_OCR_SURYA: app.node.tryGetContext('sagemakerOcrSurya') ?? '',
+    SAGEMAKER_OCR_CHANDRA: app.node.tryGetContext('sagemakerOcrChandra') ?? '',
+    SAGEMAKER_OCR_DOTS: app.node.tryGetContext('sagemakerOcrDots') ?? '',
+    SAGEMAKER_OCR_QWEN3VL: app.node.tryGetContext('sagemakerOcrQwen3Vl') ?? '',
+  },
+  sagemakerOcrCostPerPage: app.node.tryGetContext('sagemakerOcrCostPerPage') ?? '',
 });
 
 app.synth();

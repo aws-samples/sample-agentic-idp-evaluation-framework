@@ -14,7 +14,8 @@ support:
   bda-llm: "good"
   claude: "excellent"
   gpt: "excellent"
-  nova: "excellent"
+  nova: "good"
+  sagemaker-ocr: "limited"
 ---
 
 # Image & Chart Analysis
@@ -42,4 +43,5 @@ Returns structured JSON with typed fields.
 - **bda**: good
 - **bda-llm**: good
 - **claude**: excellent
-- **nova**: excellent
+- **nova**: good
+- **sagemaker-ocr**: limited

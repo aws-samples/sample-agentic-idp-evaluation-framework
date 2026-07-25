@@ -125,6 +125,16 @@ export interface PipelineGenerateResponse {
   pipeline: PipelineDefinition;
   alternatives: PipelineDefinition[];
   rationale: string;
+  /**
+   * Capabilities that were requested but could not be assigned to any runnable
+   * method in this deployment, with the reason.
+   *
+   * Reported rather than silently dropped: `embedding_generation` and
+   * `knowledge_base_ingestion` map only to Nova Multimodal Embeddings, which has
+   * no processor and is not offered in every region, so a user who selects one
+   * would otherwise see it vanish from the pipeline with no explanation.
+   */
+  skippedCapabilities?: Array<{ capability: string; reason: string }>;
 }
 
 // ─── Pipeline Execution ───────────────────────────────────────────────────────

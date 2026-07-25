@@ -12,6 +12,12 @@ interface StepGateProps {
   actionLabel?: string;
   /** Where the primary action goes. Defaults to the upload step. */
   actionHref?: string;
+  /**
+   * Heading above the message. Defaults to the "prerequisite missing" wording;
+   * override it when the situation is not a missing prerequisite (e.g. a 404,
+   * where "Nothing to show yet" would misdescribe the problem).
+   */
+  heading?: string;
 }
 
 /**
@@ -26,6 +32,7 @@ export default function StepGate({
   message,
   actionLabel = 'Upload a document',
   actionHref = '/',
+  heading = 'Nothing to show yet',
 }: StepGateProps) {
   const navigate = useNavigate();
 
@@ -36,7 +43,7 @@ export default function StepGate({
           <Box color="text-status-inactive">
             <FileUp size={40} strokeWidth={1.25} aria-hidden="true" />
           </Box>
-          <Box variant="h3" color="text-body-secondary">Nothing to show yet</Box>
+          <Box variant="h3" color="text-body-secondary">{heading}</Box>
           <Box color="text-body-secondary" fontSize="body-m">{message}</Box>
           <Button variant="primary" onClick={() => navigate(actionHref)}>
             {actionLabel}

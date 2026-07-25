@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  applyOutputCap,
   calculateMaxTokens,
   clampToCeiling,
   isMediaCapability,
@@ -72,16 +73,34 @@ describe('calculateMaxTokens', () => {
 });
 
 describe('per-model output ceilings', () => {
-  // Every model in the current catalog accepts 64000 output tokens, so no
-  // clamp entries are needed today. These tests pin the clamp MECHANISM, which
-  // exists because a model with a lower ceiling hard-fails with
+  // Ceilings now come from the committed Bedrock catalog snapshot via generated
+  // code, replacing a hand-maintained map that was empty behind a flat 64000
+  // default. These tests pin both the sourced values and the clamp MECHANISM,
+  // which exists because a model with a lower ceiling hard-fails with
   // "The maximum tokens you requested exceeds the model limit of N"
   // (Nova 1 Pro did exactly that at 10000 before it was removed).
-  it('defaults to 64000 for every model we route to', () => {
-    expect(modelMaxOutputTokens('us.anthropic.claude-opus-5')).toBe(64_000);
-    expect(modelMaxOutputTokens('us.amazon.nova-2-lite-v1:0')).toBe(64_000);
+  it('reads each model real ceiling from the catalog', () => {
+    // Opus tiers and Sonnet 5 accept 128k; the flat default understated them.
+    expect(modelMaxOutputTokens('us.anthropic.claude-opus-5')).toBe(128_000);
+    expect(modelMaxOutputTokens('us.anthropic.claude-sonnet-5')).toBe(128_000);
+    // Resolves the cross-region "us." profile prefix to the bare catalog id.
+    expect(modelMaxOutputTokens('us.amazon.nova-2-lite-v1:0')).toBe(65_536);
+  });
+
+  it('falls back to the conservative default for models the catalog omits', () => {
+    // GPT via Mantle, BDA and Guardrails publish no output ceiling. 64000 is the
+    // lowest ceiling among the Converse models we route to, so it is safe.
     expect(modelMaxOutputTokens('openai.gpt-5.6-sol')).toBe(64_000);
+    expect(modelMaxOutputTokens('us.data-automation-v1')).toBe(64_000);
     expect(modelMaxOutputTokens(undefined)).toBe(64_000);
+  });
+
+  it('knows Nova 1 Lite is far more constrained than the default', () => {
+    // The trap the empty map was one edit away from: amazon.nova-lite-v1:0 (Nova 1,
+    // still in the catalog) caps at 5120, so routing to it under a flat 64000
+    // default would have hard-failed every call.
+    expect(modelMaxOutputTokens('amazon.nova-lite-v1:0')).toBe(5_120);
+    expect(calculateMaxTokens(5, 2, 'yaml', false, 'amazon.nova-lite-v1:0')).toBe(5_120);
   });
 
   it('clamps a large request down to the ceiling', () => {
@@ -104,11 +123,24 @@ describe('per-model output ceilings', () => {
 
   it('gives Claude models the full budget', () => {
     expect(calculateMaxTokens(1, 1, 'yaml', false, 'us.anthropic.claude-opus-5')).toBe(16_384);
-    expect(calculateMaxTokens(15, 10, 'json', false, 'us.anthropic.claude-opus-5')).toBe(64_000);
+    // (4000*15 + 2000*10)*1.3 = 104000, now bounded by Opus 5's real 128k ceiling
+    // rather than clamped to the old flat 64000.
+    expect(calculateMaxTokens(15, 10, 'json', false, 'us.anthropic.claude-opus-5')).toBe(104_000);
   });
 
   it('gives Nova 2 Lite the full budget', () => {
     expect(calculateMaxTokens(5, 2, 'yaml', false, 'us.amazon.nova-2-lite-v1:0')).toBe(24_000);
+  });
+
+  it('a caller cap still bounds a model with a high ceiling', () => {
+    // Sourcing real ceilings raised Opus 5's bound from 64k to 128k, which would
+    // reintroduce the runaway-generation stall (one method emitted 16.6k tokens and
+    // held a 161s preview) if the preview cap depended on the model ceiling. It
+    // does not: every adapter wraps calculateMaxTokens in applyOutputCap, so the
+    // caller's ceiling wins. This pins that ordering.
+    const budget = calculateMaxTokens(15, 10, 'json', false, 'us.anthropic.claude-opus-5');
+    expect(budget).toBe(104_000);
+    expect(applyOutputCap(budget, 32_000)).toBe(32_000);
   });
 });
 

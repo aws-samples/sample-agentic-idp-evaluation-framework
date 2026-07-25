@@ -1,5 +1,5 @@
 import { Construct } from 'constructs';
-import { Duration } from 'aws-cdk-lib';
+import { Duration, Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -32,6 +32,26 @@ export interface EcsBackendProps {
   readonly bedrockGuardrailVersion?: string;
   readonly bedrockGuardrailArn?: string;
   readonly cloudfrontSecret: string;
+  /**
+   * Disable stored run history (Recent Runs + the resume banner).
+   *
+   * MUST be true for a shared or public deployment: with authProvider 'none' every
+   * visitor resolves to the same alias, so one shared run list would let any visitor
+   * open and read documents another person uploaded. Enforced in the backend (403 on
+   * the run endpoints), not merely hidden in the UI. Defaults to true.
+   */
+  readonly disableRunHistory?: boolean;
+  /**
+   * Endpoint NAME per specialist OCR method, keyed by backend env var
+   * (SAGEMAKER_OCR_INFINITY, _BAIDU, _SURYA, _CHANDRA, _DOTS, _QWEN3VL).
+   *
+   * Opt-in and empty by default. These are self-hosted SageMaker endpoints on GPU
+   * instances billed hourly even when idle (~$2.24-$7.09/hr each), so an unset entry
+   * makes the method report "not configured" rather than being silently offered.
+   */
+  readonly sagemakerOcrEndpoints?: Record<string, string>;
+  /** Per-image cost override for the OCR stage; GPU-hours, not tokens. */
+  readonly sagemakerOcrCostPerPage?: string;
 }
 
 /**
@@ -113,6 +133,27 @@ export class EcsBackendConstruct extends Construct {
         resources: ['*'],
       }),
     );
+    /*
+     * Specialist OCR endpoints (self-hosted SageMaker), granted ONLY when configured.
+     *
+     * sagemaker:InvokeEndpoint is a different service action from anything Bedrock,
+     * and it is scoped to the specific endpoint ARNs rather than '*'. A deployment
+     * that never enables these carries no SageMaker permission at all — withholding
+     * the grant is what makes an accidental call impossible rather than merely
+     * unintended, the same reasoning applied to the expensive Textract APIs below.
+     */
+    const ocrEndpointNames = Object.values(props.sagemakerOcrEndpoints ?? {}).filter(Boolean);
+    if (ocrEndpointNames.length > 0) {
+      this.taskRole.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ['sagemaker:InvokeEndpoint'],
+          resources: ocrEndpointNames.map(
+            (name) => `arn:aws:sagemaker:${props.region}:${Stack.of(this).account}:endpoint/${name}`,
+          ),
+        }),
+      );
+    }
+
     // OpenAI GPT models (GPT-5.6 / 5.5) are served via the Bedrock Mantle
     // OpenAI Responses API, which authorizes against the separate
     // `bedrock-mantle` service action (bedrock-mantle:CreateInference), NOT
@@ -138,12 +179,13 @@ export class EcsBackendConstruct extends Construct {
     this.taskRole.addToPolicy(
       new iam.PolicyStatement({
         actions: [
-          'textract:AnalyzeDocument',
+          // Text detection ONLY. The paid analysis APIs (AnalyzeDocument /
+          // StartDocumentAnalysis, AnalyzeExpense, AnalyzeID) are deliberately not
+          // granted: the Textract stage is plain OCR at $0.0015/page and the LLM
+          // does the structuring, so those calls would cost up to 43x more per
+          // page for output that is discarded. Withholding the permission makes an
+          // accidental expensive call impossible rather than merely unintended.
           'textract:DetectDocumentText',
-          'textract:AnalyzeExpense',
-          'textract:AnalyzeID',
-          'textract:StartDocumentAnalysis',
-          'textract:GetDocumentAnalysis',
           'textract:StartDocumentTextDetection',
           'textract:GetDocumentTextDetection',
         ],
@@ -208,7 +250,16 @@ export class EcsBackendConstruct extends Construct {
       AGENTCORE_RUNTIME_ARN: props.agentRuntimeArn,
       ACTIVITY_TABLE: props.activityTable.tableName,
       CLOUDFRONT_SECRET: props.cloudfrontSecret,
+      // Default ON: the unsafe configuration (shared alias, shared history) is also
+      // the default one, so history must be off unless explicitly enabled.
+      DISABLE_RUN_HISTORY: String(props.disableRunHistory ?? true),
     };
+    for (const [envName, endpoint] of Object.entries(props.sagemakerOcrEndpoints ?? {})) {
+      if (endpoint) runtimeEnv[envName] = endpoint;
+    }
+    if (props.sagemakerOcrCostPerPage) {
+      runtimeEnv.SAGEMAKER_OCR_COST_PER_PAGE = props.sagemakerOcrCostPerPage;
+    }
     if (props.adminUsers) runtimeEnv.ADMIN_USERS = props.adminUsers;
     if (props.cognitoUserPoolId) runtimeEnv.COGNITO_USER_POOL_ID = props.cognitoUserPoolId;
     if (props.cognitoClientId) runtimeEnv.COGNITO_CLIENT_ID = props.cognitoClientId;

@@ -4,6 +4,8 @@ import type { DocumentInputConfig } from '@idp/shared';
 import Box from '@cloudscape-design/components/box';
 import Badge from '@cloudscape-design/components/badge';
 import { getPipelineIcon } from '../../common/icons';
+import { nodeBorderColor, nodeDivider, NODE_STATUS_COLORS } from './node-style';
+import { token } from '../../../theme/tokens';
 
 interface DocumentInputData {
   config: DocumentInputConfig;
@@ -16,22 +18,15 @@ export default memo(function DocumentInputNode({ data }: { data: DocumentInputDa
   const state = data.state;
   const fileName = data.fileName;
 
-  const getBorderColor = () => {
-    switch (state) {
-      case 'active': return '#0972d3';
-      case 'complete': return '#037f0c';
-      case 'error': return '#d91515';
-      default: return '#7d8998';
-    }
-  };
 
   return (
     <div
       style={{
         padding: '12px',
         borderRadius: '8px',
-        border: `2px solid ${getBorderColor()}`,
-        background: '#ffffff',
+        border: `2px solid ${nodeBorderColor(state)}`,
+        background: token.surface,
+        color: token.text,
         width: '180px',
         boxShadow: state === 'active' ? '0 0 10px rgba(9, 114, 211, 0.5)' : '0 2px 4px rgba(0,0,0,0.1)',
         animation: state === 'active' ? 'pulse 2s infinite' : 'none',
@@ -63,7 +58,7 @@ export default memo(function DocumentInputNode({ data }: { data: DocumentInputDa
         </div>
       )}
 
-      <Handle type="source" position={Position.Right} style={{ background: '#0972d3' }} />
+      <Handle type="source" position={Position.Right} style={{ background: NODE_STATUS_COLORS.active }} />
     </div>
   );
 });

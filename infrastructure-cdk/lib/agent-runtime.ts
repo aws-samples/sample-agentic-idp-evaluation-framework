@@ -122,10 +122,10 @@ export class AgentRuntimeConstruct extends Construct {
       new iam.PolicyStatement({
         sid: 'TextractAccess',
         actions: [
-          'textract:AnalyzeDocument',
+          // Text detection only — see the note in ecs-backend.ts.
           'textract:DetectDocumentText',
-          'textract:AnalyzeExpense',
-          'textract:AnalyzeID',
+          'textract:StartDocumentTextDetection',
+          'textract:GetDocumentTextDetection',
         ],
         resources: ['*'],
       }),

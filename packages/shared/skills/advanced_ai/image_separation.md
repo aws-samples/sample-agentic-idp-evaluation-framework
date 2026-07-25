@@ -10,9 +10,6 @@ tags: ["image", "extract", "separate", "figure", "chart", "embedded", "ocr"]
 exampleInput: "PDF with embedded product photos and charts"
 exampleOutput: "Individual images extracted with captions and page locations"
 support:
-  bda: "excellent"
-  textract: "excellent"
-  nova: "excellent"
 ---
 
 # Image Separation
@@ -37,6 +34,3 @@ Returns structured JSON with typed fields.
 
 ## Method support
 
-- **bda**: excellent
-- **textract**: excellent
-- **nova**: excellent

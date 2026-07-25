@@ -12,9 +12,11 @@ import { isModelBackedCapability } from '@idp/shared';
 import ChatPanel from '../components/conversation/ChatPanel';
 import CapabilityCards from '../components/conversation/CapabilityCards';
 import PreviewComparison from '../components/conversation/PreviewComparison';
+import PreviewProgress from '../components/conversation/PreviewProgress';
 import { useConversation } from '../hooks/useConversation';
 import { usePreview, type PreviewResponse } from '../hooks/usePreview';
 import StepGate from '../components/common/StepGate';
+import { token } from '../theme/tokens';
 
 interface ConversationPageProps {
   document: UploadResponse | null;
@@ -22,6 +24,10 @@ interface ConversationPageProps {
   onCapabilitiesSelected: (caps: Capability[]) => void;
   onStartProcessing: (preferredMethod?: string, preview?: PreviewResponse | null) => void;
   onDocumentLanguagesDetected?: (languages: string[]) => void;
+  /** Preview restored from persisted state, if this document already has one. */
+  previewData?: PreviewResponse | null;
+  /** Called when a preview run finishes, so the result can be persisted. */
+  onPreviewComplete?: (preview: PreviewResponse) => void;
 }
 
 export default function ConversationPage({
@@ -30,13 +36,18 @@ export default function ConversationPage({
   onCapabilitiesSelected,
   onStartProcessing,
   onDocumentLanguagesDetected,
+  previewData = null,
+  onPreviewComplete,
 }: ConversationPageProps) {
   const { messages, recommendations, documentLanguages, isStreaming, error, sendMessage } = useConversation(
     document?.documentId ?? null,
     document?.s3Uri,
   );
 
-  const { preview, isLoading: isPreviewLoading, error: previewError, runPreview } = usePreview();
+  // Seed from the persisted preview so a refresh restores results already paid
+  // for. Without this the auto-run effect below saw `preview === null` and
+  // re-billed every method on every reload of this page.
+  const { preview, isLoading: isPreviewLoading, error: previewError, runPreview } = usePreview(previewData);
   const [selectedMethod, setSelectedMethod] = useState<string>('');
 
   const autoPreviewDone = useRef(false);
@@ -63,12 +74,24 @@ export default function ConversationPage({
     }
   }, [recommendations, selectedCapabilities.length, onCapabilitiesSelected]);
 
-  // Pass detected languages up to parent for pipeline filtering
+  /*
+   * Pass detected languages up to the parent, which feeds them to pipeline routing.
+   *
+   * TWO sources, interview first: the advisor's own analysis when it ran, otherwise
+   * the script detected in the preview's extracted text. The second source exists
+   * because routing correctness was silently conditional on the interview —
+   * `isMethodLanguageCompatible` correctly excludes BDA and Textract+LLM for
+   * non-Latin documents, but nothing populated `documentLanguages` when the user
+   * clicked "Skip questions", so a Korean document was routed to methods measured at
+   * 32-42% recall while Claude and GPT scored 100% on the same page.
+   */
   useEffect(() => {
-    if (documentLanguages && onDocumentLanguagesDetected) {
-      onDocumentLanguagesDetected(documentLanguages);
-    }
-  }, [documentLanguages, onDocumentLanguagesDetected]);
+    if (!onDocumentLanguagesDetected) return;
+    const fromInterview = documentLanguages?.length ? documentLanguages : null;
+    const fromDocument = preview?.detectedLanguages?.length ? preview.detectedLanguages : null;
+    const langs = fromInterview ?? fromDocument;
+    if (langs) onDocumentLanguagesDetected(langs);
+  }, [documentLanguages, preview?.detectedLanguages, onDocumentLanguagesDetected]);
 
   // Auto-run preview once capabilities exist.
   //
@@ -89,6 +112,14 @@ export default function ConversationPage({
       runPreview(document.documentId, document.s3Uri, selectedCapabilities, userInstruction, documentLanguages ?? undefined);
     }
   }, [document, selectedCapabilities, preview, isPreviewLoading, runPreview, userInstruction, documentLanguages]);
+
+  // Persist a finished preview so a refresh restores it rather than re-running.
+  // Guarded on !isPreviewLoading so partial streams are not stored as complete.
+  useEffect(() => {
+    if (preview && !isPreviewLoading && preview.results.length > 0 && onPreviewComplete) {
+      onPreviewComplete(preview);
+    }
+  }, [preview, isPreviewLoading, onPreviewComplete]);
 
   const handleToggleCapability = useCallback(
     (cap: Capability, enabled: boolean) => {
@@ -148,19 +179,18 @@ export default function ConversationPage({
               <SpaceBetween direction="horizontal" size="s">
                 {!preview && !isPreviewLoading && (
                   <Button onClick={handleRunPreview}>
-                    Run Quick Preview ({selectedCapabilities.length} capabilities)
+                    Run quick preview ({selectedCapabilities.length} capabilities)
                   </Button>
                 )}
-                {/* When preview results exist, require method selection; otherwise allow direct pipeline build */}
-                {preview && preview.results.some((r) => r.status === 'complete') ? (
-                  <Button variant="primary" onClick={handleBuildPipeline} disabled={!selectedMethod}>
-                    {selectedMethod
-                      ? `Build Pipeline with ${preview.results.find((m) => m.method === selectedMethod)?.shortName ?? 'selected method'}`
-                      : 'Select a method below'}
-                  </Button>
-                ) : (
+                {/*
+                  Only offer "Build pipeline" here while there is no comparison on
+                  screen. Once preview results exist, the comparison component owns
+                  that action — having both meant two primary buttons for one action,
+                  with different labels, visible at the same time.
+                */}
+                {!preview && !isPreviewLoading && (
                   <Button variant="primary" onClick={handleBuildPipeline}>
-                    Build Pipeline
+                    Build pipeline
                   </Button>
                 )}
               </SpaceBetween>
@@ -235,14 +265,16 @@ export default function ConversationPage({
                 />
               </div>
             ) : isAudio ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f2f3f3', borderRadius: 8 }}>
+              // Token-based surfaces: these placeholder panels hardcoded #f2f3f3,
+              // which stayed light in dark mode with light text on top of it.
+              <div style={{ padding: '40px 20px', textAlign: 'center', background: token.surfaceMuted, borderRadius: 8 }}>
                 <Box variant="h3" color="text-body-secondary" padding={{ bottom: 's' }}>
                   {document.fileName.split('.').pop()?.toUpperCase()} Audio
                 </Box>
                 <audio src={document.previewUrl} controls style={{ width: '100%' }} />
               </div>
             ) : (
-              <div style={{ height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f2f3f3', borderRadius: 8 }}>
+              <div style={{ height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: token.surfaceMuted, borderRadius: 8 }}>
                 <Box variant="h3" color="text-body-secondary">{document.fileName.split('.').pop()?.toUpperCase()}</Box>
                 <Box padding={{ top: 'xs' }} color="text-body-secondary" fontSize="body-s">
                   Preview not available for this file type.
@@ -281,43 +313,46 @@ export default function ConversationPage({
           </Alert>
         )}
 
+        {/*
+          Live fan-out progress.
+
+          Rendered as soon as the run starts, so each method is visibly resolving
+          while the run is in flight. Previously nothing appeared until EVERY
+          method had finished, which made a genuinely parallel 16s run (fastest
+          method 7s) look like 16 seconds of nothing happening.
+        */}
+        {preview && !previewError && (
+          <PreviewProgress preview={preview} isLoading={isPreviewLoading} />
+        )}
+
         {/* All methods failed */}
-        {preview && !previewError && preview.results.every((r) => r.status === 'error') && (
+        {preview && !isPreviewLoading && !previewError
+          && preview.results.length > 0
+          && preview.results.every((r) => r.status === 'error') && (
           <Alert type="warning" header="All preview methods failed">
             {preview.results.map((r) => `${r.shortName}: ${r.error ?? 'Unknown error'}`).join(' | ')}
           </Alert>
         )}
 
-        {/* Preview Results Comparison — only show after ALL methods complete */}
-        {preview && !isPreviewLoading && preview.results.some((r) => r.status === 'complete') && (
-          <>
+        {/*
+          Comparison appears once ANY method has succeeded, rather than waiting for
+          all of them, and streams in additional columns as the rest land.
+
+          The separate "Ready to build your pipeline" CTA container that used to sit
+          below this was removed: the same Build Pipeline button already exists in
+          the page header AND in this component's own header, so the action appeared
+          three times on one screen with three different labels.
+        */}
+        {preview && preview.results.some((r) => r.status === 'complete') && (
+          <div className="idp-stream-in">
             <PreviewComparison
               preview={preview}
               selectedMethod={selectedMethod}
               onMethodSelect={setSelectedMethod}
               onBuildPipeline={handleBuildPipeline}
+              isStreaming={isPreviewLoading}
             />
-
-            {/* Prominent Build Pipeline CTA */}
-            <Container>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
-                <div>
-                  <Box variant="h3">Ready to build your pipeline</Box>
-                  <Box color="text-body-secondary">
-                    Preview analyzed your document with {preview.results.filter(r => r.status === 'complete').length} methods.
-                    {selectedMethod
-                      ? ` Selected: ${preview.results.find((m) => m.method === selectedMethod)?.shortName ?? selectedMethod}.`
-                      : ' Select a method above to continue.'}
-                  </Box>
-                </div>
-                <Button variant="primary" onClick={handleBuildPipeline} iconName="angle-right" disabled={!selectedMethod}>
-                  {selectedMethod
-                    ? `Build Pipeline with ${preview.results.find((m) => m.method === selectedMethod)?.shortName ?? 'selected method'}`
-                    : 'Select a method'}
-                </Button>
-              </div>
-            </Container>
-          </>
+          </div>
         )}
       </SpaceBetween>
     </ContentLayout>

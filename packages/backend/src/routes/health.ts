@@ -12,6 +12,24 @@ router.get('/', (_req, res) => {
   });
 });
 
+/*
+ * Public feature flags the client needs BEFORE it renders anything.
+ *
+ * Lives under /api/health because that router is mounted ahead of the auth
+ * middleware — the client must be able to learn that run history is off without
+ * being authenticated, since on this deployment nobody is.
+ *
+ * Contains no secrets: one boolean about whether stored history is served.
+ */
+router.get('/features', (_req, res) => {
+  res.json({
+    // True on shared deployments, where one alias serves every visitor and stored
+    // runs would leak documents between strangers. The API refuses the run
+    // endpoints in that state; this only lets the UI stop advertising them.
+    runHistoryDisabled: config.disableRunHistory,
+  });
+});
+
 // Detailed health check with environment validation (#23)
 router.get('/detailed', async (_req, res) => {
   const checks: Record<string, { status: 'ok' | 'warning' | 'error'; message: string }> = {};

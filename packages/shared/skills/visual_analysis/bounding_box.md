@@ -11,11 +11,11 @@ exampleInput: "Yearbook page with photos"
 exampleOutput: "[{"label": "face", "x": 120, "y": 45, "w": 80, "h": 100}]"
 support:
   bda: "excellent"
-  bda-llm: "excellent"
-  claude: "good"
-  gpt: "good"
-  nova: "excellent"
-  textract-llm: "good"
+  bda-llm: "good"
+  nova: "limited"
+  claude: "limited"
+  gpt: "limited"
+  sagemaker-ocr: "excellent"
 ---
 
 # Bounding Box Detection
@@ -41,7 +41,8 @@ Returns structured JSON with typed fields.
 ## Method support
 
 - **bda**: excellent
-- **bda-llm**: excellent
-- **claude**: good
-- **nova**: excellent
-- **textract-llm**: good
+- **bda-llm**: good
+- **nova**: limited
+- **claude**: limited
+- **gpt**: limited
+- **sagemaker-ocr**: excellent

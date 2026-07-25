@@ -8,11 +8,13 @@ import ProgressBar from '@cloudscape-design/components/progress-bar';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import Badge from '@cloudscape-design/components/badge';
 import Tabs from '@cloudscape-design/components/tabs';
+import Spinner from '@cloudscape-design/components/spinner';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import type { CapabilityRecommendation, Capability, CapabilityCategory } from '@idp/shared';
 import { CAPABILITY_INFO, CAPABILITY_CATEGORIES, CATEGORY_INFO, isModelBackedCapability } from '@idp/shared';
 import type { PreviewResponse, MethodResult, CapabilityResult } from '../../hooks/usePreview';
-import SafeHtml from '../common/SafeHtml';
+import ExtractionView from '../common/ExtractionView';
+import { token } from '../../theme/tokens';
 
 interface CapabilityCardsProps {
   recommendations: CapabilityRecommendation[];
@@ -23,50 +25,35 @@ interface CapabilityCardsProps {
   preview?: PreviewResponse | null;
 }
 
-function renderExtraction(data: unknown, format: string): React.ReactNode {
-  if (data == null) return <Box color="text-body-secondary" fontSize="body-s">No data extracted</Box>;
+function InlinePreviewResult({
+  capId,
+  preview,
+  isStreaming,
+}: {
+  capId: string;
+  preview: PreviewResponse;
+  isStreaming: boolean;
+}) {
+  const methodResults = preview.results.filter((r) => r.status === 'complete');
+  const pendingCount = preview.methods.length - preview.results.length;
 
-  // HTML tables: sanitize model / extraction output before rendering.
-  if (format === 'html' && typeof data === 'string') {
+  // Nothing has come back yet: say so explicitly. This branch previously rendered
+  // null, so a card that had requested a preview looked identical to one that had
+  // not — no spinner, no "waiting", just an empty card for up to a minute.
+  if (methodResults.length === 0) {
     return (
-      <SafeHtml
-        html={data}
-        profile="table"
-        style={{ fontSize: '12px', maxHeight: '200px', overflow: 'auto', lineHeight: 1.4 }}
-      />
-    );
-  }
-
-  // Text: show as readable text (not code block)
-  if (format === 'text' && typeof data === 'string') {
-    return (
-      <div style={{
-        fontSize: '13px', lineHeight: 1.5, maxHeight: '400px', overflow: 'auto',
-        padding: '8px', background: '#fafafa', borderRadius: '4px',
-        whiteSpace: 'pre-wrap',
-      }}>
-        {data}
+      <div style={{ marginTop: 8, borderTop: `1px solid ${token.borderSubtle}`, paddingTop: 8 }}>
+        <Box color="text-body-secondary" fontSize="body-s">
+          {isStreaming
+            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Spinner size="normal" />
+                Extracting… waiting on {pendingCount} method{pendingCount === 1 ? '' : 's'}
+              </span>
+            : 'No method returned a result for this capability.'}
+        </Box>
       </div>
     );
   }
-
-  // JSON/objects: formatted code block
-  const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-  return (
-    <pre style={{
-      fontSize: '12px', lineHeight: 1.4, margin: 0,
-      maxHeight: '400px', overflow: 'auto',
-      background: '#f8f9fa', padding: '8px', borderRadius: '4px',
-      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-    }}>
-      {text}
-    </pre>
-  );
-}
-
-function InlinePreviewResult({ capId, preview }: { capId: string; preview: PreviewResponse }) {
-  const methodResults = preview.results.filter((r) => r.status === 'complete');
-  if (methodResults.length === 0) return null;
 
   const tabs = methodResults.map((r) => {
     const capResult = r.results[capId] as CapabilityResult | undefined;
@@ -78,17 +65,23 @@ function InlinePreviewResult({ capId, preview }: { capId: string; preview: Previ
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {r.shortName}
           {hasData ? (
-            <span style={{ color: '#037f0c', fontSize: '11px' }}>
+            <span style={{ color: token.textSuccess, fontSize: '11px' }}>
               {capResult.confidence != null ? `${Math.round(capResult.confidence * 100)}%` : ''}
             </span>
           ) : (
-            <span style={{ color: '#9ba7b6', fontSize: '11px' }}>N/A</span>
+            <span style={{ color: token.textInactive, fontSize: '11px' }}>N/A</span>
           )}
         </span>
       ) as unknown as string,
       content: hasData ? (
+        // ExtractionView renders the natural form of the payload (a real table for
+        // an HTML table) with the exact source one click away. Previously an HTML
+        // table was dropped into a 200px box and everything else into a <pre>, so
+        // a table extraction appeared as raw "```yaml / <thead> / <tr> / <th>"
+        // markup — the single worst thing to be unreadable, since it is the result
+        // the whole comparison exists to show.
         <div style={{ padding: '4px 0' }}>
-          {renderExtraction(capResult.data, capResult.format)}
+          <ExtractionView data={capResult.data} format={capResult.format} />
         </div>
       ) : (
         <Box color="text-body-secondary" fontSize="body-s" padding={{ top: 'xs' }}>
@@ -101,10 +94,18 @@ function InlinePreviewResult({ capId, preview }: { capId: string; preview: Previ
   return (
     <div style={{
       marginTop: '8px',
-      borderTop: '1px solid #e9ebed',
+      borderTop: `1px solid ${token.borderSubtle}`,
       paddingTop: '8px',
     }}>
       <Tabs tabs={tabs} />
+      {isStreaming && pendingCount > 0 && (
+        <Box color="text-body-secondary" fontSize="body-s" padding={{ top: 'xs' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Spinner size="normal" />
+            {pendingCount} more method{pendingCount === 1 ? '' : 's'} still running
+          </span>
+        </Box>
+      )}
     </div>
   );
 }
@@ -152,32 +153,14 @@ export default function CapabilityCards({
         Recommended Capabilities
       </Header>
 
-      {/* Preview summary bar */}
-      {preview && !isPreviewLoading && (
-        <div style={{
-          display: 'flex', gap: '16px', flexWrap: 'wrap',
-          padding: '10px 16px', background: '#f0f8ff', borderRadius: '8px', border: '1px solid #d1e4f6',
-        }}>
-          {preview.results.filter((r) => r.status === 'complete').map((r) => (
-            <div key={r.method} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontFamily: "'Open Sans', 'Helvetica Neue', Roboto, Arial, sans-serif" }}>
-              <StatusIndicator type="success">{r.shortName}</StatusIndicator>
-              <span style={{ color: '#5f6b7a', fontVariantNumeric: 'tabular-nums' }}>{r.latencyMs}ms</span>
-              {r.estimatedCost != null && (
-                <span style={{ color: '#037f0c', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                  ~${r.estimatedCost.toFixed(4)}
-                </span>
-              )}
-            </div>
-          ))}
-          {preview.results.filter((r) => r.status === 'error').map((r) => (
-            <div key={r.method} style={{ fontSize: '13px', maxWidth: '300px' }}>
-              <StatusIndicator type="error">
-                {r.shortName}: {(r.error ?? 'Error').substring(0, 50)}
-              </StatusIndicator>
-            </div>
-          ))}
-        </div>
-      )}
+      {/*
+        The per-method summary bar that used to sit here has been removed.
+        PreviewProgress (rendered directly above this component) already lists every
+        method with its latency and status, so this repeated the same chip list a
+        second time on one screen — and repeated each failure message truncated to
+        50 characters, which is where the nine identical
+        "…exceeded the 60s preview limit and w" fragments came from.
+      */}
 
       {CAPABILITY_CATEGORIES.map((category) => {
         const items = groupedByCategory[category];
@@ -259,21 +242,51 @@ export default function CapabilityCards({
                   },
                   {
                     id: 'relevance',
-                    header: 'Relevance Score',
-                    content: (item) => (
-                      <ProgressBar
-                        value={item.relevance * 100}
-                        status="in-progress"
-                        resultText={`${Math.round(item.relevance * 100)}%`}
-                      />
-                    ),
+                    content: (item) => {
+                      // Rounded before it reaches the bar. Cloudscape renders the
+                      // raw `value` as the visible label, so `0.55 * 100` printed
+                      // "55.00000000000001%" on the card.
+                      const pct = Math.round(item.relevance * 100);
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Box variant="awsui-key-label">Relevance</Box>
+                          {/* A slim bar rather than a full ProgressBar per card:
+                              with 6+ cards on screen the stacked bars dominated
+                              the layout while carrying one number each. */}
+                          <div
+                            style={{
+                              flex: 1, height: 4, borderRadius: 2,
+                              background: token.borderSubtle, overflow: 'hidden',
+                            }}
+                            role="img"
+                            aria-label={`Relevance ${pct} percent`}
+                          >
+                            <div style={{
+                              width: `${pct}%`, height: '100%',
+                              background: token.borderSelected,
+                            }} />
+                          </div>
+                          <Box fontSize="body-s" color="text-body-secondary">{pct}%</Box>
+                        </div>
+                      );
+                    },
                   },
                   {
                     id: 'preview-results',
                     content: (item) => {
-                      if (!preview || isPreviewLoading) return null;
+                      if (!preview) return null;
                       if (!selected.includes(item.capability)) return null;
-                      return <InlinePreviewResult capId={item.capability} preview={preview} />;
+                      // Render whatever has arrived, rather than waiting for the
+                      // whole fan-out: `isPreviewLoading` used to hide ALL results
+                      // until every method finished, so a run where one model
+                      // answered in 7s showed nothing for another 40s.
+                      return (
+                        <InlinePreviewResult
+                          capId={item.capability}
+                          preview={preview}
+                          isStreaming={!!isPreviewLoading}
+                        />
+                      );
                     },
                   },
                 ],

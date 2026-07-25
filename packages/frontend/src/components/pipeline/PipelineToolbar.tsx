@@ -5,6 +5,7 @@ import SegmentedControl from '@cloudscape-design/components/segmented-control';
 import Toggle from '@cloudscape-design/components/toggle';
 import Box from '@cloudscape-design/components/box';
 import type { PipelineDefinition } from '@idp/shared';
+import { token } from '../../theme/tokens';
 
 interface PipelineToolbarProps {
   pipeline: PipelineDefinition | null;
@@ -36,9 +37,9 @@ export default function PipelineToolbar({
     <div
       style={{
         padding: '16px',
-        background: '#ffffff',
+        background: token.surface,
         borderRadius: '8px',
-        border: '1px solid #d5dbdb',
+        border: `1px solid ${token.border}`,
       }}
     >
       <SpaceBetween direction="horizontal" size="l">

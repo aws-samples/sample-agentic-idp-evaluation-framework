@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import type { ProcessingMethod } from '@idp/shared';
-import { METHOD_INFO } from '@idp/shared';
+import { METHOD_INFO, TEXTRACT_PAGE_PRICING } from '@idp/shared';
 import {
   DetectDocumentTextCommand,
   StartDocumentTextDetectionCommand,
@@ -49,6 +49,20 @@ export class TwoPhaseAdapter implements StreamAdapter {
 
     let blocks: Block[];
 
+    /*
+     * Textract is used for PLAIN OCR ONLY — DetectDocumentText at $0.0015/page.
+     *
+     * AnalyzeDocument's analysis features (TABLES $0.015, FORMS $0.05,
+     * TABLES+FORMS $0.065/page) are deliberately never requested: they cost up to
+     * 43x more per page, and the whole point of this family is a cheap OCR stage
+     * feeding a capable LLM that does the structuring. Paying Textract to detect
+     * table structure AND paying an LLM to interpret it defeats the reason to pick
+     * a hybrid at all.
+     *
+     * The consequence is honest in the support matrix: textract-llm is rated
+     * "good" (not "excellent") for table and key-value extraction, because the LLM
+     * receives OCR lines and infers structure from reading order.
+     */
     if (needsAsync && hasS3) {
       blocks = await this.runAsyncTextract(res, input.s3Uri);
     } else if (isLargePayload) {
@@ -57,8 +71,6 @@ export class TwoPhaseAdapter implements StreamAdapter {
         `Image exceeds Textract sync 5MB limit (${Math.round(input.documentBuffer.length / 1024 / 1024)}MB). Re-upload via S3 or downscale the image.`,
       );
     } else {
-      // Sync Textract OCR — DetectDocumentText is sufficient since the LLM
-      // handles key-value/table structuring. ~$0.0015/page vs $0.065/page.
       const textractCommand = new DetectDocumentTextCommand({
         Document: { Bytes: input.documentBuffer },
       });
@@ -85,7 +97,20 @@ Return ONLY valid JSON, no markdown code blocks.`;
         role: 'user',
         content: [
           {
-            text: `Here is the OCR output from Textract:\n\n${extractedText}\n\nPlease structure this content for the following capabilities: ${input.capabilities.join(', ')}`,
+            /*
+             * The text is plain OCR in reading order, with no table or form
+             * structure attached — that is the deliberate cost trade-off of this
+             * family. Say so, and tell the model to reconstruct the layout, so it
+             * treats line order as evidence rather than assuming it has been given
+             * pre-detected cells.
+             */
+            text: `Below is plain OCR text from Amazon Textract, in reading order. `
+              + `It contains no table or form structure — column and row boundaries `
+              + `must be reconstructed from the line layout and from values that `
+              + `belong together (for example a description followed by quantity, `
+              + `unit price and amount). Preserve every line item; do not merge or `
+              + `drop rows.\n\n${extractedText}\n\n`
+              + `Structure this content for the following capabilities: ${input.capabilities.join(', ')}`,
           },
         ],
       },
@@ -116,6 +141,7 @@ Return ONLY valid JSON, no markdown code blocks.`;
 
     let fullText = '';
     let tokenCount = 0;
+    let tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number } | undefined;
 
     if (llmResponse.stream) {
       for await (const event of llmResponse.stream) {
@@ -126,6 +152,23 @@ Return ONLY valid JSON, no markdown code blocks.`;
 
           const progress = 40 + Math.min(Math.floor((tokenCount / 100) * 55), 55);
           emitProgress(res, this.method, 'all', progress, chunk);
+        }
+        // Capture real token usage from the stream's final metadata event.
+        //
+        // This was dropped, so the LLM half of a two-stage method reported no
+        // token usage at all and calculateCost fell back to the flat per-page
+        // estimate. Every Textract+LLM run therefore reported exactly its
+        // estimate ($0.0050 / $0.0060 / $0.0170) no matter how much work it did,
+        // and the "Textract $0.0015/pg + tokens" pricing shown in the UI was
+        // never actually computed. Verified live: all three Txt+* methods
+        // returned suspiciously round numbers identical to estimatedCostPerPage.
+        const usage = event.metadata?.usage;
+        if (usage) {
+          tokenUsage = {
+            inputTokens: usage.inputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
+            totalTokens: usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+          };
         }
       }
     }
@@ -138,6 +181,11 @@ Return ONLY valid JSON, no markdown code blocks.`;
       results,
       rawOutput: JSON.stringify({ textractBlocks: blocks.length, llmOutput: fullText }),
       latencyMs: Date.now() - start,
+      tokenUsage,
+      ocrConfidence: this.meanOcrConfidence(blocks),
+      // Always the plain-OCR price: this adapter only ever calls
+      // DetectDocumentText (see the comment on the Textract call above).
+      perPageFee: TEXTRACT_PAGE_PRICING.detectText,
     };
   }
 
@@ -202,6 +250,26 @@ Return ONLY valid JSON, no markdown code blocks.`;
       }
     }
     return lines.join('\n');
+  }
+
+  /**
+   * Mean OCR confidence over the recognised lines, as a 0-1 fraction.
+   *
+   * This is a *measured* signal, unlike the confidence the LLM reports about its
+   * own output: Textract returns a per-block `Confidence` (0-100) reflecting how
+   * certain the OCR is of each recognised line. We already pay for it on every
+   * two-stage run and were discarding it.
+   *
+   * It bounds what the downstream LLM can possibly get right — if the OCR text is
+   * garbled, no amount of structuring recovers the values — so it is worth
+   * surfacing next to the model's self-report rather than in place of it.
+   */
+  private meanOcrConfidence(blocks: Block[]): number | undefined {
+    const scores = blocks
+      .filter((b) => b.BlockType === 'LINE' && typeof b.Confidence === 'number')
+      .map((b) => b.Confidence as number);
+    if (scores.length === 0) return undefined;
+    return scores.reduce((a, b) => a + b, 0) / scores.length / 100;
   }
 
 }

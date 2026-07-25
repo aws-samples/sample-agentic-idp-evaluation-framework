@@ -111,6 +111,10 @@ resource "aws_ecs_task_definition" "backend" {
           { name = "AGENTCORE_RUNTIME_ARN", value = aws_bedrockagentcore_agent_runtime.idp_agent.agent_runtime_arn },
           { name = "ACTIVITY_TABLE", value = "${var.project_name}-activity-${var.environment}" },
           { name = "CLOUDFRONT_SECRET", value = random_password.cloudfront_secret.result },
+          # Run-history privacy. With auth_provider = "none" every visitor resolves to
+          # the same alias, so stored runs would expose one person's uploaded documents
+          # to the next visitor. Enforced server-side (403), not just hidden in the UI.
+          { name = "DISABLE_RUN_HISTORY", value = tostring(var.disable_run_history) },
         ],
         var.admin_users != "" ? [{ name = "ADMIN_USERS", value = var.admin_users }] : [],
         var.cognito_user_pool_id != "" ? [{ name = "COGNITO_USER_POOL_ID", value = var.cognito_user_pool_id }] : [],
@@ -118,6 +122,12 @@ resource "aws_ecs_task_definition" "backend" {
         local.effective_guardrail_id != "" ? [
           { name = "BEDROCK_GUARDRAIL_ID", value = local.effective_guardrail_id },
           { name = "BEDROCK_GUARDRAIL_VERSION", value = local.effective_guardrail_version },
+        ] : [],
+        # Specialist OCR endpoints — only the ones actually deployed are passed, so an
+        # unset one leaves the method reporting "not configured" rather than failing.
+        [for k, v in var.sagemaker_ocr_endpoints : { name = k, value = v } if v != ""],
+        var.sagemaker_ocr_cost_per_page != "" ? [
+          { name = "SAGEMAKER_OCR_COST_PER_PAGE", value = var.sagemaker_ocr_cost_per_page },
         ] : [],
       )
 
@@ -349,17 +359,49 @@ resource "aws_iam_role_policy" "ecs_textract" {
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
+      # PLAIN OCR ONLY, by deliberate decision.
+      #
+      # AnalyzeDocument costs up to 43x more per page than DetectDocumentText
+      # ($0.065/page for TABLES+FORMS vs $0.0015), and in a Textract+LLM pipeline the
+      # LLM does the structuring — so detected structure would be paid for and then
+      # discarded. Guardrails was the live instance of this: it called AnalyzeDocument
+      # with FORMS while being costed at $0.0016/page, ~33x under-reported.
+      #
+      # The expensive actions are WITHHELD rather than merely unused, because that is
+      # what makes an accidental 43x call impossible instead of just unintended.
       Action = [
-        "textract:AnalyzeDocument",
         "textract:DetectDocumentText",
-        "textract:AnalyzeExpense",
-        "textract:AnalyzeID",
-        "textract:StartDocumentAnalysis",
-        "textract:GetDocumentAnalysis",
         "textract:StartDocumentTextDetection",
         "textract:GetDocumentTextDetection",
       ]
       Resource = "*"
+    }]
+  })
+}
+
+# Specialist OCR endpoints (self-hosted SageMaker), created ONLY when configured.
+#
+# sagemaker:InvokeEndpoint is a different service action from anything Bedrock, and it
+# is scoped to the specific endpoint ARNs rather than "*". `count` means a deployment
+# that never enables these carries no SageMaker permission at all — withholding the
+# grant is what makes an accidental call impossible rather than merely unintended,
+# the same reasoning applied to the expensive Textract APIs above.
+resource "aws_iam_role_policy" "ecs_sagemaker_ocr" {
+  count = length([for v in values(var.sagemaker_ocr_endpoints) : v if v != ""]) > 0 ? 1 : 0
+
+  name = "SageMakerOcrInvoke"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["sagemaker:InvokeEndpoint"]
+      Resource = [
+        for v in values(var.sagemaker_ocr_endpoints) :
+        "arn:aws:sagemaker:${var.aws_region}:${data.aws_caller_identity.current.account_id}:endpoint/${v}"
+        if v != ""
+      ]
     }]
   })
 }

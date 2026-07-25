@@ -39,6 +39,124 @@ import App from './App';
 .chat-markdown th, .chat-markdown td { border: 1px solid rgba(0,0,0,0.12); padding: 4px 8px; }
 .chat-markdown th { background: rgba(0,0,0,0.04); font-weight: 600; }
 
+/* ─── Streaming result animations ────────────────────────────────────────────
+   Preview fans every method out in parallel and streams each result back over
+   SSE as it lands. These make that arrival visible instead of having rows appear
+   instantly with no indication that anything progressed. Deliberately short
+   (~240ms) and transform/opacity only, so they never delay interaction, and fully
+   disabled under prefers-reduced-motion. */
+@keyframes idp-rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.idp-chip-resolved { animation: idp-rise-in 240ms ease-out both; }
+.idp-stream-in { animation: idp-rise-in 260ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .idp-chip-resolved, .idp-stream-in { animation: none; }
+}
+
+/* ─── Extracted tables ───────────────────────────────────────────────────────
+   Model output rendered as a real table instead of raw <table><thead><tr><th>
+   markup. Colours use rgba/currentColor so the same rules work in both themes
+   (Cloudscape hashes its CSS variable names, so a hand-written var() would not
+   resolve — see theme/tokens.ts). A sticky header keeps the column names visible
+   in a 200-row quotation, which is the case that made the old view unusable. */
+.idp-extracted-table table,
+table.idp-extracted-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+.idp-extracted-table th,
+.idp-extracted-table td {
+  border: 1px solid rgba(128,128,128,0.32);
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.idp-extracted-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: 600;
+  background: #f2f3f7;
+  color: #0f141a;
+}
+.awsui-dark-mode .idp-extracted-table th { background: #232b37; color: #e9ebed; }
+.idp-extracted-table tbody tr:nth-child(even) { background: rgba(128,128,128,0.06); }
+
+/* ─── Capability x method support matrix ─────────────────────────────────────
+   33 rows x up to 22 columns. Column headers are rotated so 22 of them fit
+   without a 3000px-wide table, and both the header row and the capability column
+   are sticky because a cell is meaningless once you have scrolled its labels off
+   screen. Colours use rgba/currentColor so one rule set serves both themes. */
+.idp-matrix { border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.idp-matrix th, .idp-matrix td {
+  border-bottom: 1px solid rgba(128,128,128,0.22);
+  padding: 3px 6px;
+}
+/*
+  Stacking order, and why it matters: the capability popover is rendered inside a
+  sticky row header, and the sticky THEAD used to sit at z-index 3 above it — so
+  hovering a capability name opened a popover the header painted over, hiding the
+  description the popover exists to show. Sticky layers now sit BELOW 1, and the
+  hovered row header is lifted above them, so the popover always wins.
+    thead th        1   (above cells, below any popover)
+    corner cell     2   (above thead, it is both sticky-top and sticky-left)
+    row header      1   (sticky-left, above cells)
+    row header:hover 20 (above every sticky layer, so its popover is not clipped)
+*/
+.idp-matrix thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--idp-matrix-head-bg, #f2f3f7);
+  height: 118px; vertical-align: bottom;
+  border-bottom: 1px solid rgba(128,128,128,0.45);
+}
+.awsui-dark-mode .idp-matrix thead th { --idp-matrix-head-bg: #232b37; }
+.idp-matrix-collabel {
+  display: inline-block;
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  white-space: nowrap; font-weight: 600; text-align: left;
+  max-height: 108px; overflow: hidden;
+}
+/* Group separator: a hairline every time the method FAMILY changes, so the eye
+   can tell "all five BDA columns" from "all seven Claude columns" without
+   reading 22 rotated labels. */
+.idp-matrix .idp-matrix-groupstart { border-left: 2px solid rgba(128,128,128,0.38); }
+.idp-matrix-corner {
+  left: 0; z-index: 2 !important;
+  writing-mode: horizontal-tb; vertical-align: bottom !important;
+  text-align: left; min-width: 210px;
+}
+.idp-matrix-row {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--idp-matrix-row-bg, #ffffff);
+  text-align: left; font-weight: 400; white-space: nowrap;
+  min-width: 210px; max-width: 260px;
+}
+/* Lift the hovered row header above every sticky layer so its popover is never
+   clipped by the sticky header or the corner cell. */
+.idp-matrix-row:hover, .idp-matrix-row:focus-within { z-index: 20; }
+.awsui-dark-mode .idp-matrix-row { --idp-matrix-row-bg: #0f1419; }
+.idp-matrix td { text-align: center; font-size: 15px; line-height: 1.1; }
+/* An unrunnable capability is dimmed as a whole row rather than being left as an
+   unexplained line of grey dots — the row header carries the reason. */
+.idp-matrix tr.idp-matrix-unavailable td { opacity: 0.45; }
+.idp-matrix-catrow th {
+  position: sticky; left: 0; z-index: 1;
+  text-align: left; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.4px;
+  padding-top: 12px;
+  background: rgba(128,128,128,0.10);
+}
+/* Cross-hair reading aid: a 33x22 grid is hard to read across, so highlight the
+   whole row on hover and give the row header a stronger tint than its cells. */
+.idp-matrix tbody tr:hover td { background: rgba(9,114,211,0.10); }
+.idp-matrix tbody tr:hover .idp-matrix-row { background: rgba(9,114,211,0.16); }
+.idp-matrix tbody tr:hover td.idp-matrix-cell-hl { background: rgba(9,114,211,0.18); }
+
 /* ─── Docs page (SPA viewer with left sidebar) ───────────────────────────── */
 .docs-layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; background: var(--docs-bg, #fafbfc); }
 .awsui-dark-mode .docs-layout { --docs-bg: #0f1419; }

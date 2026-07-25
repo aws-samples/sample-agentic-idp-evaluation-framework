@@ -36,6 +36,24 @@ export interface AdapterOutput {
   rawOutput?: string;
   latencyMs: number;
   tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
+  /**
+   * Mean OCR confidence (0-1) for methods with a real OCR stage.
+   *
+   * Distinct from `results[].confidence`, which is the model grading its own
+   * output. This is measured by Textract per recognised line, so it is the one
+   * confidence number in the app that is not self-reported. Absent for methods
+   * that have no OCR stage.
+   */
+  ocrConfidence?: number;
+  /**
+   * Per-page infrastructure fee actually incurred by this run, in USD.
+   *
+   * Set by adapters whose non-token cost depends on what they requested — the
+   * Textract stage costs $0.0015/page for plain OCR but up to $0.065/page when
+   * TABLES+FORMS are needed, so a fixed table value would misreport the run by
+   * more than an order of magnitude in either direction.
+   */
+  perPageFee?: number;
 }
 
 export function emitProgress(

@@ -448,21 +448,23 @@ def run_textract_llm(method: str, doc_bytes: bytes, file_name: str, capabilities
 
     if multi_page and s3_uri:
         u = urlparse(s3_uri)
-        job = textract.start_document_analysis(
+        # Text detection only. The LLM below does the structuring, so
+        # AnalyzeDocument's TABLES/FORMS features would be paid for and discarded:
+        # $0.0015/page here vs up to $0.065/page for TABLES+FORMS.
+        job = textract.start_document_text_detection(
             DocumentLocation={"S3Object": {"Bucket": u.netloc, "Name": u.path.lstrip("/")}},
-            FeatureTypes=["TABLES", "FORMS"],
         )
         job_id = job["JobId"]
         blocks: list[dict[str, Any]] = []
         for _ in range(60):
             time.sleep(3)
-            r = textract.get_document_analysis(JobId=job_id)
+            r = textract.get_document_text_detection(JobId=job_id)
             status = r.get("JobStatus", "FAILED")
             if status == "SUCCEEDED":
                 blocks.extend(r.get("Blocks", []))
                 token = r.get("NextToken")
                 while token:
-                    r2 = textract.get_document_analysis(JobId=job_id, NextToken=token)
+                    r2 = textract.get_document_text_detection(JobId=job_id, NextToken=token)
                     blocks.extend(r2.get("Blocks", []))
                     token = r2.get("NextToken")
                 break
@@ -471,7 +473,7 @@ def run_textract_llm(method: str, doc_bytes: bytes, file_name: str, capabilities
         else:
             raise TimeoutError("Textract async timed out")
     else:
-        r = textract.analyze_document(Document={"Bytes": doc_bytes}, FeatureTypes=["TABLES", "FORMS"])
+        r = textract.detect_document_text(Document={"Bytes": doc_bytes})
         blocks = r.get("Blocks", [])
 
     ocr_text = "\\n".join(b["Text"] for b in blocks if b.get("BlockType") == "LINE" and b.get("Text"))
@@ -604,9 +606,9 @@ ${families.has('bda') || families.has('bda-llm') ? `import {
 } from '@aws-sdk/client-bedrock-data-automation-runtime';` : ''}
 ${families.has('textract-llm') ? `import {
   TextractClient,
-  AnalyzeDocumentCommand,
-  StartDocumentAnalysisCommand,
-  GetDocumentAnalysisCommand,
+  DetectDocumentTextCommand,
+  StartDocumentTextDetectionCommand,
+  GetDocumentTextDetectionCommand,
   type Block,
 } from '@aws-sdk/client-textract';` : ''}
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -885,22 +887,22 @@ async function runTextractLlm(method: string, docBytes: Buffer, fileName: string
   let blocks: Block[];
   if (multiPage && s3Uri) {
     const u = new URL(s3Uri);
-    const started = await textract.send(new StartDocumentAnalysisCommand({
+    // Text detection only — see the Python note above on cost.
+    const started = await textract.send(new StartDocumentTextDetectionCommand({
       DocumentLocation: { S3Object: { Bucket: u.hostname, Name: decodeURIComponent(u.pathname.slice(1)) } },
-      FeatureTypes: ['TABLES', 'FORMS'],
     }));
     const jobId = started.JobId!;
     blocks = [];
     let status = 'IN_PROGRESS';
     for (let i = 0; i < 60 && status === 'IN_PROGRESS'; i++) {
       await sleep(3000);
-      const r = await textract.send(new GetDocumentAnalysisCommand({ JobId: jobId }));
+      const r = await textract.send(new GetDocumentTextDetectionCommand({ JobId: jobId }));
       status = r.JobStatus ?? 'FAILED';
       if (status === 'SUCCEEDED') {
         blocks.push(...(r.Blocks ?? []));
         let next = r.NextToken;
         while (next) {
-          const r2 = await textract.send(new GetDocumentAnalysisCommand({ JobId: jobId, NextToken: next }));
+          const r2 = await textract.send(new GetDocumentTextDetectionCommand({ JobId: jobId, NextToken: next }));
           blocks.push(...(r2.Blocks ?? []));
           next = r2.NextToken;
         }
@@ -910,9 +912,8 @@ async function runTextractLlm(method: string, docBytes: Buffer, fileName: string
     }
     if (status !== 'SUCCEEDED') throw new Error('Textract async timed out');
   } else {
-    const r = await textract.send(new AnalyzeDocumentCommand({
+    const r = await textract.send(new DetectDocumentTextCommand({
       Document: { Bytes: docBytes },
-      FeatureTypes: ['TABLES', 'FORMS'],
     }));
     blocks = r.Blocks ?? [];
   }
@@ -1168,9 +1169,9 @@ ${usesTextract ? `
     // Textract does not support resource-level permissions for these actions.
     processorFn.addToRolePolicy(new iam.PolicyStatement({
       actions: [
-        'textract:AnalyzeDocument',
-        'textract:StartDocumentAnalysis',
-        'textract:GetDocumentAnalysis',
+        'textract:DetectDocumentText',
+        'textract:StartDocumentTextDetection',
+        'textract:GetDocumentTextDetection',
       ],
       resources: ['*'],
     }));` : ''}

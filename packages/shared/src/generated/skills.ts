@@ -91,8 +91,9 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
-    'nova': 'excellent' as const,
-    'textract-llm': 'excellent' as const
+    'nova': 'good' as const,
+    'textract-llm': 'excellent' as const,
+    'sagemaker-ocr': 'good' as const
     },
   },
   'kv_extraction': {
@@ -111,7 +112,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
     'nova': 'good' as const,
-    'textract-llm': 'excellent' as const
+    'textract-llm': 'good' as const
     },
   },
   'table_extraction': {
@@ -130,7 +131,8 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
     'nova': 'good' as const,
-    'textract-llm': 'excellent' as const
+    'textract-llm': 'good' as const,
+    'sagemaker-ocr': 'good' as const
     },
   },
   'text_extraction': {
@@ -149,7 +151,8 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
     'nova': 'good' as const,
-    'textract-llm': 'excellent' as const
+    'textract-llm': 'excellent' as const,
+    'sagemaker-ocr': 'excellent' as const
     },
   },
   'barcode_qr': {
@@ -163,11 +166,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'Shipping label with barcode',
     exampleOutput: '{"type": "QR", "data": "https://...", "location": {...}}',
     support: {
-    'bda': 'limited' as const,
-    'bda-llm': 'limited' as const,
-    'claude': 'limited' as const,
-    'gpt': 'limited' as const,
-    'nova': 'good' as const
+
     },
   },
   'bounding_box': {
@@ -182,11 +181,11 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleOutput: '[{"label": "face", "x": 120, "y": 45, "w": 80, "h": 100}]',
     support: {
     'bda': 'excellent' as const,
-    'bda-llm': 'excellent' as const,
-    'claude': 'good' as const,
-    'gpt': 'good' as const,
-    'nova': 'excellent' as const,
-    'textract-llm': 'good' as const
+    'bda-llm': 'good' as const,
+    'nova': 'limited' as const,
+    'claude': 'limited' as const,
+    'gpt': 'limited' as const,
+    'sagemaker-ocr': 'excellent' as const
     },
   },
   'image_description': {
@@ -204,7 +203,8 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda-llm': 'good' as const,
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
-    'nova': 'excellent' as const
+    'nova': 'good' as const,
+    'sagemaker-ocr': 'limited' as const
     },
   },
   'layout_analysis': {
@@ -222,8 +222,9 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'bda-llm': 'excellent' as const,
     'claude': 'good' as const,
     'gpt': 'good' as const,
-    'nova': 'excellent' as const,
-    'textract-llm': 'excellent' as const
+    'nova': 'good' as const,
+    'textract-llm': 'limited' as const,
+    'sagemaker-ocr': 'excellent' as const
     },
   },
   'signature_detection': {
@@ -238,11 +239,10 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleOutput: '{"hasSignature": true, "locations": [...], "count": 2}',
     support: {
     'bda': 'limited' as const,
-    'bda-llm': 'good' as const,
+    'bda-llm': 'limited' as const,
     'claude': 'good' as const,
     'gpt': 'good' as const,
-    'nova': 'good' as const,
-    'textract-llm': 'good' as const
+    'nova': 'good' as const
     },
   },
   'document_classification': {
@@ -256,7 +256,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'Unknown document',
     exampleOutput: '{"type": "invoice", "confidence": 0.95, "subtype": "utility_bill"}',
     support: {
-    'bda': 'good' as const,
+    'bda': 'limited' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
@@ -275,12 +275,12 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: '50-page PDF with mixed documents',
     exampleOutput: '[{"pages": [1,2], "type": "invoice"}, {"pages": [3,4,5], "type": "contract"}]',
     support: {
-    'bda': 'excellent' as const,
+    'bda': 'limited' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'good' as const,
     'gpt': 'good' as const,
     'nova': 'good' as const,
-    'textract-llm': 'good' as const
+    'textract-llm': 'limited' as const
     },
   },
   'document_summarization': {
@@ -294,7 +294,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: '20-page legal agreement',
     exampleOutput: 'Executive summary with key terms, obligations, and deadlines',
     support: {
-    'bda': 'excellent' as const,
+    'bda': 'limited' as const,
     'bda-llm': 'excellent' as const,
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
@@ -376,7 +376,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
     'nova': 'good' as const,
-    'textract-llm': 'excellent' as const
+    'textract-llm': 'good' as const
     },
   },
   'contract_analysis': {
@@ -433,7 +433,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
     'nova': 'good' as const,
-    'textract-llm': 'excellent' as const
+    'textract-llm': 'good' as const
     },
   },
   'medical_records': {
@@ -471,7 +471,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     'claude': 'excellent' as const,
     'gpt': 'excellent' as const,
     'nova': 'good' as const,
-    'textract-llm': 'excellent' as const
+    'textract-llm': 'good' as const
     },
   },
   'audio_summarization': {
@@ -485,9 +485,8 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'Team meeting recording',
     exampleOutput: 'Topic summaries with timestamps and action items',
     support: {
-    'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
-    'nova': 'excellent' as const
+    'video-understanding': 'good' as const
     },
   },
   'audio_transcription': {
@@ -501,9 +500,9 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'Customer support call recording (WAV/MP3)',
     exampleOutput: 'Timestamped transcript with speaker labels (spk_0, spk_1)',
     support: {
-    'bda': 'excellent' as const,
+    'bda': 'limited' as const,
     'bda-llm': 'excellent' as const,
-    'nova': 'excellent' as const
+    'video-understanding': 'good' as const
     },
   },
   'content_moderation': {
@@ -519,7 +518,8 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     support: {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
-    'nova': 'excellent' as const
+    'nova': 'excellent' as const,
+    'video-understanding': 'good' as const
     },
   },
   'video_chapter_extraction': {
@@ -533,9 +533,10 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'Training webinar recording',
     exampleOutput: 'Chapters with start/end times, summaries, and IAB categories',
     support: {
-    'bda': 'excellent' as const,
+    'bda': 'limited' as const,
     'bda-llm': 'excellent' as const,
-    'nova': 'excellent' as const
+    'nova': 'excellent' as const,
+    'video-understanding': 'excellent' as const
     },
   },
   'video_summarization': {
@@ -551,7 +552,8 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     support: {
     'bda': 'excellent' as const,
     'bda-llm': 'excellent' as const,
-    'nova': 'excellent' as const
+    'nova': 'excellent' as const,
+    'video-understanding': 'excellent' as const
     },
   },
   'embedding_generation': {
@@ -579,9 +581,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'PDF with embedded product photos and charts',
     exampleOutput: 'Individual images extracted with captions and page locations',
     support: {
-    'bda': 'excellent' as const,
-    'textract': 'excellent' as const,
-    'nova': 'excellent' as const
+
     },
   },
   'knowledge_base_ingestion': {
@@ -595,7 +595,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'Extracted text + embeddings from processing pipeline',
     exampleOutput: 'Documents indexed in Bedrock Knowledge Base, queryable via RetrieveAndGenerate API',
     support: {
-    'nova-embeddings': 'excellent' as const
+
     },
   },
   'format_standardization': {
@@ -615,7 +615,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
   'ocr_enhancement': {
     id: 'ocr_enhancement',
     name: 'OCR Enhancement',
-    description: 'Pre-process scanned images for better extraction accuracy: deskew, denoise, contrast enhancement, binarization. Method Support: Lambda + OpenCV/Pillow for image preprocessing, then Amazon Textract for OCR, or BDA with overrideConfiguration for enhanced extraction. Critical for low-quality fax/scan inputs.',
+    description: 'Reference capability — not implemented in this demo. A production pipeline would deskew, denoise, adjust contrast and binarize scanned pages before OCR (for example Lambda with OpenCV or Pillow), which is critical for low-quality fax and scan inputs. No model performs this, and this deployment does not run it.',
     category: 'document_conversion',
     icon: 'scan-eye',
     defaultFormat: 'json',
@@ -623,7 +623,7 @@ export const SKILL_INFO: Record<SkillId, SkillInfo> = {
     exampleInput: 'Low-quality scan with noise, skew, and poor contrast',
     exampleOutput: 'Enhanced image with improved OCR accuracy (90%+ character recognition)',
     support: {
-    'textract-llm': 'limited' as const
+    'sagemaker-ocr': 'good' as const
     },
   },
   'pdf_conversion': {

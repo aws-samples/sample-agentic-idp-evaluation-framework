@@ -10,9 +10,10 @@ tags: ["video", "chapter", "scene", "timestamp", "iab", "segmentation"]
 exampleInput: "Training webinar recording"
 exampleOutput: "Chapters with start/end times, summaries, and IAB categories"
 support:
-  bda: "excellent"
+  bda: "limited"
   bda-llm: "excellent"
   nova: "excellent"
+  video-understanding: "excellent"
 ---
 
 # Video Chapter Extraction
@@ -37,6 +38,7 @@ Returns structured JSON with typed fields.
 
 ## Method support
 
-- **bda**: excellent
+- **bda**: limited
 - **bda-llm**: excellent
 - **nova**: excellent
+- **video-understanding**: excellent

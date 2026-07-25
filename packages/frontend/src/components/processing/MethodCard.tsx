@@ -11,6 +11,7 @@ import { METHOD_INFO, CAPABILITY_INFO, getMethodFamily } from '@idp/shared';
 import type { Capability, MethodFamily } from '@idp/shared';
 import type { MethodProgress } from '../../hooks/useProcessing';
 import StreamingResult from './StreamingResult';
+import { FAMILY_COLORS, FAMILY_LABELS } from '../../theme/family-colors';
 
 interface MethodCardProps {
   progress: MethodProgress;
@@ -28,17 +29,6 @@ export default function MethodCard({ progress, capabilities }: MethodCardProps) 
   const info = METHOD_INFO[progress.method];
   const family = getMethodFamily(progress.method);
 
-  const familyLabels: Record<MethodFamily, string> = {
-    bda: 'BDA',
-    'bda-llm': 'BDA+LLM',
-    claude: 'Claude',
-    nova: 'Nova',
-    gpt: 'GPT',
-    'textract-llm': 'Textract+LLM',
-    embeddings: 'Embeddings',
-    guardrails: 'Guardrails',
-  };
-
   return (
     <Container
       header={
@@ -46,7 +36,7 @@ export default function MethodCard({ progress, capabilities }: MethodCardProps) 
           variant="h3"
           description={
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Badge>{familyLabels[family]}</Badge>
+              <Badge>{FAMILY_LABELS[family]}</Badge>
               <span>{info?.description ?? ''}</span>
             </div>
           }

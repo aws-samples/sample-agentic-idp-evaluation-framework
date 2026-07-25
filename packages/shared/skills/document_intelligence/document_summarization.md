@@ -10,7 +10,7 @@ tags: ["summary", "key-points", "abstract", "executive-summary"]
 exampleInput: "20-page legal agreement"
 exampleOutput: "Executive summary with key terms, obligations, and deadlines"
 support:
-  bda: "excellent"
+  bda: "limited"
   bda-llm: "excellent"
   claude: "excellent"
   gpt: "excellent"
@@ -40,7 +40,7 @@ Returns plain text with preserved structure and formatting.
 
 ## Method support
 
-- **bda**: excellent
+- **bda**: limited
 - **bda-llm**: excellent
 - **claude**: excellent
 - **nova**: good

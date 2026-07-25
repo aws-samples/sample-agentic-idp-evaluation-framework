@@ -195,6 +195,7 @@ Return ONLY valid JSON, no markdown code blocks.${clipped ? '\n\nNOTE: The BDA o
 
     let fullText = '';
     let tokenCount = 0;
+    let tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number } | undefined;
 
     if (llmResponse.stream) {
       for await (const event of llmResponse.stream) {
@@ -205,6 +206,17 @@ Return ONLY valid JSON, no markdown code blocks.${clipped ? '\n\nNOTE: The BDA o
 
           const progress = 50 + Math.min(Math.floor((tokenCount / 100) * 45), 45);
           emitProgress(res, this.method, 'all', progress, chunk);
+        }
+        // Real token usage for the LLM stage. Without this the BDA+LLM cost was
+        // just its flat per-page estimate, so the "BDA $0.01/pg + tokens" pricing
+        // advertised in the UI never included the token half.
+        const usage = event.metadata?.usage;
+        if (usage) {
+          tokenUsage = {
+            inputTokens: usage.inputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
+            totalTokens: usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+          };
         }
       }
     }
@@ -217,6 +229,7 @@ Return ONLY valid JSON, no markdown code blocks.${clipped ? '\n\nNOTE: The BDA o
       results,
       rawOutput: JSON.stringify({ bdaOutput, llmOutput: fullText }),
       latencyMs: Date.now() - start,
+      tokenUsage,
     };
   }
 

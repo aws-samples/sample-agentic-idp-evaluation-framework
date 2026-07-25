@@ -165,11 +165,12 @@ resource "aws_iam_role_policy" "agentcore_execution" {
       {
         Sid    = "TextractAccess"
         Effect = "Allow"
+        # Text detection only — see the note in ecs.tf; the paid analysis APIs
+        # are deliberately not granted.
         Action = [
-          "textract:AnalyzeDocument",
           "textract:DetectDocumentText",
-          "textract:AnalyzeExpense",
-          "textract:AnalyzeID",
+          "textract:StartDocumentTextDetection",
+          "textract:GetDocumentTextDetection",
         ]
         Resource = "*"
       },

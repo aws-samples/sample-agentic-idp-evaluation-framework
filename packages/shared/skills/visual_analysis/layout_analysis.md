@@ -14,8 +14,9 @@ support:
   bda-llm: "excellent"
   claude: "good"
   gpt: "good"
-  nova: "excellent"
-  textract-llm: "excellent"
+  nova: "good"
+  textract-llm: "limited"
+  sagemaker-ocr: "excellent"
 ---
 
 # Layout Analysis
@@ -43,5 +44,6 @@ Returns structured JSON with typed fields.
 - **bda**: excellent
 - **bda-llm**: excellent
 - **claude**: good
-- **nova**: excellent
-- **textract-llm**: excellent
+- **nova**: good
+- **textract-llm**: limited
+- **sagemaker-ocr**: excellent

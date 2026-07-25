@@ -5,6 +5,7 @@ import Box from '@cloudscape-design/components/box';
 import Badge from '@cloudscape-design/components/badge';
 import { METHOD_INFO, getMethodFamily } from '@idp/shared';
 import type { ComparisonResult, MethodFamily } from '@idp/shared';
+import { FAMILY_COLORS, FAMILY_LABELS } from '../../theme/family-colors';
 
 interface ComparisonTableProps {
   comparison: ComparisonResult | null;
@@ -33,17 +34,6 @@ export default function ComparisonTable({ comparison }: ComparisonTableProps) {
   const bestCost = Math.min(...items.map((i) => i.metrics.cost));
   const bestConfidence = Math.max(...items.map((i) => i.metrics.confidence));
 
-  const familyLabels: Record<MethodFamily, string> = {
-    bda: 'BDA',
-    'bda-llm': 'BDA+LLM',
-    claude: 'Claude',
-    nova: 'Nova',
-    gpt: 'GPT',
-    'textract-llm': 'Textract+LLM',
-    embeddings: 'Embeddings',
-    guardrails: 'Guardrails',
-  };
-
   return (
     <Table
       header={
@@ -60,7 +50,7 @@ export default function ComparisonTable({ comparison }: ComparisonTableProps) {
           header: 'Family',
           cell: (item) => {
             const family = getMethodFamily(item.method);
-            return <Badge>{familyLabels[family]}</Badge>;
+            return <Badge>{FAMILY_LABELS[family]}</Badge>;
           },
           width: 120,
         },

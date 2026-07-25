@@ -15,7 +15,8 @@ support:
   claude: "excellent"
   gpt: "excellent"
   nova: "good"
-  textract-llm: "excellent"
+  textract-llm: "good"
+  sagemaker-ocr: "good"
 ---
 
 # Table Extraction
@@ -44,4 +45,5 @@ Returns structured HTML (e.g., `<table>` elements with `<thead>` and `<tbody>`).
 - **bda-llm**: excellent
 - **claude**: excellent
 - **nova**: good
-- **textract-llm**: excellent
+- **textract-llm**: good
+- **sagemaker-ocr**: good

@@ -1,7 +1,7 @@
 ---
 id: "ocr_enhancement"
 name: "OCR Enhancement"
-description: "Pre-process scanned images for better extraction accuracy: deskew, denoise, contrast enhancement, binarization. Method Support: Lambda + OpenCV/Pillow for image preprocessing, then Amazon Textract for OCR, or BDA with overrideConfiguration for enhanced extraction. Critical for low-quality fax/scan inputs."
+description: "Reference capability — not implemented in this demo. A production pipeline would deskew, denoise, adjust contrast and binarize scanned pages before OCR (for example Lambda with OpenCV or Pillow), which is critical for low-quality fax and scan inputs. No model performs this, and this deployment does not run it."
 category: "document_conversion"
 categoryName: "Document Conversion"
 icon: "scan-eye"
@@ -10,7 +10,8 @@ tags: ["ocr", "enhance", "deskew", "denoise", "scan", "opencv", "textract", "pre
 exampleInput: "Low-quality scan with noise, skew, and poor contrast"
 exampleOutput: "Enhanced image with improved OCR accuracy (90%+ character recognition)"
 support:
-  textract-llm: "limited"
+  sagemaker-ocr: "good"
+
 ---
 
 # OCR Enhancement
@@ -34,5 +35,4 @@ Default format: `json`
 Returns structured JSON with typed fields.
 
 ## Method support
-
-- **textract-llm**: limited
+- **sagemaker-ocr**: good

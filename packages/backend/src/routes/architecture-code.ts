@@ -72,16 +72,18 @@ for (let i = 0; i < 60 && !['Success','ServiceError','ClientError'].includes(sta
 //     elements: [{ type: 'TABLE'|'KEY_VALUE'|'TEXT'|..., representation: { markdown, html, text } }] }
 
 --- Textract sync (<=5MB single-page) vs async (multi-page PDF) ---
+// Text detection ONLY, never AnalyzeDocument. In a Textract+LLM pipeline the LLM
+// does the structuring, so the analysis features are paid for and then thrown
+// away: DetectDocumentText is $0.0015/page, while AnalyzeDocument is $0.015 for
+// TABLES, $0.05 for FORMS and $0.065 for TABLES+FORMS — up to 43x more.
 if (multiPage && s3Uri) {
-  const { JobId } = await textract.send(new StartDocumentAnalysisCommand({
+  const { JobId } = await textract.send(new StartDocumentTextDetectionCommand({
     DocumentLocation: { S3Object: { Bucket: bucket, Name: key } },
-    FeatureTypes: ['TABLES', 'FORMS'],
   }));
-  // Poll GetDocumentAnalysis every 3s up to ~3 min, paginate via NextToken.
+  // Poll GetDocumentTextDetection every 3s up to ~3 min, paginate via NextToken.
 } else {
-  const r = await textract.send(new AnalyzeDocumentCommand({
+  const r = await textract.send(new DetectDocumentTextCommand({
     Document: { Bytes: docBytes },
-    FeatureTypes: ['TABLES', 'FORMS'],
   }));
   blocks = r.Blocks ?? [];
 }
@@ -314,7 +316,10 @@ explicit tags so a downstream parser can split them. No prose outside tags.
    - BDA IAM: \`bedrock:InvokeDataAutomationAsync\`, \`bedrock:GetDataAutomationStatus\` on the project ARN
      (use \`arn:aws:bedrock:\${region}:aws:data-automation-project/public-default\` when unset). And
      \`bedrock:InvokeDataAutomationAsync\` with the profile ARN as the resource condition (only for bda* methods).
-   - Textract IAM: \`textract:AnalyzeDocument\`, \`textract:StartDocumentAnalysis\`, \`textract:GetDocumentAnalysis\`
+   - Textract IAM: \`textract:DetectDocumentText\`, \`textract:StartDocumentTextDetection\`, \`textract:GetDocumentTextDetection\`
+     (text detection only — do NOT grant or call the AnalyzeDocument APIs; the LLM
+     does the structuring, so their TABLES/FORMS features cost up to 43x more per
+     page and their output is discarded)
      on \`*\` (service doesn't support resource-level) — only when a textract* method is in use.
    - Step Functions express state machine orchestrating: S3 ingest event → processorFn → DynamoDB write →
      choice for success/failure → SNS on failure. Include the actual definition with \`sfn.Chain\`.

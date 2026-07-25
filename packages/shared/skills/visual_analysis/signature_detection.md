@@ -11,11 +11,10 @@ exampleInput: "Signed contract"
 exampleOutput: "{"hasSignature": true, "locations": [...], "count": 2}"
 support:
   bda: "limited"
-  bda-llm: "good"
+  bda-llm: "limited"
   claude: "good"
   gpt: "good"
   nova: "good"
-  textract-llm: "good"
 ---
 
 # Signature Detection
@@ -41,7 +40,6 @@ Returns structured JSON with typed fields.
 ## Method support
 
 - **bda**: limited
-- **bda-llm**: good
+- **bda-llm**: limited
 - **claude**: good
 - **nova**: good
-- **textract-llm**: good

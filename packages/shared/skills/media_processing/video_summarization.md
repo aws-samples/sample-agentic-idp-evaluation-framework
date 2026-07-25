@@ -13,6 +13,7 @@ support:
   bda: "excellent"
   bda-llm: "excellent"
   nova: "excellent"
+  video-understanding: "excellent"
 ---
 
 # Video Summarization
@@ -40,3 +41,4 @@ Returns structured JSON with typed fields.
 - **bda**: excellent
 - **bda-llm**: excellent
 - **nova**: excellent
+- **video-understanding**: excellent

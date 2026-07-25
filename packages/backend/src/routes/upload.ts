@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { UploadResponse } from '@idp/shared';
 import { getDocumentType } from '@idp/shared';
-import { upload } from '../middleware/upload.js';
+import { upload, handleUploadErrors } from '../middleware/upload.js';
 import { uploadDocument, getPresignedUrl } from '../services/s3.js';
 import { trackActivity } from '../services/activity-tracker.js';
 
@@ -71,5 +71,9 @@ router.post('/', upload.single('file'), async (req, res) => {
     res.status(500).json({ error: 'Failed to upload document' });
   }
 });
+
+// Mounted after the route so multer's rejections (unsupported type, too large)
+// become 415/413 with a reason instead of a bare 500.
+router.use(handleUploadErrors);
 
 export default router;

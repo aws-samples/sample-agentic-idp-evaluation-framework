@@ -18,7 +18,8 @@
     "build:shared": "npm run build -w packages/shared",
     "dev:backend": "npm run dev -w packages/backend",
     "dev:frontend": "npm run dev -w packages/frontend",
-    "clean": "rm -rf packages/*/dist packages/*/node_modules packages/docs/.next packages/docs/.source packages/docs/out node_modules"
+    "clean": "rm -rf packages/*/dist packages/*/node_modules packages/docs/.next packages/docs/.source packages/docs/out node_modules",
+    "check:prices": "node scripts/sync-model-catalog.mjs --strict"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

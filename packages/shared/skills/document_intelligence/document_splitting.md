@@ -10,12 +10,12 @@ tags: ["split", "multi-document", "page-classification", "boundaries"]
 exampleInput: "50-page PDF with mixed documents"
 exampleOutput: "[{"pages": [1,2], "type": "invoice"}, {"pages": [3,4,5], "type": "contract"}]"
 support:
-  bda: "excellent"
+  bda: "limited"
   bda-llm: "excellent"
   claude: "good"
   gpt: "good"
   nova: "good"
-  textract-llm: "good"
+  textract-llm: "limited"
 ---
 
 # Document Splitting
@@ -40,8 +40,8 @@ Returns structured JSON with typed fields.
 
 ## Method support
 
-- **bda**: excellent
+- **bda**: limited
 - **bda-llm**: excellent
 - **claude**: good
 - **nova**: good
-- **textract-llm**: good
+- **textract-llm**: limited

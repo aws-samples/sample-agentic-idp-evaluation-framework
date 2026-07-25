@@ -27,6 +27,16 @@ export interface OneIdpStackProps extends cdk.StackProps {
   readonly manageGuardrail?: boolean;
   readonly bedrockGuardrailId?: string;
   readonly bedrockGuardrailVersion?: string;
+  /**
+   * Disable stored run history. Defaults to true — see EcsBackendProps: with
+   * authProvider 'none' a shared run list exposes one visitor's documents to the
+   * next, so it must be opt-IN, not opt-out.
+   */
+  readonly disableRunHistory?: boolean;
+  /** Specialist OCR endpoint names, keyed by backend env var. Opt-in, empty default. */
+  readonly sagemakerOcrEndpoints?: Record<string, string>;
+  /** Per-image cost override for the specialist OCR stage (GPU-hours, not tokens). */
+  readonly sagemakerOcrCostPerPage?: string;
 }
 
 /**
@@ -126,6 +136,9 @@ export class OneIdpStack extends cdk.Stack {
       claudeModelId: props.claudeModelId,
       novaModelId: props.novaModelId,
       authProvider: props.authProvider,
+      disableRunHistory: props.disableRunHistory,
+      sagemakerOcrEndpoints: props.sagemakerOcrEndpoints,
+      sagemakerOcrCostPerPage: props.sagemakerOcrCostPerPage,
       adminUsers: props.adminUsers,
       cognitoUserPoolId: props.cognitoUserPoolId ?? '',
       cognitoClientId: props.cognitoClientId ?? '',

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
@@ -15,6 +15,7 @@ import {
   CAPABILITY_CATEGORIES,
   getCapabilitiesByCategory,
   METHODS,
+  METHOD_FAMILIES,
   getMethodsByFamily,
 } from '@idp/shared';
 import type { SupportLevel, MethodFamily } from '@idp/shared';
@@ -26,7 +27,9 @@ import {
   GitCompareArrows,
   Award,
 } from 'lucide-react';
+import Button from '@cloudscape-design/components/button';
 import DocumentUpload from '../components/upload/DocumentUpload';
+import SupportMatrix from '../components/common/SupportMatrix';
 import OnboardingBanner from '../components/common/OnboardingBanner';
 import { getCapabilityIcon } from '../components/common/icons';
 import { useMethodAvailability } from '../hooks/useMethodAvailability';
@@ -42,12 +45,8 @@ const FAMILY_NAMES: Record<string, string> = {
   nova: 'Nova (LLM)',
   gpt: 'OpenAI GPT (LLM)',
   'textract-llm': 'Textract + LLM',
-  textract: 'Amazon Textract',
   embeddings: 'Nova Embeddings',
-  'nova-embeddings': 'Nova Embeddings',
-  comprehend: 'Amazon Comprehend',
   guardrails: 'Bedrock Guardrails',
-  'bedrock-guardrails': 'Bedrock Guardrails',
 };
 
 /**
@@ -98,10 +97,37 @@ const STEPS = [
   { icon: <Award size={24} strokeWidth={1.5} />, title: 'Recommend', desc: 'Get architecture guidance with cost projections at scale.' },
 ];
 
+/** localStorage key for the dismissed-catalogs preference. */
+const CATALOG_HIDDEN_KEY = 'idp-catalogs-hidden';
+
 export default function HomePage({ onUploadComplete }: HomePageProps) {
   const uploadRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { isUnavailable, reasonFor } = useMethodAvailability();
+
+  /*
+   * Reference catalogs are OPEN by default and dismissible with an ✕.
+   *
+   * They were collapsed by default so the upload control could be the hero, but
+   * collapsed-by-default hides the thing that explains what the tool can do — a
+   * first-time visitor saw two closed accordions. Open-by-default with an explicit
+   * dismiss is the better trade: the information is there when you arrive, and once
+   * you know the catalog you can hide it for good. Upload stays above them either
+   * way, so the hero is unaffected.
+   *
+   * The preference is deliberately NOT part of the workflow state cleared by
+   * "Start over" (see WORKFLOW_KEYS in App.tsx) — it is a preference, not evaluation
+   * state.
+   */
+  const [catalogsHidden, setCatalogsHidden] = useState(
+    () => localStorage.getItem(CATALOG_HIDDEN_KEY) === 'true',
+  );
+  const hideCatalogs = useCallback((hidden: boolean) => {
+    setCatalogsHidden(hidden);
+    try {
+      localStorage.setItem(CATALOG_HIDDEN_KEY, String(hidden));
+    } catch { /* preference only — a quota failure must not break the page */ }
+  }, []);
 
   const handleUploadComplete = (doc: UploadResponse) => {
     onUploadComplete(doc);
@@ -166,12 +192,29 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
           they are not the task, and expanded they pushed the upload control
           three screens down.
         */}
-        <div id="capabilities">
+        {catalogsHidden && (
+          <Box textAlign="center">
+            <Button variant="inline-link" iconName="add-plus" onClick={() => hideCatalogs(false)}>
+              Show the capability and method reference
+            </Button>
+          </Box>
+        )}
+
+        <div id="capabilities" hidden={catalogsHidden}>
           <ExpandableSection
             variant="container"
+            defaultExpanded
             headerText="Capabilities"
             headerCounter={`(${CAPABILITIES.length})`}
             headerDescription="What you can ask a method to extract. The advisor recommends a set for your document."
+            headerActions={
+              <Button
+                variant="icon"
+                iconName="close"
+                ariaLabel="Hide the capability and method reference"
+                onClick={() => hideCatalogs(true)}
+              />
+            }
           >
             <SpaceBetween size="m">
               {CAPABILITY_CATEGORIES.filter((c) => c !== 'industry_specific').map((catId) => {
@@ -185,13 +228,20 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                         display: 'flex', flexWrap: 'wrap', gap: 6,
                       }}>
                         {caps.map((cap) => {
-                          const supportEntries = cap.support
-                            ? Object.entries(cap.support).map(([key, level]) => ({
-                                family: key,
-                                label: FAMILY_NAMES[key] || key,
-                                level: level as SupportLevel,
-                              }))
-                            : [];
+                          /*
+                           * Every family, including the ones that cannot do this.
+                           *
+                           * The popover used to build rows from `cap.support` and then
+                           * filter out `none`, so an unsupported family simply did not
+                           * appear — indistinguishable from a family the catalog forgot
+                           * to rate. For a table someone reads to choose a method,
+                           * absence is ambiguous; state it.
+                           */
+                          const supportEntries = METHOD_FAMILIES.map((family) => ({
+                            family,
+                            label: FAMILY_NAMES[family] || family,
+                            level: (cap.support?.[family] ?? 'none') as SupportLevel,
+                          }));
 
                           return (
                             <Popover
@@ -220,14 +270,19 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                                     ) : (
                                       <>
                                         <Box variant="small" fontWeight="bold" padding={{ bottom: 'xxs' }}>Method Support:</Box>
-                                        {supportEntries.filter((s) => s.level !== 'none').length > 0 ? (
-                                          supportEntries.filter((s) => s.level !== 'none').map((s) => (
+                                        {supportEntries.some((s) => s.level !== 'none') ? (
+                                          supportEntries.map((s) => (
                                             <div key={s.family} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '1px 0' }}>
-                                              <span>{s.label}</span>
+                                              <span style={{ opacity: s.level === 'none' ? 0.6 : 1 }}>{s.label}</span>
                                               <StatusIndicator
-                                                type={s.level === 'excellent' ? 'success' : s.level === 'good' ? 'info' : 'warning'}
+                                                type={
+                                                  s.level === 'excellent' ? 'success'
+                                                    : s.level === 'good' ? 'info'
+                                                      : s.level === 'limited' ? 'warning'
+                                                        : 'stopped'
+                                                }
                                               >
-                                                {s.level}
+                                                {s.level === 'none' ? 'not supported' : s.level}
                                               </StatusIndicator>
                                             </div>
                                           ))
@@ -272,11 +327,21 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
         </div>
 
         {/* Methods, grouped by role rather than as one flat list of peers */}
+        <div hidden={catalogsHidden}>
         <ExpandableSection
           variant="container"
+          defaultExpanded
           headerText="Processing methods"
           headerCounter={`(${METHODS.length})`}
           headerDescription="Grouped by the role each approach plays. Availability reflects this deployment's configuration."
+          headerActions={
+            <Button
+              variant="icon"
+              iconName="close"
+              ariaLabel="Hide the capability and method reference"
+              onClick={() => hideCatalogs(true)}
+            />
+          }
         >
           <SpaceBetween size="l">
             {FAMILY_GROUPS.map((group) => {
@@ -319,7 +384,11 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
                                         ? `Textract $0.0015/pg + $${m.tokenPricing.inputPer1MTokens}/$${m.tokenPricing.outputPer1MTokens} MTok`
                                         : m.tokenPricing.inputPer1MTokens > 0
                                           ? `$${m.tokenPricing.inputPer1MTokens} / $${m.tokenPricing.outputPer1MTokens} MTok`
-                                          : `$${m.estimatedCostPerPage.toFixed(2)}/page`}
+                                          // 4 decimals, not 2: Guardrails is $0.0016/page and
+                                          // Nova Embeddings $0.0005/page, both of which
+                                          // toFixed(2) rendered as "$0.00/page" — advertising a
+                                          // billed method as free.
+                                          : `$${m.estimatedCostPerPage.toFixed(4)}/page`}
                                   </Box>
                                 </div>
                                 {isUnavailable(m.id) && (
@@ -341,6 +410,32 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
             })}
           </SpaceBetween>
         </ExpandableSection>
+        </div>
+
+        {/*
+          The full capability x method matrix. The catalogs above answer "what
+          capabilities exist" and "what methods exist" separately; only this answers
+          the question that actually decides a pipeline — can THIS method do THIS
+          thing, and how well.
+        */}
+        <div hidden={catalogsHidden}>
+          <ExpandableSection
+            variant="container"
+            headerText="Support matrix"
+            headerCounter={`(${CAPABILITIES.length} x ${METHODS.length})`}
+            headerDescription="Every capability against every method, with the support level for each pair."
+            headerActions={
+              <Button
+                variant="icon"
+                iconName="close"
+                ariaLabel="Hide the capability and method reference"
+                onClick={() => hideCatalogs(true)}
+              />
+            }
+          >
+            <SupportMatrix />
+          </ExpandableSection>
+        </div>
 
         <Box color="text-body-secondary" fontSize="body-s" textAlign="center" padding={{ horizontal: 'l' }}>
           * Pricing shown as input / output per 1M tokens for LLM-based methods, and per-page for BDA.

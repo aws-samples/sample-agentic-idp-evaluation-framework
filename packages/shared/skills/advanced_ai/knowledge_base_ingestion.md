@@ -10,7 +10,6 @@ tags: ["knowledge", "base", "rag", "ingestion", "bedrock", "retrieval", "qa"]
 exampleInput: "Extracted text + embeddings from processing pipeline"
 exampleOutput: "Documents indexed in Bedrock Knowledge Base, queryable via RetrieveAndGenerate API"
 support:
-  nova-embeddings: "excellent"
 ---
 
 # Knowledge Base Ingestion
@@ -35,4 +34,3 @@ Returns structured JSON with typed fields.
 
 ## Method support
 
-- **nova-embeddings**: excellent

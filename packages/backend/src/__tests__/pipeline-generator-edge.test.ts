@@ -3,6 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { PipelineGenerateRequest } from '@idp/shared';
+import { METHOD_INFO } from '@idp/shared';
 import { generatePipeline } from '../services/pipeline-generator.js';
 
 function mk(overrides: Partial<PipelineGenerateRequest> = {}): PipelineGenerateRequest {
@@ -141,8 +142,13 @@ describe('generatePipeline — edge cases', () => {
       },
     }));
     expect(pipeline.estimatedCostPerPage).toBeGreaterThan(0);
-    // claude-sonnet ($0.015) + bedrock-guardrails ($0.0016) ≈ 0.0166
-    expect(pipeline.estimatedCostPerPage).toBeCloseTo(0.015 + 0.0016, 3);
+    // Derived from the catalog rather than restated, so a price correction does
+    // not silently turn this into an assertion about a stale number. (It did:
+    // Guardrails was $0.0016 and is now $0.0501 — it calls Textract
+    // AnalyzeDocument with FORMS, not plain OCR.)
+    const expected = METHOD_INFO['claude-sonnet'].estimatedCostPerPage
+      + METHOD_INFO['bedrock-guardrails'].estimatedCostPerPage;
+    expect(pipeline.estimatedCostPerPage).toBeCloseTo(expected, 4);
   });
 
   it('alternatives do not include the primary strategy', () => {

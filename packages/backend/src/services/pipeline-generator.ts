@@ -17,12 +17,14 @@ import type {
   OutputConfig,
 } from '@idp/shared';
 import {
-  CAPABILITY_SUPPORT,
   METHOD_INFO,
+  METHODS,
   getBestMethodsForCapability,
   getMethodFamily,
+  getSupportLevel,
   isMethodLanguageCompatible,
 } from '@idp/shared';
+import { isMethodConfigured } from './method-availability.js';
 
 // Capabilities that Guardrails handles as a dedicated "PII specialist" stage
 // (fed from an upstream LLM/BDA extraction stage via a sequential composer).
@@ -73,6 +75,21 @@ const SPEED_RANK: Record<string, number> = {
 };
 
 const OFFICE_DOC_TYPES: ReadonlySet<string> = new Set(['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls']);
+/**
+ * Families that can read video directly.
+ *
+ * `nova` only — verified against live Bedrock, not inferred from the API shape.
+ * Claude was listed here because Converse HAS a `video` content block, but having
+ * the block is not the same as a model accepting it: every Claude tier (Opus 5,
+ * 4.8, 4.7, Sonnet 4.6/5, Haiku 4.5) rejects it with
+ *   "This model doesn't support the video content block that you provided."
+ * All 7 failed on a real 9-second mp4 through the deployed stack. Nova 2 Lite
+ * reads the same file correctly. GPT goes through the Mantle Responses API, which
+ * has no video path at all.
+ *
+ * Re-verify with a real file before adding a family here; the API surface lies.
+ */
+const VIDEO_CAPABLE_FAMILIES: ReadonlySet<string> = new Set(['nova']);
 
 function selectMethod(
   capability: Capability,
@@ -80,8 +97,59 @@ function selectMethod(
   preferredMethods?: ProcessingMethod[],
   documentLanguages?: string[],
   documentType?: string,
-): ProcessingMethod {
+): ProcessingMethod | undefined {
   let candidates = getBestMethodsForCapability(capability);
+
+  // No method supports this capability (preprocessing/reference entries, or an id
+  // outside the catalog). Returning undefined lets the caller skip it; the
+  // previous implicit `candidates[0]` returned undefined anyway and then blew up
+  // two frames later on `METHOD_INFO[method].shortName`, which surfaced as an
+  // opaque HTTP 500.
+  if (candidates.length === 0) return undefined;
+
+  /*
+   * Drop methods this deployment cannot run, before any strategy is applied.
+   *
+   * Filtering only `preferredMethods` was not enough: when a capability maps to
+   * exactly ONE family and that family is unavailable here, the sole candidate
+   * survived and became a method node that can never execute. That is the real
+   * state of `embedding_generation` and `knowledge_base_ingestion`, which map only
+   * to `embeddings` — Nova Multimodal Embeddings has no processor in any route
+   * registry and its model is not offered in us-west-2 at all. Verified live:
+   * requesting either produced a pipeline whose only node was `nova-embeddings`.
+   *
+   * If nothing runnable is left the capability is unroutable; the caller reports
+   * that instead of emitting a dead node.
+   */
+  const runnable = candidates.filter((m) => isMethodConfigured(m).available);
+  if (runnable.length === 0) return undefined;
+  candidates = runnable;
+
+  /*
+   * Media routing.
+   *
+   * The right mental model is that **BDA is to media what Textract is to pages**: a
+   * managed extractor whose structured output an LLM then interprets. So the
+   * preferred media path is the two-stage `bda-llm` family (BDA extracts shots,
+   * timecodes and transcript; Claude/Nova/etc. structure it), exactly mirroring
+   * `textract-llm` for documents. Verified live on a 9s mp4: BDA returned real shot
+   * detection with timecodes and per-shot confidence, and the LLM stage structured
+   * it — while `bda-standard` alone returns raw BDA JSON the user has to read.
+   *
+   * AUDIO is BDA-only. Converse has no audio content block, so any direct-LLM
+   * method receives a UTF-8 decode of the container and fails.
+   * VIDEO additionally works direct-to-Nova via the Converse video block. Claude is
+   * NOT included — see VIDEO_CAPABLE_FAMILIES; all 7 tiers reject the block.
+   */
+  if (documentType === 'audio') {
+    const audioCapable = candidates.filter((m) => m.startsWith('bda-'));
+    if (audioCapable.length > 0) candidates = audioCapable;
+  } else if (documentType === 'video') {
+    const videoCapable = candidates.filter(
+      (m) => m.startsWith('bda-') || VIDEO_CAPABLE_FAMILIES.has(getMethodFamily(m)),
+    );
+    if (videoCapable.length > 0) candidates = videoCapable;
+  }
 
   // Filter out BDA/Textract for Office documents — they only support PDF/image
   if (documentType && OFFICE_DOC_TYPES.has(documentType)) {
@@ -97,16 +165,53 @@ function selectMethod(
     if (langFiltered.length > 0) candidates = langFiltered;
   }
 
-  // Filter to preferred methods if specified
-  const filtered =
-    preferredMethods?.length
-      ? candidates.filter((m) => preferredMethods.includes(m))
-      : candidates;
+  // Filter to preferred methods if specified. When none of the preferred methods
+  // can perform this capability, fall back to the FULL candidate list and still
+  // apply the requested strategy below.
+  //
+  // This branch used to `return candidates[0]` directly, which silently discarded
+  // optimizeFor: candidates are ordered by support level, so a request to
+  // optimize for cost or speed returned the most ACCURATE method instead — the
+  // opposite of what was asked, and the most expensive/slowest option. It is a
+  // routine path, not an edge case: any capability outside the preferred set hits
+  // it (e.g. preferring Nova 2 Lite, then requesting a PII capability that only
+  // Guardrails and Claude support).
+  const preferredMatches = preferredMethods?.length
+    ? candidates.filter((m) => preferredMethods.includes(m))
+    : candidates;
+  const filtered = preferredMatches.length > 0 ? preferredMatches : candidates;
 
-  if (filtered.length === 0) {
-    // Fallback to first candidate if no preferred methods match
-    return candidates[0];
+  /*
+   * PII is not a cost/speed trade-off.
+   *
+   * Only `balanced` consults balancedScore, so the specialist preference for
+   * Bedrock Guardrails applied to exactly one of the four strategies: optimizing
+   * for cost routed PII redaction to Nova Lite and optimizing for speed to Claude
+   * Haiku — i.e. it asked a generative model to redact its own output. A missed
+   * redaction is a data leak, not a saving, so the deterministic policy engine
+   * wins under every strategy whenever it is genuinely available here.
+   */
+  if (PII_CAPABILITIES.has(capability)) {
+    const specialist = filtered.find((m) => getMethodFamily(m) === 'guardrails');
+    if (specialist) return specialist;
   }
+
+  /*
+   * Quality floor for the cost and speed strategies.
+   *
+   * Both used to sort the whole candidate list with no regard for how well the
+   * method performs the capability, so they returned a method rated `limited`
+   * whenever it happened to be cheapest or fastest. Measured on `bounding_box`
+   * after the per-tier corrections: `cost` chose Nova 2 Lite and `speed` chose
+   * Claude Haiku, both `limited`, while capable tiers were available — the user
+   * asked for the cheapest way to do the job, not the cheapest method that will
+   * probably fail at it.
+   *
+   * `limited` is only accepted when nothing better exists, so a capability that
+   * genuinely has no strong method still routes rather than failing.
+   */
+  const usable = filtered.filter((m) => getSupportLevel(m, capability) !== 'limited');
+  const pool = usable.length > 0 ? usable : filtered;
 
   switch (optimizeFor) {
     case 'accuracy':
@@ -114,15 +219,15 @@ function selectMethod(
       return filtered[0];
 
     case 'cost':
-      // Pick cheapest method
-      return filtered.sort(
+      // Cheapest method that can actually do the job.
+      return pool.slice().sort(
         (a, b) => METHOD_INFO[a].estimatedCostPerPage - METHOD_INFO[b].estimatedCostPerPage,
       )[0];
 
     case 'speed':
-      // Prefer smaller, faster models
-      return filtered.sort(
-        (a, b) => (SPEED_RANK[a] ?? 99) - (SPEED_RANK[b] ?? 99),
+      // Fastest method that can actually do the job.
+      return pool.slice().sort(
+        (a, b) => (SPEED_RANK[a] ?? UNKNOWN_SPEED_RANK) - (SPEED_RANK[b] ?? UNKNOWN_SPEED_RANK),
       )[0];
 
     case 'balanced':
@@ -138,35 +243,79 @@ function selectMethod(
   }
 }
 
+/**
+ * Normalisation bounds, derived from the tables rather than hardcoded.
+ *
+ * Both of these used to be literals sized for the original, smaller catalog:
+ * `maxCost = 0.04` and a speed divisor of `11`. Adding the frontier tiers pushed
+ * SPEED_RANK to 18, so `((11 - rank) / 11) * 100` produced a NEGATIVE speed score
+ * (-64 for Opus 5) instead of a 0-100 one. A negative term is not a low score —
+ * it actively subtracts from accuracy, so the balanced strategy penalised the
+ * most capable models far beyond the intended 30% speed weight. Deriving the
+ * bounds keeps the score in range as the catalog grows.
+ */
+const MAX_SPEED_RANK = Math.max(...Object.values(SPEED_RANK));
+const MAX_COST_PER_PAGE = Math.max(
+  ...Object.values(METHOD_INFO).map((m) => m.estimatedCostPerPage),
+);
+
+/** Rank used for a method absent from SPEED_RANK: assume slowest, not median. */
+const UNKNOWN_SPEED_RANK = MAX_SPEED_RANK;
+
 function balancedScore(method: ProcessingMethod, capability: Capability): number {
   const info = METHOD_INFO[method];
   const family = getMethodFamily(method);
-  const supportLevel = CAPABILITY_SUPPORT[family]?.[capability];
+  // getSupportLevel, not the raw family table: a per-method override (e.g. the
+  // frontier tiers being genuinely good at bounding boxes) must influence the
+  // score, otherwise the matrix and the selection would disagree.
+  const supportLevel = getSupportLevel(method, capability);
 
   // Accuracy score (0-100)
   const accuracyScore =
     supportLevel === 'excellent' ? 100 : supportLevel === 'good' ? 70 : supportLevel === 'limited' ? 40 : 0;
 
   // Cost score (0-100, lower cost = higher score)
-  const maxCost = 0.04; // bda-custom
-  const costScore = ((maxCost - info.estimatedCostPerPage) / maxCost) * 100;
+  const costScore = ((MAX_COST_PER_PAGE - info.estimatedCostPerPage) / MAX_COST_PER_PAGE) * 100;
 
   // Speed score (0-100, lower rank = higher score)
-  const speedRank = SPEED_RANK[method] ?? 11;
-  const speedScore = ((11 - speedRank) / 11) * 100;
+  const speedRank = SPEED_RANK[method] ?? UNKNOWN_SPEED_RANK;
+  const speedScore = ((MAX_SPEED_RANK - speedRank) / MAX_SPEED_RANK) * 100;
 
   // Weighted average: 40% accuracy, 30% cost, 30% speed
   let score = accuracyScore * 0.4 + costScore * 0.3 + speedScore * 0.3;
 
-  // Bonus for PII specialist — Guardrails is deterministic and purpose-built,
-  // so it should win ties for PII capabilities even when cheaper/faster LLMs
-  // exist. Applied only when the method's family is 'guardrails'.
+  /*
+   * PII specialist preference.
+   *
+   * For PII detection/redaction, Guardrails is deterministic and policy-driven
+   * while an LLM is asked to self-redact — and a missed redaction is a data leak,
+   * not a quality trade-off you accept to save money. So the preference must
+   * dominate the cost and speed terms rather than merely break ties.
+   *
+   * The previous flat +25 was calibrated when Guardrails was believed to cost
+   * $0.0016/page. Correcting that to $0.0501 (it calls Textract AnalyzeDocument
+   * with FORMS, not plain OCR) made the cost term large enough to overturn the
+   * bonus, and Claude Haiku started winning PII routing — a correctness
+   * regression caused by a pricing fix. The bonus is now large enough that no
+   * cost/speed advantage can outrank the purpose-built engine.
+   */
   if (PII_CAPABILITIES.has(capability) && family === 'guardrails') {
-    score += 25;
+    score += 100;
   }
 
   return score;
 }
+
+/**
+ * Test-only. The 0-100 normalisation silently broke once SPEED_RANK outgrew its
+ * hardcoded divisor, so the bounds are worth pinning directly rather than
+ * inferring them from which method a pipeline happened to pick.
+ */
+export const scoringBoundsForTest = {
+  maxSpeedRank: MAX_SPEED_RANK,
+  maxCostPerPage: MAX_COST_PER_PAGE,
+  balancedScore,
+};
 
 // ─── Page Classifier Logic ───────────────────────────────────────────────────
 
@@ -217,12 +366,31 @@ export function generatePipeline(
   const {
     documentType,
     capabilities,
-    preferredMethods,
     methodAssignments,
     optimizeFor,
     enableHybridRouting,
     documentLanguages,
   } = request;
+
+  /*
+   * Restrict candidates to methods this deployment can actually run.
+   *
+   * Availability was enforced only at EXECUTION time, so generation happily
+   * proposed a method the deployment cannot run and the user found out when the
+   * node failed. With "optimize for accuracy" this was the common case rather
+   * than an edge case: bda-custom outranks every other BDA method, so the
+   * accuracy pipeline recommended a custom-blueprint method that is deliberately
+   * left unconfigured here — visible in the UI as a canvas node that errors
+   * immediately with "Needs a custom blueprint project".
+   *
+   * Format/language/capability rules still belong to execution (they depend on
+   * the actual upload); this filter is configuration-only, which is exactly what
+   * is knowable at generation time.
+   */
+  const configuredMethods = (request.preferredMethods ?? METHODS).filter(
+    (m) => isMethodConfigured(m).available,
+  );
+  const preferredMethods = configuredMethods.length > 0 ? configuredMethods : request.preferredMethods;
 
   // Reset counters for consistent IDs within this generation
   nodeIdCounter = 1;
@@ -285,13 +453,38 @@ export function generatePipeline(
   //    fall back to the auto-selection heuristic.
   const methodToCapabilities = new Map<ProcessingMethod, Capability[]>();
 
+  const unroutable: Capability[] = [];
+  const skippedCapabilities: Array<{ capability: string; reason: string }> = [];
   for (const capability of capabilities) {
     const explicit = methodAssignments?.[capability];
     const method = explicit ?? selectMethod(capability, optimizeFor, preferredMethods, documentLanguages, documentType);
+    // Skip capabilities no method can perform, and any explicit assignment naming
+    // a method that is not in the catalog (e.g. a stale id from a saved run).
+    if (!method || !METHOD_INFO[method]) {
+      unroutable.push(capability);
+      // Explain WHY, distinguishing "no method supports this" from "the only
+      // method that supports it cannot run in this deployment". Silently dropping
+      // the capability made it look like the request had been honoured.
+      const supporting = getBestMethodsForCapability(capability);
+      skippedCapabilities.push({
+        capability,
+        reason: supporting.length === 0
+          ? 'No processing method performs this capability (it is a preprocessing or reference-only entry).'
+          : (isMethodConfigured(supporting[0]).detail
+            ?? 'No method that supports this capability is available in this deployment.'),
+      });
+      continue;
+    }
     if (!methodToCapabilities.has(method)) {
       methodToCapabilities.set(method, []);
     }
     methodToCapabilities.get(method)!.push(capability);
+  }
+
+  if (methodToCapabilities.size === 0) {
+    throw new Error(
+      `No processing method supports the requested capabilities: ${unroutable.join(', ')}`,
+    );
   }
 
   // 3a. Detect a sequential composition pattern:
@@ -540,6 +733,7 @@ export function generatePipeline(
     pipeline,
     alternatives,
     rationale,
+    ...(skippedCapabilities.length > 0 ? { skippedCapabilities } : {}),
   };
 }
 
@@ -592,9 +786,22 @@ function generateRationale(
   if (request.documentLanguages?.length) {
     const isEnglish = request.documentLanguages.every((l) => l.toLowerCase().startsWith('en'));
     if (!isEnglish) {
+      /*
+       * State the measurement, not a vague caveat. "Do not reliably support" reads
+       * like a minor quality note; the real gap is severe. Measured on a Korean
+       * quotation with known ground truth, recall of content verifiably present in
+       * the document: every BDA method 32%, every Textract hybrid 37-42%, versus
+       * 100% for the Claude and GPT tiers. Two of the excluded methods also reported
+       * 87-93% self-confidence while recovering a third of the page, which is why
+       * the exclusion is a routing rule rather than a warning the user can weigh.
+       */
       lines.push(`\n**Language Constraint:**`);
       lines.push(
-        `Document language(s): ${request.documentLanguages.join(', ')}. BDA and Textract methods were excluded as they do not reliably support non-English documents. Only Claude and Nova (multimodal LLM) methods are used.`,
+        `Document language(s): ${request.documentLanguages.join(', ')}. BDA and Textract methods were excluded: `
+        + `measured against a Korean document with known ground truth they recovered only 32% (BDA) and `
+        + `37-42% (Textract+LLM) of the content actually present, while the multimodal LLMs recovered 100%. `
+        + `Textract's own OCR confidence drops to ~63% on Korean versus ~100% on English. `
+        + `Only Claude, Nova and GPT (multimodal LLM) methods are used.`,
       );
     }
   }

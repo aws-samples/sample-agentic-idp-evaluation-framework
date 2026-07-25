@@ -11,15 +11,17 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
     "@aws-sdk/client-bedrock-agentcore": "^3.1014.0",
     "@aws-sdk/client-bedrock-data-automation-runtime": "^3.750.0",
     "@aws-sdk/client-bedrock-runtime": "^3.750.0",
     "@aws-sdk/client-dynamodb": "^3.1014.0",
     "@aws-sdk/client-s3": "^3.750.0",
+    "@aws-sdk/client-sagemaker-runtime": "^3.1095.0",
+    "@aws-sdk/client-sts": "^3.1095.0",
     "@aws-sdk/client-textract": "^3.750.0",
     "@aws-sdk/lib-dynamodb": "^3.1014.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
-    "@aws-crypto/sha256-js": "^5.2.0",
     "@idp/shared": "*",
     "@smithy/protocol-http": "^5.3.0",
     "@smithy/signature-v4": "^5.3.0",

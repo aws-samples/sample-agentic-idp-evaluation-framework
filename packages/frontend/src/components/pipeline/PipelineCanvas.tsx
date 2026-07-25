@@ -21,6 +21,8 @@ import AggregatorNode from './nodes/AggregatorNode';
 import SequentialComposerNode from './nodes/SequentialComposerNode';
 import OutputNode from './nodes/OutputNode';
 import type { NodeStateInfo } from '../../hooks/usePipeline';
+import { NODE_STATUS_COLORS } from './nodes/node-style';
+import { token } from '../../theme/tokens';
 
 const nodeTypes = {
   'document-input': DocumentInputNode,
@@ -82,10 +84,10 @@ export default function PipelineCanvas({
         type: ConnectionLineType.SmoothStep,
         animated: isActive,
         style: {
-          stroke: isActive ? '#0972d3' : '#b6bec9',
+          stroke: isActive ? NODE_STATUS_COLORS.active : token.border,
           strokeWidth: isActive ? 2.5 : 1.5,
         },
-        labelStyle: { fontSize: 10, fill: '#5f6b7a' },
+        labelStyle: { fontSize: 10, fill: token.textSecondary },
       };
     });
   }, [pipeline.edges, activeEdges]);
@@ -118,7 +120,7 @@ export default function PipelineCanvas({
   );
 
   return (
-    <div style={{ width: '100%', height: '500px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e9ebed' }}>
+    <div style={{ width: '100%', height: '500px', background: token.surfaceMuted, borderRadius: '8px', border: `1px solid ${token.border}` }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -136,7 +138,7 @@ export default function PipelineCanvas({
           type: ConnectionLineType.SmoothStep,
         }}
       >
-        <Background color="#e9ebed" gap={20} />
+        <Background color={token.border} gap={20} />
         <Controls style={{ bottom: 10, left: 10 }} />
       </ReactFlow>
     </div>

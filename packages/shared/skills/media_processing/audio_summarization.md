@@ -10,9 +10,8 @@ tags: ["audio", "summary", "topic", "meeting", "podcast"]
 exampleInput: "Team meeting recording"
 exampleOutput: "Topic summaries with timestamps and action items"
 support:
-  bda: "excellent"
   bda-llm: "excellent"
-  nova: "excellent"
+  video-understanding: "good"
 ---
 
 # Audio Summarization
@@ -37,6 +36,5 @@ Returns structured JSON with typed fields.
 
 ## Method support
 
-- **bda**: excellent
 - **bda-llm**: excellent
-- **nova**: excellent
+- **video-understanding**: good

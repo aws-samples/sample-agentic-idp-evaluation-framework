@@ -167,15 +167,38 @@ Return ONLY valid JSON:
       };
     }
 
-    // Generate pipeline using the standard generator with LLM's preferences
-    const preferredMethods = Object.values(recommendation.methodAssignments) as ProcessingMethod[];
+    /*
+     * Pass the LLM's plan through as a per-capability MAPPING, not a flat list.
+     *
+     * `Object.values(methodAssignments)` threw away which method was chosen for
+     * which capability, leaving only an unordered set of allowed methods. The
+     * generator then re-derived an assignment itself and, because it picks the
+     * single best method from that set per capability, a deliberate multi-method
+     * plan ("Textract+Haiku for tables, Guardrails for PII") collapsed onto
+     * whichever one method scored highest overall — so the smart pipeline
+     * consistently produced a single-method pipeline while the rationale shown
+     * next to it described several.
+     *
+     * generatePipeline already honours `methodAssignments` per capability, so the
+     * mapping only had to be forwarded. Unknown method names are dropped here
+     * rather than reaching layout, since the LLM can hallucinate an id.
+     */
+    const rawAssignments = recommendation.methodAssignments ?? {};
+    const methodAssignments: Record<string, ProcessingMethod> = {};
+    for (const [capability, method] of Object.entries(rawAssignments)) {
+      if (typeof method === 'string' && method in METHOD_INFO) {
+        methodAssignments[capability] = method as ProcessingMethod;
+      } else {
+        console.warn(`[Smart Pipeline] ignoring unknown method "${method}" for ${capability}`);
+      }
+    }
 
     const pipelineRequest: PipelineGenerateRequest = {
       documentType: (body.documentType ?? 'pdf') as any,
       capabilities: body.capabilities,
       optimizeFor: (recommendation.optimizeFor ?? 'balanced') as any,
       enableHybridRouting: recommendation.enableHybridRouting ?? false,
-      preferredMethods: preferredMethods.length > 0 ? preferredMethods : undefined,
+      methodAssignments: Object.keys(methodAssignments).length > 0 ? methodAssignments as any : undefined,
       documentLanguages: body.documentLanguages,
     };
 

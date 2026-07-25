@@ -12,6 +12,15 @@ import { NovaLiteProcessor } from '../processors/nova-direct.js';
 import { Gpt56SolProcessor, Gpt56TerraProcessor, Gpt56LunaProcessor, Gpt55Processor } from '../processors/gpt-direct.js';
 import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor } from '../processors/textract-llm.js';
 import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
+import { TwelveLabsPegasusProcessor } from '../processors/pegasus.js';
+import {
+  SageMakerInfinityParser2Processor,
+  SageMakerBaiduOcrProcessor,
+  SageMakerSuryaOcrProcessor,
+  SageMakerChandraOcrProcessor,
+  SageMakerDotsOcrProcessor,
+  SageMakerQwen3VlProcessor,
+} from '../processors/sagemaker-ocr.js';
 import { getMethodAvailability } from '../services/method-availability.js';
 
 const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Record<string, () => ProcessorBase> = {
@@ -36,6 +45,16 @@ const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Re
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
   'textract-nova-lite': () => new TextractNovaLiteProcessor(),
   'bedrock-guardrails': () => new BedrockGuardrailsProcessor(),
+  // Purpose-built video understanding (InvokeModel + inference profile).
+  'twelvelabs-pegasus': () => new TwelveLabsPegasusProcessor(),
+  // Specialist OCR on self-hosted SageMaker endpoints. Registered so they can run
+  // when configured; availability gating reports them unavailable until then.
+  'sagemaker-infinity-parser2': () => new SageMakerInfinityParser2Processor(),
+  'sagemaker-baidu-ocr': () => new SageMakerBaiduOcrProcessor(),
+  'sagemaker-surya-ocr': () => new SageMakerSuryaOcrProcessor(),
+  'sagemaker-chandra-ocr': () => new SageMakerChandraOcrProcessor(),
+  'sagemaker-dots-ocr': () => new SageMakerDotsOcrProcessor(),
+  'sagemaker-qwen3-vl': () => new SageMakerQwen3VlProcessor(),
 };
 
 function estimatePageCount(buffer: Buffer): number {

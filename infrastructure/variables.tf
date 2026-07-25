@@ -133,3 +133,72 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
+
+# ─── Run-history privacy ──────────────────────────────────────────────────────
+
+variable "disable_run_history" {
+  description = <<-EOT
+    Disable stored run history (Recent Runs + the "evaluation in progress" resume
+    banner).
+
+    MUST be true for any shared or public deployment. With auth_provider = "none"
+    every visitor authenticates as the same alias, so a stored run list is a single
+    shared list — meaning any visitor can open, resume and read documents that
+    someone else uploaded, and one person's evaluation can be contaminated with
+    another person's file. That is document disclosure between strangers.
+
+    When true the backend refuses GET /api/runs and GET /api/runs/:id outright (403),
+    and the UI hides the nav entry, the route and the resume banner. The refusal is
+    server-side on purpose: hiding a nav link is not a security control.
+
+    Defaults to true. An authenticated deployment (Cognito/Midway) can set this to
+    false to get real per-user history.
+  EOT
+  type        = bool
+  default     = true
+}
+
+# ─── Specialist OCR endpoints (opt-in, self-hosted on SageMaker) ──────────────
+
+variable "sagemaker_ocr_endpoints" {
+  description = <<-EOT
+    Map of backend env var name -> SageMaker endpoint NAME for the specialist
+    document-OCR models. Empty by default: every entry you leave blank makes that
+    method report "endpoint not configured" instead of failing at run time.
+
+    These are NOT Bedrock models. Each is a self-hosted SageMaker real-time endpoint
+    on a GPU instance that bills hourly WHETHER OR NOT it serves traffic —
+    ml.g6e.2xlarge is ~$2.24/hr and ml.g7e.4xlarge ~$7.09/hr, so five idle endpoints
+    would add well over $1,000/month. Deploy them deliberately, and delete them when
+    you are done demoing.
+
+    Measured over 336 real scanned pages (see the hybrid vision + spatial reasoning
+    benchmark): Infinity-Parser2 is the only model that reliably splits dense grid
+    layouts; Baidu is cheapest per image and handles ~70% of pages; Surya and Chandra
+    have the highest recall but collapse dense grids; dots has the best precision but
+    loops on dense pages.
+
+    Recognised keys:
+      SAGEMAKER_OCR_INFINITY  - infly/Infinity-Parser2-Pro (35B)
+      SAGEMAKER_OCR_BAIDU     - baidu/Unlimited-OCR (3B)
+      SAGEMAKER_OCR_SURYA     - Surya OCR 2 (0.65B)
+      SAGEMAKER_OCR_CHANDRA   - Chandra OCR 2 (5.3B)
+      SAGEMAKER_OCR_DOTS      - dots.ocr (3B)
+      SAGEMAKER_OCR_QWEN3VL   - Qwen3-VL (235B)
+  EOT
+  type        = map(string)
+  default     = {}
+}
+
+variable "sagemaker_ocr_cost_per_page" {
+  description = <<-EOT
+    Override the per-image cost used to price the specialist OCR stage, as a string.
+
+    Cost is GPU-hours, not tokens, so the real figure depends on YOUR instance type
+    and throughput. Leave empty to use the measured ml.g6e.2xlarge default
+    ($2.24/hr / ~263 img/hr = $0.0085/image). For ml.g7e.4xlarge the measured figure
+    is $0.0122/image (faster wall-clock, ~31% more per image).
+  EOT
+  type        = string
+  default     = ""
+}

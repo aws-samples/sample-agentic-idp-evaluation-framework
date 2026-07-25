@@ -10,7 +10,7 @@ tags: ["classify", "categorize", "type", "identification"]
 exampleInput: "Unknown document"
 exampleOutput: "{"type": "invoice", "confidence": 0.95, "subtype": "utility_bill"}"
 support:
-  bda: "good"
+  bda: "limited"
   bda-llm: "excellent"
   claude: "excellent"
   gpt: "excellent"
@@ -40,7 +40,7 @@ Returns structured JSON with typed fields.
 
 ## Method support
 
-- **bda**: good
+- **bda**: limited
 - **bda-llm**: excellent
 - **claude**: excellent
 - **nova**: good

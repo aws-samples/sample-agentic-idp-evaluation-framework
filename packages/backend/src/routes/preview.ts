@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import type { Capability, ProcessingMethod } from '@idp/shared';
-import { getBestMethodsForCapability, METHOD_INFO } from '@idp/shared';
+import type { Capability, ProcessingMethod, ProcessorResult } from '@idp/shared';
+import { getBestMethodsForCapability, METHOD_INFO, detectScripts } from '@idp/shared';
 import { getDocumentBuffer } from '../services/s3.js';
 import { convertOfficeDocument, isOfficeFormat } from '../services/file-converter.js';
 import type { AdapterInput } from '../adapters/stream-adapter.js';
@@ -12,9 +12,19 @@ import { NovaLiteProcessor } from '../processors/nova-direct.js';
 import { Gpt56SolProcessor, Gpt56TerraProcessor, Gpt56LunaProcessor, Gpt55Processor } from '../processors/gpt-direct.js';
 import { TextractClaudeSonnetProcessor, TextractClaudeHaikuProcessor, TextractNovaLiteProcessor } from '../processors/textract-llm.js';
 import { BedrockGuardrailsProcessor } from '../processors/guardrails.js';
+import { TwelveLabsPegasusProcessor } from '../processors/pegasus.js';
+import {
+  SageMakerInfinityParser2Processor,
+  SageMakerBaiduOcrProcessor,
+  SageMakerSuryaOcrProcessor,
+  SageMakerChandraOcrProcessor,
+  SageMakerDotsOcrProcessor,
+  SageMakerQwen3VlProcessor,
+} from '../processors/sagemaker-ocr.js';
 import { getMethodAvailability } from '../services/method-availability.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { trackActivity, trackRunResults } from '../services/activity-tracker.js';
+import { extractUpstreamText } from '../services/pipeline-text-extractor.js';
 import { randomUUID } from 'crypto';
 
 interface PreviewRequest {
@@ -58,6 +68,16 @@ const PROCESSOR_FACTORY: Partial<Record<ProcessingMethod, () => ProcessorBase>> 
   'textract-claude-haiku': () => new TextractClaudeHaikuProcessor(),
   'textract-nova-lite': () => new TextractNovaLiteProcessor(),
   'bedrock-guardrails': () => new BedrockGuardrailsProcessor(),
+  // Purpose-built video understanding (InvokeModel + inference profile).
+  'twelvelabs-pegasus': () => new TwelveLabsPegasusProcessor(),
+  // Specialist OCR on self-hosted SageMaker endpoints. Registered so they can run
+  // when configured; availability gating reports them unavailable until then.
+  'sagemaker-infinity-parser2': () => new SageMakerInfinityParser2Processor(),
+  'sagemaker-baidu-ocr': () => new SageMakerBaiduOcrProcessor(),
+  'sagemaker-surya-ocr': () => new SageMakerSuryaOcrProcessor(),
+  'sagemaker-chandra-ocr': () => new SageMakerChandraOcrProcessor(),
+  'sagemaker-dots-ocr': () => new SageMakerDotsOcrProcessor(),
+  'sagemaker-qwen3-vl': () => new SageMakerQwen3VlProcessor(),
 };
 
 function estimatePageCount(buffer: Buffer): number {
@@ -67,12 +87,23 @@ function estimatePageCount(buffer: Buffer): number {
 }
 
 /**
- * Per-method ceiling for the preview step. Preview runs every method in
- * parallel and the user waits on the slowest one, so an unbounded method makes
- * the whole comparison unusable. 60s is far above the observed p99 for a
- * healthy method (~5-25s) while still cutting off a runaway.
+ * Per-method ceiling for the preview step.
+ *
+ * This exists only to stop a genuinely stuck method from holding the SSE stream
+ * open forever — NOT to enforce a latency budget. It was 60s, chosen from
+ * single-page test documents, and that turned out to be far too aggressive on
+ * real work: a 6-page Korean quotation with dense tables took Nova 2 Lite 41.8s
+ * and Haiku 45.6s, and cancelled 9 of 12 methods — every Opus and Sonnet tier and
+ * three GPT tiers — so the comparison showed 3 results and 9 identical
+ * "exceeded the 60s preview limit" errors. A cancelled method is worse than a
+ * slow one: the user still waits, still pays for the tokens already generated,
+ * and learns nothing about the model.
+ *
+ * 5 minutes is above any plausible healthy run (the slowest observed real method
+ * is ~46s) while still bounding a hang. Results stream in as each method
+ * finishes, so a slow method no longer blocks seeing the fast ones.
  */
-const PREVIEW_METHOD_TIMEOUT_MS = 60_000;
+const PREVIEW_METHOD_TIMEOUT_MS = 300_000;
 
 /**
  * Output-token cap for preview runs, scaled by document size.
@@ -103,7 +134,7 @@ function previewOutputCap(capabilityCount: number, pageCount: number): number {
 
 class MethodTimeoutError extends Error {
   constructor(method: string, ms: number) {
-    super(`${method} exceeded the ${ms / 1000}s preview limit and was cancelled. Run it from the Pipeline step for a full, untimed execution.`);
+    super(`Stopped waiting after ${Math.round(ms / 60_000)} minutes. Run this method from the Pipeline step for a full, untimed execution.`);
     this.name = 'MethodTimeoutError';
   }
 }
@@ -194,8 +225,9 @@ router.post('/', async (req, res) => {
     initSSE(res);
     const keepalive = startKeepalive(res);
 
-    // Collect results for run tracking
-    const collectedResults: unknown[] = [];
+    // Collect results for run tracking. Typed (was `unknown[]`) so the script
+    // detection below can read each result's extracted text without a cast.
+    const collectedResults: ProcessorResult[] = [];
 
     // Emit method list upfront
     emitSSE(res, {
@@ -254,6 +286,9 @@ router.post('/', async (req, res) => {
             latencyMs: result.metrics.latencyMs,
             estimatedCost: result.metrics.cost,
             confidence: result.metrics.confidence,
+            // Measured OCR confidence for two-stage methods — the only
+            // non-self-reported confidence figure available.
+            ocrConfidence: result.metrics.ocrConfidence,
             tokenUsage: result.metrics.tokenUsage,
             ...(result.error ? { error: result.error } : {}),
           });
@@ -277,6 +312,47 @@ router.post('/', async (req, res) => {
 
     console.log(`[Preview] docId=${body.documentId} completed ${validMethods.length} methods in ${Date.now() - previewStart}ms`);
 
+    /*
+     * Detect the document's script from what the models actually read, and tell the
+     * client — so pipeline routing can exclude the families that cannot handle it
+     * even when the advisor interview never ran.
+     *
+     * Why here and not at upload: this is the first point where the document's text
+     * exists without paying for a separate extraction. Preview deliberately still
+     * runs EVERY method — watching BDA score 32% on a Korean page next to Claude's
+     * 100% is the comparison this product exists to show. It is step 3 (build a
+     * pipeline you would deploy) that must not silently pick a 32% method.
+     *
+     * Measured on a real Korean quotation: every BDA method recovered 32% of known
+     * content and every Textract hybrid 37-42%, versus 100% for the Claude and GPT
+     * tiers — and two of them reported 87-93% self-confidence while doing it.
+     * `isMethodLanguageCompatible` already encodes exactly this exclusion; it was
+     * simply never given the input.
+     */
+    const detected = detectScripts(
+      collectedResults.map((r) => extractUpstreamText(r)).join('\n'),
+    );
+    // A caller-supplied language (from the interview) is authoritative — the user
+    // may know something the sample does not show.
+    const effectiveLanguages = documentLanguages.length > 0
+      ? documentLanguages
+      : detected.languages;
+
+    if (documentLanguages.length === 0 && detected.scripts.length > 0) {
+      emitSSE(res, {
+        type: 'languages_detected',
+        data: {
+          languages: detected.languages,
+          scripts: detected.scripts,
+          nonLatinRatio: detected.nonLatinRatio,
+        },
+      } as never);
+      console.log(
+        `[Preview] detected script(s) ${detected.scripts.join('/')} `
+        + `(${Math.round(detected.nonLatinRatio * 100)}% non-Latin) -> languages ${detected.languages.join(',')}`,
+      );
+    }
+
     // Save run results for the "Recent Runs" feature (non-blocking)
     const ext2 = (fileName.match(/\.(\w+)$/)?.[1] ?? '').toLowerCase();
     trackRunResults(userAlias, {
@@ -293,7 +369,7 @@ router.post('/', async (req, res) => {
       fileSize: docBuffer.length,
       pageCount,
       fileType: ext2 || undefined,
-      documentLanguages: documentLanguages.length > 0 ? documentLanguages : undefined,
+      documentLanguages: effectiveLanguages.length > 0 ? effectiveLanguages : undefined,
     });
 
     emitSSE(res, { type: 'preview_done', runId });

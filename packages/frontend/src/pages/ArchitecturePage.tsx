@@ -13,6 +13,7 @@ import Input from '@cloudscape-design/components/input';
 import FormField from '@cloudscape-design/components/form-field';
 import Table from '@cloudscape-design/components/table';
 import Spinner from '@cloudscape-design/components/spinner';
+import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import type {
   UploadResponse,
   Capability,
@@ -26,6 +27,7 @@ import { marked } from 'marked';
 import { useArchitecture } from '../hooks/useArchitecture';
 import { useCodeGen } from '../hooks/useCodeGen';
 import MermaidDiagram from '../components/common/MermaidDiagram';
+import { token } from '../theme/tokens';
 import SafeHtml from '../components/common/SafeHtml';
 import StepGate from '../components/common/StepGate';
 import {
@@ -52,6 +54,88 @@ interface ArchitecturePageProps {
 }
 
 
+/**
+ * The generated project, grouped by what the user is trying to do rather than by
+ * file. `aiGenerated` marks the files an LLM writes; the rest are fixed manifests
+ * and entry points that are identical in every bundle, so tagging them "(AI)"
+ * would have been noise.
+ */
+type FileKey =
+  | 'readme' | 'python' | 'requirements' | 'typescript' | 'tsPkg'
+  | 'cdkStack' | 'cdkLambda' | 'cdkApp' | 'cdkPkg' | 'cdkJson' | 'pipelineConfig';
+
+interface GeneratedFile {
+  key: FileKey;
+  name: string;
+  language: string;
+  /** Whether this file comes from the AI bundle, so the label can say so. */
+  aiGenerated?: boolean;
+}
+
+const FILE_GROUPS: Array<{
+  id: string;
+  label: string;
+  hint: string;
+  files: GeneratedFile[];
+}> = [
+  {
+    id: 'overview',
+    label: 'Read me first',
+    hint: 'What this project does, how to run it, and which methods it was generated from.',
+    files: [
+      { key: 'readme', name: 'README.md', language: 'markdown' },
+      { key: 'pipelineConfig', name: 'pipeline.json', language: 'json' },
+    ],
+  },
+  {
+    id: 'python',
+    label: 'Python',
+    hint: 'A runnable script plus its dependencies. Start here for a quick local test.',
+    files: [
+      { key: 'python', name: 'process.py', language: 'python', aiGenerated: true },
+      { key: 'requirements', name: 'requirements.txt', language: 'text' },
+    ],
+  },
+  {
+    id: 'typescript',
+    label: 'TypeScript',
+    hint: 'The same processing logic for a Node.js project.',
+    files: [
+      { key: 'typescript', name: 'process.ts', language: 'typescript', aiGenerated: true },
+      { key: 'tsPkg', name: 'package.json', language: 'json' },
+    ],
+  },
+  {
+    id: 'deploy',
+    label: 'Deploy (CDK)',
+    hint: 'A complete CDK app: S3, Lambda and least-privilege IAM. `cdk deploy` as-is.',
+    files: [
+      { key: 'cdkStack', name: 'lib/idp-stack.ts', language: 'typescript', aiGenerated: true },
+      { key: 'cdkLambda', name: 'lambda/processor.ts', language: 'typescript', aiGenerated: true },
+      { key: 'cdkApp', name: 'bin/idp.ts', language: 'typescript' },
+      { key: 'cdkPkg', name: 'package.json', language: 'json' },
+      { key: 'cdkJson', name: 'cdk.json', language: 'json' },
+    ],
+  },
+];
+
+const TOTAL_GENERATED_FILES = FILE_GROUPS.reduce((n, g) => n + g.files.length, 0);
+
+/** Where each file lands in the downloaded ZIP. The tab labels are relative names. */
+const ZIP_PATHS: Record<FileKey, string> = {
+  readme: 'README.md',
+  pipelineConfig: 'pipeline.json',
+  python: 'process.py',
+  requirements: 'requirements.txt',
+  typescript: 'process.ts',
+  tsPkg: 'package.json',
+  cdkStack: 'cdk/lib/idp-stack.ts',
+  cdkLambda: 'cdk/lambda/processor.ts',
+  cdkApp: 'cdk/bin/idp.ts',
+  cdkPkg: 'cdk/package.json',
+  cdkJson: 'cdk/cdk.json',
+};
+
 export default function ArchitecturePage({
   document,
   processingResults,
@@ -64,6 +148,7 @@ export default function ArchitecturePage({
   const { code: aiCode, isGenerating: codeGenLoading, generateCode } = useCodeGen();
   const aiGenerated = useRef(false);
   const codeGenTriggered = useRef(false);
+  const [activeGroup, setActiveGroup] = useState(FILE_GROUPS[0].id);
 
   // Auto-generate AI recommendation when we have processing results
   useEffect(() => {
@@ -147,17 +232,69 @@ export default function ArchitecturePage({
 
   const methodSummary = useMemo(() => {
     const methodMap = buildMethodMap(capabilities, processingResults, comparison, executedPipeline);
-    return Array.from(methodMap.entries()).map(([method, caps]) => ({
-      method,
-      info: METHOD_INFO[method as ProcessingMethod],
-      capabilities: caps.map(c => CAPABILITY_INFO[c as Capability]?.name ?? c),
-    }));
+    return Array.from(methodMap.entries())
+      .map(([method, caps]) => ({
+        method,
+        info: METHOD_INFO[method as ProcessingMethod],
+        capabilities: caps.map(c => CAPABILITY_INFO[c as Capability]?.name ?? c),
+      }))
+      // Drop methods that are no longer in the catalog.
+      //
+      // State persists across releases, and runs are re-loadable from DynamoDB, so
+      // a stored pipeline can name a method that has since been removed (nova-pro
+      // was). `info` was then undefined and the very next line —
+      // `m.info.shortName` — threw, blanking the whole Architecture page for a run
+      // that is otherwise perfectly readable.
+      .filter((m) => !!m.info);
   }, [capabilities, processingResults, comparison, executedPipeline]);
 
   // Detect sequential composer from the executed pipeline (extract→guardrails).
   const hasSequentialComposer = useMemo(() => {
     return !!executedPipeline?.nodes.some((n) => n.type === 'sequential-composer');
   }, [executedPipeline]);
+
+  /**
+   * Per-page cost of the whole architecture, matching how step 3 states it
+   * (`pipeline.estimatedCostPerPage`) so the two steps do not disagree on the
+   * headline number. Methods run per page, so their fees add.
+   */
+  const summaryCostPerPage = useMemo(
+    () => methodSummary.reduce((sum, m) => sum + m.info.estimatedCostPerPage, 0),
+    [methodSummary],
+  );
+
+  const pipelineConfigJson = useMemo(() => JSON.stringify({
+    capabilities,
+    methods: methodSummary.map((m) => ({
+      method: m.method,
+      model: m.info.name,
+      modelId: METHOD_INFO[m.method as ProcessingMethod]?.modelId,
+      capabilities: m.capabilities,
+      pricing: m.info.tokenPricing,
+    })),
+  }, null, 2), [capabilities, methodSummary]);
+
+  const fileContents: Record<FileKey, string> = {
+    readme: activeReadme,
+    python: activePython,
+    requirements: activeRequirements,
+    typescript: activeTs,
+    tsPkg: activeTsPkg,
+    cdkStack: activeCdk,
+    cdkLambda: activeLambda,
+    cdkApp: activeCdkApp,
+    cdkPkg: activeCdkPkg,
+    cdkJson: activeCdkJson,
+    pipelineConfig: pipelineConfigJson,
+  };
+  const fileFor = (key: FileKey) => fileContents[key];
+
+  /** Suffix marks provenance, so a template bundle is never presented as AI output. */
+  const fileLabel = (file: GeneratedFile) => {
+    if (!file.aiGenerated) return file.name;
+    if (codeGenLoading) return `${file.name} …`;
+    return aiBundleComplete ? `${file.name} (AI)` : file.name;
+  };
 
   if (!document || capabilities.length === 0) {
     return (
@@ -171,27 +308,16 @@ export default function ArchitecturePage({
     const JSZip = (await import('jszip')).default;
     const zip = new JSZip();
 
-    zip.file('README.md', activeReadme);
-    zip.file('process.py', activePython);
-    zip.file('requirements.txt', activeRequirements);
-    zip.file('process.ts', activeTs);
-    zip.file('package.json', activeTsPkg);
-    zip.file('cdk/cdk.json', activeCdkJson);
-    zip.file('cdk/package.json', activeCdkPkg);
-    zip.file('cdk/bin/idp.ts', activeCdkApp);
-    zip.file('cdk/lib/idp-stack.ts', activeCdk);
-    zip.file('cdk/lambda/processor.ts', activeLambda);
-    zip.file('pipeline.json', JSON.stringify({
-      capabilities,
-      methods: methodSummary.map((m) => ({
-        method: m.method,
-        model: m.info.name,
-        modelId: METHOD_INFO[m.method as ProcessingMethod]?.modelId,
-        capabilities: m.capabilities,
-        pricing: m.info.tokenPricing,
-      })),
-      generatedAt: new Date().toISOString(),
-    }, null, 2));
+    /*
+     * Paths come from ZIP_PATHS keyed by the same FileKey the tabs use, so the
+     * download and the viewer cannot drift apart — previously both restated the
+     * file list and `pipeline.json` was serialised twice with different content.
+     */
+    for (const group of FILE_GROUPS) {
+      for (const file of group.files) {
+        zip.file(ZIP_PATHS[file.key], fileFor(file.key));
+      }
+    }
 
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
@@ -214,6 +340,83 @@ export default function ArchitecturePage({
       }
     >
       <SpaceBetween size="l">
+        {processingResults.length === 0 && (
+          <Alert type="info" header="No pipeline execution data" action={
+            <Button href="/pipeline">Go to Pipeline</Button>
+          }>
+            Run the pipeline first to get AI-powered architecture recommendations based on actual processing results.
+          </Alert>
+        )}
+
+        {/*
+          Leads with the same shape as step 3: a 4-up metric row, then the detail.
+          Step 4 used to open with the AI narrative and bury what actually ran in
+          the middle of the page, so the two steps read as unrelated screens.
+        */}
+        <Container
+          header={
+            <Header
+              variant="h2"
+              description={
+                executedPipeline
+                  ? `Reflects the pipeline you executed in Step 3${selectedPipelineMethod ? ` (preferred: ${selectedPipelineMethod})` : ''}${hasSequentialComposer ? ' — sequential composition active' : ''}.`
+                  : 'No pipeline executed; showing best-guess from preview comparison.'
+              }
+            >
+              Pipeline Architecture
+            </Header>
+          }
+        >
+          <SpaceBetween size="m">
+            <ColumnLayout columns={4} variant="text-grid">
+              <div>
+                <Box variant="awsui-key-label">Estimated Cost</Box>
+                <Box variant="awsui-value-large">${summaryCostPerPage.toFixed(4)}/page</Box>
+              </div>
+              <div>
+                <Box variant="awsui-key-label">Methods</Box>
+                <Box variant="awsui-value-large">{methodSummary.length}</Box>
+              </div>
+              <div>
+                <Box variant="awsui-key-label">Capabilities</Box>
+                <Box variant="awsui-value-large">{capabilities.length}</Box>
+              </div>
+              <div>
+                <Box variant="awsui-key-label">Files Generated</Box>
+                <Box variant="awsui-value-large">{TOTAL_GENERATED_FILES}</Box>
+              </div>
+            </ColumnLayout>
+
+            {/*
+              `columns` is clamped to 1-4. It used to be passed methodSummary.length
+              directly, so a pipeline using 5+ methods handed Cloudscape an
+              out-of-range column count, and a pipeline with 0 methods passed 0.
+            */}
+            {methodSummary.length === 0 ? (
+              <Box color="text-body-secondary">
+                No processing methods recorded for this run.
+              </Box>
+            ) : (
+              <ColumnLayout
+                columns={Math.min(4, Math.max(1, methodSummary.length))}
+                variant="text-grid"
+              >
+                {methodSummary.map((m) => (
+                  <div key={m.method}>
+                    <Box variant="awsui-key-label">{m.info.shortName}</Box>
+                    <Box color="text-body-secondary" fontSize="body-s" padding={{ top: 'xxs' }}>
+                      {m.capabilities.join(', ')}
+                    </Box>
+                    <Box fontSize="body-s" padding={{ top: 'xxs' }}>
+                      ${m.info.tokenPricing.inputPer1MTokens}/{m.info.tokenPricing.outputPer1MTokens} per 1M tokens
+                    </Box>
+                  </div>
+                ))}
+              </ColumnLayout>
+            )}
+          </SpaceBetween>
+        </Container>
+
         {/* AI Architecture Recommendation */}
         {(aiLoading || aiText) && (
           <Container
@@ -291,26 +494,11 @@ export default function ArchitecturePage({
                   <MermaidDiagram chart={diagram} />
                 </div>
               )}
-              {costProjections.length > 0 && (
-                <Table
-                  header={<Header variant="h3">AI Cost Projections</Header>}
-                  columnDefinitions={[
-                    { id: 'scale', header: 'Scale', cell: (item) => item.scale },
-                    { id: 'docs', header: 'Docs/Month', cell: (item) => item.docsPerMonth.toLocaleString() },
-                    ...((costProjections[0]?.methods ?? []).map((m) => ({
-                      id: m.method,
-                      header: m.method,
-                      cell: (item: any) => {
-                        const method = item.methods?.find((x: any) => x.method === m.method);
-                        return method ? `$${method.monthlyCost.toFixed(2)}` : '-';
-                      },
-                    }))),
-                  ]}
-                  items={costProjections}
-                  variant="embedded"
-                  stripedRows
-                />
-              )}
+              {/*
+                The AI's own cost projections used to render here as a second table.
+                They are now shown inside the single Cost Projection section below,
+                next to the calculator, so the page states monthly cost once.
+              */}
             </SpaceBetween>
           </Container>
         )}
@@ -320,53 +508,6 @@ export default function ArchitecturePage({
             {aiError}. Showing static code generation below.
           </Alert>
         )}
-
-        {processingResults.length === 0 && (
-          <Alert type="info" header="No pipeline execution data" action={
-            <Button href="/pipeline">Go to Pipeline</Button>
-          }>
-            Run the pipeline first to get AI-powered architecture recommendations based on actual processing results.
-          </Alert>
-        )}
-
-        {/* Architecture Summary */}
-        <Container
-          header={
-            <Header
-              variant="h2"
-              description={
-                executedPipeline
-                  ? `Reflects the pipeline you executed in Step 3${selectedPipelineMethod ? ` (preferred: ${selectedPipelineMethod})` : ''}${hasSequentialComposer ? ' — sequential composition active' : ''}.`
-                  : 'No pipeline executed; showing best-guess from preview comparison.'
-              }
-            >
-              Pipeline Architecture
-            </Header>
-          }
-        >
-          <SpaceBetween size="m">
-            <ColumnLayout columns={methodSummary.length} variant="text-grid">
-              {methodSummary.map((m) => (
-                <div key={m.method}>
-                  <Box variant="awsui-key-label">{m.info.shortName}</Box>
-                  <Box variant="awsui-value-large">{m.capabilities.length} capabilities</Box>
-                  <Box color="text-body-secondary" fontSize="body-s" padding={{ top: 'xxs' }}>
-                    {m.capabilities.join(', ')}
-                  </Box>
-                  <Box fontSize="body-s" padding={{ top: 'xxs' }}>
-                    ${m.info.tokenPricing.inputPer1MTokens}/{m.info.tokenPricing.outputPer1MTokens} per 1M tokens
-                  </Box>
-                </div>
-              ))}
-            </ColumnLayout>
-
-            <Alert type="info">
-              Code snippets below are ready to use with Claude Code or Kiro.
-              Copy the code, paste it into your project, and run it.
-              Each snippet includes the correct Bedrock model IDs, capabilities, and cost tracking.
-            </Alert>
-          </SpaceBetween>
-        </Container>
 
         {/* Code Tabs */}
         <Container
@@ -388,84 +529,54 @@ export default function ArchitecturePage({
             </Header>
           }
         >
+          {/*
+            Grouped into the four things a user actually chooses between — read me
+            first, run it in Python, run it in TypeScript, deploy it — with the
+            secondary files of each group behind a sub-tab. A flat 11-tab strip mixed
+            `process.py` with `cdk/cdk.json` at the same level, so the five CDK files
+            read as five unrelated choices and the strip overflowed on a laptop.
+          */}
           <Tabs
-            tabs={[
-              {
-                id: 'readme',
-                label: 'README.md',
-                content: <CodeBlock code={activeReadme} language="markdown" />,
-              },
-              {
-                id: 'python',
-                label: codeGenLoading ? 'process.py …' : aiBundleComplete ? 'process.py (AI)' : 'process.py',
-                content: <CodeBlock code={activePython} language="python" />,
-              },
-              {
-                id: 'requirements',
-                label: 'requirements.txt',
-                content: <CodeBlock code={activeRequirements} language="text" />,
-              },
-              {
-                id: 'typescript',
-                label: codeGenLoading ? 'process.ts …' : aiBundleComplete ? 'process.ts (AI)' : 'process.ts',
-                content: <CodeBlock code={activeTs} language="typescript" />,
-              },
-              {
-                id: 'ts-pkg',
-                label: 'package.json',
-                content: <CodeBlock code={activeTsPkg} language="json" />,
-              },
-              {
-                id: 'cdk-stack',
-                label: codeGenLoading ? 'cdk/lib/idp-stack.ts …' : aiBundleComplete ? 'cdk/lib/idp-stack.ts (AI)' : 'cdk/lib/idp-stack.ts',
-                content: <CodeBlock code={activeCdk} language="typescript" />,
-              },
-              {
-                id: 'cdk-lambda',
-                label: 'cdk/lambda/processor.ts',
-                content: <CodeBlock code={activeLambda} language="typescript" />,
-              },
-              {
-                id: 'cdk-app',
-                label: 'cdk/bin/idp.ts',
-                content: <CodeBlock code={activeCdkApp} language="typescript" />,
-              },
-              {
-                id: 'cdk-pkg',
-                label: 'cdk/package.json',
-                content: <CodeBlock code={activeCdkPkg} language="json" />,
-              },
-              {
-                id: 'cdk-json',
-                label: 'cdk/cdk.json',
-                content: <CodeBlock code={activeCdkJson} language="json" />,
-              },
-              {
-                id: 'pipeline-config',
-                label: 'pipeline.json',
-                content: (
-                  <CodeBlock
-                    code={JSON.stringify({
-                      capabilities,
-                      methods: methodSummary.map((m) => ({
-                        method: m.method,
-                        model: m.info.name,
-                        modelId: METHOD_INFO[m.method as ProcessingMethod]?.modelId,
-                        capabilities: m.capabilities,
-                        pricing: m.info.tokenPricing,
-                      })),
-                      generatedAt: new Date().toISOString(),
-                    }, null, 2)}
-                    language="json"
-                  />
-                ),
-              },
-            ]}
+            activeTabId={activeGroup}
+            onChange={({ detail }) => setActiveGroup(detail.activeTabId)}
+            tabs={FILE_GROUPS.map((group) => ({
+              id: group.id,
+              label: group.label,
+              content: (
+                <SpaceBetween size="s">
+                  <Box color="text-body-secondary" fontSize="body-s">{group.hint}</Box>
+                  {group.files.length === 1 ? (
+                    <CodeBlock
+                      code={fileFor(group.files[0].key)}
+                      language={group.files[0].language}
+                    />
+                  ) : (
+                    <Tabs
+                      variant="container"
+                      tabs={group.files.map((file) => ({
+                        id: `${group.id}:${file.key}`,
+                        label: fileLabel(file),
+                        content: <CodeBlock code={fileFor(file.key)} language={file.language} />,
+                      }))}
+                    />
+                  )}
+                </SpaceBetween>
+              ),
+            }))}
           />
         </Container>
 
-        {/* Cost Projection Calculator (#12) */}
-        <CostProjectionCalculator methodSummary={methodSummary} />
+        {/*
+          One cost section, not two. The AI cost projection table and this
+          calculator both answered "what will this cost per month" with different
+          numbers from different models — the AI table from its own estimate, this
+          one from estimatedCostPerPage — with nothing saying which to trust. The AI
+          projections are now shown here as a comparison row, clearly labelled.
+        */}
+        <CostProjectionCalculator
+          methodSummary={methodSummary}
+          aiProjections={costProjections}
+        />
 
         {/* Next Steps */}
         <Container header={<Header variant="h2">Next Steps</Header>}>
@@ -510,11 +621,19 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
           variant="icon"
         />
       </div>
+      {/*
+        Kept deliberately dark in BOTH themes: this is source code, and a
+        consistently dark editor surface is the convention users expect. Unlike the
+        extraction-result blocks, the colours here are a fixed pair with adequate
+        contrast (#e8e8e8 on #1a1a2e ≈ 13:1), so they are correct rather than an
+        oversight — the token-based surfaces are for UI chrome, not code.
+      */}
       <pre style={{
         background: '#1a1a2e',
         color: '#e8e8e8',
         padding: '16px',
         borderRadius: '8px',
+        fontFamily: token.fontMono,
         fontSize: '13px',
         lineHeight: '1.5',
         overflow: 'auto',
@@ -533,7 +652,19 @@ interface MethodSummaryItem {
   capabilities: string[];
 }
 
-function CostProjectionCalculator({ methodSummary }: { methodSummary: MethodSummaryItem[] }) {
+interface AiCostProjection {
+  scale: string;
+  docsPerMonth: number;
+  methods: Array<{ method: string; monthlyCost: number }>;
+}
+
+function CostProjectionCalculator({
+  methodSummary,
+  aiProjections = [],
+}: {
+  methodSummary: MethodSummaryItem[];
+  aiProjections?: AiCostProjection[];
+}) {
   const [docsPerMonth, setDocsPerMonth] = useState('1000');
   const [avgPages, setAvgPages] = useState('5');
 
@@ -591,6 +722,7 @@ function CostProjectionCalculator({ methodSummary }: { methodSummary: MethodSumm
             { id: 'annual', header: 'Annual', cell: (item) => item.annualCost },
           ]}
           items={projections}
+          trackBy="method"
           variant="embedded"
           stripedRows
           footer={
@@ -599,6 +731,41 @@ function CostProjectionCalculator({ methodSummary }: { methodSummary: MethodSumm
             </Box>
           }
         />
+
+        {/*
+          The AI's independent projection, shown as a second opinion rather than a
+          competing table. It answers the same question from a different estimate, so
+          presenting it unlabelled beside the calculator invited the reader to assume
+          one of them was authoritative.
+        */}
+        {aiProjections.length > 0 && (
+          <ExpandableSection
+            headerText="Compare with the AI's own projection"
+            headerDescription="Generated from your run, at the scale tiers it chose. Expect it to differ from the calculator above — different assumptions, not a correction."
+          >
+            <Table
+              columnDefinitions={[
+                { id: 'scale', header: 'Scale', cell: (item) => item.scale },
+                { id: 'docs', header: 'Docs/Month', cell: (item) => item.docsPerMonth.toLocaleString() },
+                ...((aiProjections[0]?.methods ?? []).map((m) => ({
+                  id: m.method,
+                  header: m.method,
+                  cell: (item: AiCostProjection) => {
+                    const method = item.methods?.find((x) => x.method === m.method);
+                    return method ? `$${method.monthlyCost.toFixed(2)}` : '-';
+                  },
+                }))),
+              ]}
+              items={aiProjections}
+              // Without trackBy, Cloudscape cannot derive a stable React key per row
+              // and logs "Each child in a list should have a unique key prop" — the
+              // warning that used to appear on this page.
+              trackBy="scale"
+              variant="embedded"
+              stripedRows
+            />
+          </ExpandableSection>
+        )}
 
         <Alert type="info">
           Estimates use per-page cost approximations. Actual LLM costs depend on token count per document.

@@ -169,3 +169,85 @@ describe('processor + language rules', () => {
     expect(getMethodAvailability('claude-opus-5').available).toBe(true);
   });
 });
+
+/**
+ * Audio/video reached the direct-LLM adapters, which decoded the container as
+ * UTF-8 and asked the model to extract fields from binary noise. The run was then
+ * reported as a priced success over meaningless output. Media must only be
+ * offered to the managed BDA path.
+ */
+describe('media files (audio/video)', () => {
+  const AUDIO = ['mp3', 'wav', 'flac', 'm4a', 'ogg'];
+  const VIDEO = ['mp4', 'mov', 'mkv', 'webm'];
+  const NON_BDA = [
+    'claude-sonnet', 'claude-opus-5', 'nova-lite', 'gpt-5-6-luna',
+    'textract-claude-sonnet', 'textract-nova-lite',
+  ] as const;
+
+  it('never offers a non-BDA method for AUDIO', () => {
+    // Converse accepts text, image, document and video content blocks — but not
+    // audio — so a direct-LLM method would receive a UTF-8 decode of the container.
+    for (const extension of AUDIO) {
+      for (const method of NON_BDA) {
+        const result = getMethodAvailability(method, { extension });
+        expect(result.available, `${method} for .${extension}`).toBe(false);
+        expect(result.detail).toMatch(/audio/i);
+      }
+    }
+  });
+
+  it('offers the models that can ACTUALLY read video', () => {
+    /*
+     * Nova via Converse's video block, and TwelveLabs Pegasus via InvokeModel — both
+     * verified against live Bedrock on a real 9s mp4 with known content.
+     *
+     * This test previously asserted `claude-sonnet` was available for video, on the
+     * reasoning that Converse has a video block. That reasoning was wrong: the API
+     * having the block is not the same as a model accepting it.
+     */
+    for (const extension of VIDEO) {
+      for (const method of ['nova-lite', 'twelvelabs-pegasus'] as const) {
+        expect(
+          getMethodAvailability(method, { extension }).available,
+          `${method} for .${extension}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('excludes every Claude tier for video — they reject the video block', () => {
+    /*
+     * Measured, not assumed: all 7 Claude tiers (Opus 5 / 4.8 / 4.7 / 4.6,
+     * Sonnet 4.6 / 5, Haiku 4.5) failed on a real mp4 with
+     *   "This model doesn't support the video content block that you provided."
+     * while Nova read the identical file correctly. Offering them wasted a preview
+     * slot on a guaranteed error.
+     */
+    for (const method of [
+      'claude-sonnet', 'claude-haiku', 'claude-opus', 'claude-opus-5',
+      'claude-opus-4-8', 'claude-opus-4-7', 'claude-sonnet-5',
+    ] as const) {
+      const r = getMethodAvailability(method, { extension: 'mp4' });
+      expect(r.available, `${method} must not be offered for video`).toBe(false);
+    }
+  });
+
+  it('still excludes Textract and GPT for video (no video path)', () => {
+    for (const method of ['textract-nova-lite', 'gpt-5-6-luna'] as const) {
+      const r = getMethodAvailability(method, { extension: 'mp4' });
+      expect(r.available, method).toBe(false);
+    }
+  });
+
+  it('still allows BDA for media', () => {
+    // bda-standard is the managed path that genuinely supports media.
+    for (const extension of ['mp4', 'mp3']) {
+      expect(getMethodAvailability('bda-standard', { extension }).available).toBe(true);
+    }
+  });
+
+  it('does not affect document formats', () => {
+    expect(getMethodAvailability('claude-sonnet', { extension: 'pdf' }).available).toBe(true);
+    expect(getMethodAvailability('claude-sonnet', { extension: 'png' }).available).toBe(true);
+  });
+});

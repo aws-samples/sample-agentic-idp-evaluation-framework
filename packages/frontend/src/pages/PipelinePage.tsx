@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
 import SpaceBetween from '@cloudscape-design/components/space-between';
@@ -23,6 +23,7 @@ import { usePipelineChat } from '../hooks/usePipelineChat';
 import type { PreviewResponse } from '../hooks/usePreview';
 import StepGate from '../components/common/StepGate';
 import ResultBlock from '../components/common/ResultBlock';
+import { token } from '../theme/tokens';
 
 interface PipelinePageProps {
   document: UploadResponse | null;
@@ -110,6 +111,35 @@ export default function PipelinePage({
   const hasAggregatedResults = !!completionData
     && Object.keys(completionData.results ?? {}).length > 0
     && completionData.processorResults.filter((r) => r.status === 'complete').length > 1;
+
+  /**
+   * Canvas legend, derived from the nodes this pipeline actually has.
+   *
+   * The legend was previously a fixed list of six stages, so a single-method
+   * pipeline still advertised "Classify — route by content type" and
+   * "Aggregate — merge results" even though neither node existed on the canvas
+   * and neither ran. Describing stages that are not there is the same class of
+   * problem as the decorative classifier node itself.
+   */
+  const stageLegend = useMemo(() => {
+    if (!pipeline) return [];
+    const has = (type: string) => pipeline.nodes.some((n) => n.type === type);
+    const methodCount = pipeline.nodes.filter((n) => n.type === 'method').length;
+    const legend: Array<{ label: string; desc: string }> = [];
+    if (has('document-input')) legend.push({ label: 'Input', desc: 'document ingestion' });
+    if (has('page-classifier')) legend.push({ label: 'Classify', desc: 'route pages by content type' });
+    if (has('sequential-composer')) {
+      legend.push({ label: 'Extract → Redact', desc: 'output of one stage feeds the next' });
+    } else if (methodCount > 0) {
+      legend.push({
+        label: 'Methods',
+        desc: methodCount > 1 ? `${methodCount} models run in parallel` : 'model extraction',
+      });
+    }
+    if (has('aggregator')) legend.push({ label: 'Aggregate', desc: 'pick the best answer per capability' });
+    if (has('pipeline-output')) legend.push({ label: 'Output', desc: 'structured JSON' });
+    return legend;
+  }, [pipeline]);
 
   const [smartRec, setSmartRec] = useState<SmartRecommendation | null>(null);
   const [isSmartGenerating, setIsSmartGenerating] = useState(false);
@@ -308,6 +338,42 @@ export default function PipelinePage({
           <Alert type="info">Generating pipeline configuration...</Alert>
         )}
 
+        {/*
+          Nothing generated and nothing in flight. This state was silent — the
+          auto-generate effect needs document.documentType, and a run loaded from
+          Recent Runs had none, so step 3 rendered an empty page with no canvas,
+          no error and no spinner. The document type is now derived on load, and
+          this is the visible backstop with a way forward.
+        */}
+        {!pipeline && !isGenerating && !isSmartGenerating && !error && !smartError && (
+          <Container>
+            <Box padding={{ vertical: 'l' }} textAlign="center">
+              <SpaceBetween size="s" alignItems="center">
+                <Box variant="h3" color="text-body-secondary">No pipeline yet</Box>
+                <Box color="text-body-secondary">
+                  A pipeline has not been built for this document.
+                </Box>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    if (!document.documentType) return;
+                    generatePipeline({
+                      documentType: document.documentType,
+                      capabilities,
+                      optimizeFor: 'balanced',
+                      enableHybridRouting: true,
+                      documentLanguages,
+                    }).catch(() => {});
+                  }}
+                  disabled={!document.documentType}
+                >
+                  Build pipeline
+                </Button>
+              </SpaceBetween>
+            </Box>
+          </Container>
+        )}
+
         {/* Main layout: Chat + Canvas */}
         {pipeline && (
           <Grid
@@ -387,13 +453,27 @@ export default function PipelinePage({
                   fileName={document.fileName}
                 />
 
-                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#5f6b7a' }}>
-                  <span><strong>1. Input</strong> - Document ingestion</span>
-                  <span><strong>2. Classify</strong> - Route by content type</span>
-                  <span><strong>3. Capabilities</strong> - What to extract</span>
-                  <span><strong>4. Methods</strong> - AI model selection</span>
-                  <span><strong>5. Aggregate</strong> - Merge results</span>
-                  <span><strong>6. Output</strong> - Structured JSON</span>
+                {/*
+                  Legend for the canvas above. Only lists stages this pipeline
+                  actually contains — it used to hard-code all six regardless, so a
+                  simple single-method pipeline claimed to have a Classify and an
+                  Aggregate stage that were not on the canvas and never ran.
+                */}
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 20,
+                    flexWrap: 'wrap',
+                    fontSize: 13,
+                    color: token.textSecondary,
+                  }}
+                >
+                  {stageLegend.map((stage, i) => (
+                    <span key={stage.label}>
+                      <strong style={{ color: token.text }}>{`${i + 1}. ${stage.label}`}</strong>
+                      {` — ${stage.desc}`}
+                    </span>
+                  ))}
                 </div>
               </SpaceBetween>
             </Container>

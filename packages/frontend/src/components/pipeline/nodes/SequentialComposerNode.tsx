@@ -4,6 +4,8 @@ import type { SequentialComposerConfig } from '@idp/shared';
 import Box from '@cloudscape-design/components/box';
 import Badge from '@cloudscape-design/components/badge';
 import { getPipelineIcon } from '../../common/icons';
+import { nodeBorderColor, nodeDivider, NODE_STATUS_COLORS } from './node-style';
+import { token } from '../../../theme/tokens';
 
 interface SequentialComposerNodeData {
   config: SequentialComposerConfig;
@@ -15,22 +17,15 @@ export default memo(function SequentialComposerNode({ data }: { data: Sequential
   const config = data.config;
   const state = data.state;
 
-  const getBorderColor = () => {
-    switch (state) {
-      case 'active': return '#0972d3';
-      case 'complete': return '#037f0c';
-      case 'error': return '#d91515';
-      default: return '#7d8998';
-    }
-  };
 
   return (
     <div
       style={{
         padding: '12px',
         borderRadius: '8px',
-        border: `2px solid ${getBorderColor()}`,
-        background: '#ffffff',
+        border: `2px solid ${nodeBorderColor(state)}`,
+        background: token.surface,
+        color: token.text,
         width: '160px',
         boxShadow: state === 'active'
           ? '0 0 10px rgba(9, 114, 211, 0.5)'
@@ -45,7 +40,7 @@ export default memo(function SequentialComposerNode({ data }: { data: Sequential
         }
       `}</style>
 
-      <Handle type="target" position={Position.Left} style={{ background: '#0972d3' }} />
+      <Handle type="target" position={Position.Left} style={{ background: NODE_STATUS_COLORS.active }} />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
         {getPipelineIcon('sequential-composer', 20, '#0972d3')}
@@ -66,7 +61,7 @@ export default memo(function SequentialComposerNode({ data }: { data: Sequential
         </div>
       )}
 
-      <Handle type="source" position={Position.Right} style={{ background: '#0972d3' }} />
+      <Handle type="source" position={Position.Right} style={{ background: NODE_STATUS_COLORS.active }} />
     </div>
   );
 });

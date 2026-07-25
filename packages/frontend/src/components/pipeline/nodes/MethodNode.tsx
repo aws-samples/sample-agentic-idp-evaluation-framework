@@ -6,6 +6,9 @@ import Box from '@cloudscape-design/components/box';
 import Badge from '@cloudscape-design/components/badge';
 import Spinner from '@cloudscape-design/components/spinner';
 import { getCapabilityIcon } from '../../common/icons';
+import { nodeBorderColor, nodeDivider } from './node-style';
+import { token } from '../../../theme/tokens';
+import { FAMILY_COLORS } from '../../../theme/family-colors';
 
 interface MethodNodeData {
   config: MethodNodeConfig & { capabilities?: string[] };
@@ -13,15 +16,6 @@ interface MethodNodeData {
   metrics?: { latencyMs: number; cost: number };
 }
 
-const FAMILY_COLORS: Record<MethodFamily, string> = {
-  bda: '#0972d3',
-  'bda-llm': '#0891b2',
-  claude: '#8b5cf6',
-  nova: '#ec7211',
-  gpt: '#10a37f',
-  'textract-llm': '#037f0c', embeddings: '#2563eb',
-  guardrails: '#d13212',
-};
 
 export default memo(function MethodNode({ data }: { data: MethodNodeData }) {
   const config = data.config;
@@ -31,22 +25,15 @@ export default memo(function MethodNode({ data }: { data: MethodNodeData }) {
   const familyColor = FAMILY_COLORS[config.family];
   const capabilities = config.capabilities ?? [];
 
-  const getBorderColor = () => {
-    switch (state) {
-      case 'active': return familyColor;
-      case 'complete': return '#037f0c';
-      case 'error': return '#d91515';
-      default: return '#7d8998';
-    }
-  };
 
   return (
     <div
       style={{
         padding: '12px',
         borderRadius: '8px',
-        border: `2px solid ${getBorderColor()}`,
-        background: '#ffffff',
+        border: `2px solid ${nodeBorderColor(state, familyColor)}`,
+        background: token.surface,
+        color: token.text,
         minWidth: '200px',
         maxWidth: '260px',
         boxShadow: state === 'active' ? `0 0 10px ${familyColor}80` : '0 2px 4px rgba(0,0,0,0.1)',
@@ -72,13 +59,13 @@ export default memo(function MethodNode({ data }: { data: MethodNodeData }) {
       </Box>
 
       {capabilities.length > 0 && (
-        <div style={{ marginTop: '8px', borderTop: '1px solid #e9ebed', paddingTop: '6px' }}>
+        <div style={{ marginTop: '8px', borderTop: nodeDivider, paddingTop: '6px' }}>
           <Box variant="small" color="text-body-secondary" fontWeight="bold">
             {capabilities.length} capabilities:
           </Box>
           <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {capabilities.filter(Boolean).map((cap: string) => (
-              <div key={cap} style={{ fontSize: '11px', color: '#414d5c', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div key={cap} style={{ fontSize: '11px', color: token.textSecondary, display: 'flex', alignItems: 'center', gap: '5px' }}>
                 {getCapabilityIcon(cap, 13, familyColor)}
                 {cap.replace(/_/g, ' ')}
               </div>

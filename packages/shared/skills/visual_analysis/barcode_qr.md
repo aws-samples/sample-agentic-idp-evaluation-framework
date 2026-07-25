@@ -9,12 +9,7 @@ defaultFormat: "json"
 tags: ["barcode", "qr", "data-matrix", "scan", "code"]
 exampleInput: "Shipping label with barcode"
 exampleOutput: "{"type": "QR", "data": "https://...", "location": {...}}"
-support:
-  bda: "limited"
-  bda-llm: "limited"
-  claude: "limited"
-  gpt: "limited"
-  nova: "good"
+support: {}
 ---
 
 # Barcode & QR Code
@@ -39,7 +34,3 @@ Returns structured JSON with typed fields.
 
 ## Method support
 
-- **bda**: limited
-- **bda-llm**: limited
-- **claude**: limited
-- **nova**: good

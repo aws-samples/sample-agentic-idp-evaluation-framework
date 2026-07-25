@@ -1,9 +1,9 @@
 import type { Response } from 'express';
 import type { ProcessingMethod } from '@idp/shared';
 import {
-  AnalyzeDocumentCommand,
-  StartDocumentAnalysisCommand,
-  GetDocumentAnalysisCommand,
+  DetectDocumentTextCommand,
+  StartDocumentTextDetectionCommand,
+  GetDocumentTextDetectionCommand,
   type Block,
 } from '@aws-sdk/client-textract';
 import {
@@ -109,14 +109,23 @@ export class GuardrailsAdapter implements StreamAdapter {
       const isPDF = /\.pdf$/i.test(fileName);
       const isMultiPage = isPDF && ((input.pageCount ?? 1) > 1 || input.documentBuffer.length > 5 * 1024 * 1024);
 
+      /*
+       * Plain OCR only — DetectDocumentText at $0.0015/page.
+       *
+       * This used to call AnalyzeDocument with FeatureTypes: ['FORMS'], which is
+       * $0.05/page: ~33x more expensive for no benefit here. Guardrails needs a
+       * flat string of text to run its PII/policy evaluation over; it never reads
+       * the KEY_VALUE_SET blocks that FORMS exists to produce, and `blocksToText`
+       * below discarded them anyway. The method's cost was also modelled as
+       * $0.0016/page, so the real spend was ~33x what was reported.
+       */
       let blocks: Block[];
       if (isMultiPage && input.s3Uri && !input.s3Uri.startsWith('local://')) {
         blocks = await this.runAsyncTextract(res, input.s3Uri);
       } else {
         const r = await textractClient.send(
-          new AnalyzeDocumentCommand({
+          new DetectDocumentTextCommand({
             Document: { Bytes: input.documentBuffer },
-            FeatureTypes: ['FORMS'],
           }),
         );
         blocks = r.Blocks ?? [];
@@ -252,13 +261,14 @@ export class GuardrailsAdapter implements StreamAdapter {
     const bucket = url.hostname;
     const key = decodeURIComponent(url.pathname.slice(1));
 
-    const startCmd = new StartDocumentAnalysisCommand({
+    // Async plain-OCR job, matching the sync path: text detection only, never
+    // AnalyzeDocument's paid analysis features.
+    const startCmd = new StartDocumentTextDetectionCommand({
       DocumentLocation: { S3Object: { Bucket: bucket, Name: key } },
-      FeatureTypes: ['FORMS'],
     });
     const startResp = await textractClient.send(startCmd);
     const jobId = startResp.JobId;
-    if (!jobId) throw new Error('Textract StartDocumentAnalysis returned no JobId');
+    if (!jobId) throw new Error('Textract StartDocumentTextDetection returned no JobId');
 
     emitProgress(res, this.method, 'all', 10, 'Textract async started...');
 
@@ -266,13 +276,13 @@ export class GuardrailsAdapter implements StreamAdapter {
     let all: Block[] = [];
     for (let i = 0; i < 60; i++) {
       await new Promise((r) => setTimeout(r, 3000));
-      const r = await textractClient.send(new GetDocumentAnalysisCommand({ JobId: jobId }));
+      const r = await textractClient.send(new GetDocumentTextDetectionCommand({ JobId: jobId }));
       status = r.JobStatus ?? 'FAILED';
       if (status === 'SUCCEEDED') {
         all = r.Blocks ?? [];
         let next = r.NextToken;
         while (next) {
-          const page = await textractClient.send(new GetDocumentAnalysisCommand({ JobId: jobId, NextToken: next }));
+          const page = await textractClient.send(new GetDocumentTextDetectionCommand({ JobId: jobId, NextToken: next }));
           all.push(...(page.Blocks ?? []));
           next = page.NextToken;
         }

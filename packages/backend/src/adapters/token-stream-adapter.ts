@@ -6,6 +6,7 @@ import {
   ConverseStreamCommand,
   type ContentBlock,
   type Message,
+  type VideoFormat,
 } from '@aws-sdk/client-bedrock-runtime';
 import type { StreamAdapter, AdapterInput, AdapterOutput } from './stream-adapter.js';
 import { emitProgress } from './stream-adapter.js';
@@ -15,6 +16,8 @@ import { isOfficeFormat, convertOfficeDocument } from '../services/file-converte
 import {
   IMAGE_EXTENSIONS,
   PDF_EXTENSION,
+  MEDIA_EXTENSIONS,
+  converseVideoFormat,
   getImageFormat,
   resizeImageIfNeeded,
   buildSystemPrompt,
@@ -49,6 +52,13 @@ export async function splitPdfByPages(
   }
   return chunks;
 }
+
+/**
+ * Converse accepts an inline (base64) video only under 25 MB; larger files must be
+ * passed by S3 location, which supports up to 1 GB. Kept slightly under the
+ * documented cap so base64 expansion and request envelope still fit.
+ */
+const VIDEO_INLINE_LIMIT_BYTES = 20 * 1024 * 1024;
 
 export class TokenStreamAdapter implements StreamAdapter {
   constructor(public readonly method: ProcessingMethod) {}
@@ -136,6 +146,49 @@ export class TokenStreamAdapter implements StreamAdapter {
     } else if (isOfficeFormat(fileName) && input.documentBuffer.length > 4 && input.documentBuffer[0] === 0x50 && input.documentBuffer[1] === 0x4B && input.documentBuffer[2] === 0x03 && input.documentBuffer[3] === 0x04) {
       const converted = await convertOfficeDocument(input.documentBuffer, fileName);
       contentBlocks.push({ text: `Document content:\n${converted.text}` });
+    } else if (converseVideoFormat(fileName)) {
+      /*
+       * Video as a native Converse content block.
+       *
+       * Converse accepts video (base64 under 25 MB, or an S3 location up to 1 GB)
+       * and Nova 2 Lite lists video understanding as a core capability, so sending
+       * every video to BDA was leaving a real capability unimplemented. Prefer the
+       * S3 location when we have one: it avoids base64-inflating a large file
+       * through the request body, and lifts the 25 MB cap to 1 GB.
+       */
+      const format = converseVideoFormat(fileName) as VideoFormat;
+      const useS3 = !!input.s3Uri
+        && !input.s3Uri.startsWith('local://')
+        && input.documentBuffer.length > VIDEO_INLINE_LIMIT_BYTES;
+
+      if (useS3) {
+        contentBlocks.push({ video: { format, source: { s3Location: { uri: input.s3Uri } } } });
+      } else if (input.documentBuffer.length <= VIDEO_INLINE_LIMIT_BYTES) {
+        contentBlocks.push({ video: { format, source: { bytes: input.documentBuffer } } });
+      } else {
+        throw new Error(
+          `Video is ${Math.round(input.documentBuffer.length / 1024 / 1024)}MB, over the `
+          + `${VIDEO_INLINE_LIMIT_BYTES / 1024 / 1024}MB inline limit, and no S3 object is available. `
+          + 'Re-upload via S3 or use a Bedrock Data Automation method.',
+        );
+      }
+    } else if (MEDIA_EXTENSIONS.test(fileName)) {
+      /*
+       * Audio cannot be sent to Converse as text or as a document
+       * block. This used to fall through to the branch below, which ran
+       * `.toString('utf-8')` over an MP4/MP3 container — so the model received
+       * megabytes of mojibake and was asked to extract fields from it. It then
+       * either hallucinated an answer or returned an empty one, and the run was
+       * reported as a SUCCESS with a real cost attached, which is worse than an
+       * error: nothing on screen said the output was meaningless.
+       *
+       * BDA is the path for media in this app; a direct-LLM method should say so.
+       */
+      throw new Error(
+        `${METHOD_INFO[this.method]?.shortName ?? this.method} cannot read audio directly — `
+        + 'the Converse API accepts text, image, document and video content blocks, but not audio. '
+        + 'Use a Bedrock Data Automation method for audio files.',
+      );
     } else {
       const text = input.documentBuffer.toString('utf-8');
       contentBlocks.push({ text: `Document content:\n${text}` });

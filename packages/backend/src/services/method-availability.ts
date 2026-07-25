@@ -8,6 +8,28 @@ import {
   type Capability,
 } from '@idp/shared';
 import { config } from '../config/aws.js';
+import { AUDIO_EXTENSIONS, CONVERSE_VIDEO_FORMATS } from '../adapters/extraction-shared.js';
+
+/** Video containers Converse accepts, as a bare-extension matcher. */
+const VIDEO_EXTENSIONS = new RegExp(`\\.(${Object.keys(CONVERSE_VIDEO_FORMATS).join('|')})$`, 'i');
+
+/**
+ * Families that can actually read a video, verified against live Bedrock.
+ *
+ * `nova` — Converse's native video block. Verified on a real 9s mp4.
+ * `video-understanding` — TwelveLabs Pegasus, via InvokeModel + inference profile
+ *   (NOT Converse), which is why it must be listed explicitly rather than inferred
+ *   from "is a multimodal LLM".
+ *
+ * `claude` is deliberately ABSENT: Converse has a video block, but every Claude tier
+ * REJECTS it — all 7 failed with "This model doesn't support the video content block
+ * that you provided" on the same file Nova read correctly. GPT goes through the Mantle
+ * Responses API, which has no video block at all.
+ *
+ * The lesson encoded here: the API surface having a feature is not the same as a model
+ * accepting it. Verify with a real file before adding a family.
+ */
+const VIDEO_CAPABLE_FAMILIES: ReadonlySet<string> = new Set(['nova', 'video-understanding']);
 
 /**
  * Single source of truth for "can this method run right now, and if not, why?".
@@ -26,6 +48,10 @@ export type UnavailableReason =
   | 'guardrails-needs-pii-capability'
   | 'unsupported-format'
   | 'unsupported-language'
+  | 'unsupported-region'
+  | 'not-implemented'
+  /** Specialist OCR method whose self-hosted SageMaker endpoint is not deployed. */
+  | 'sagemaker-endpoint-not-configured'
   | 'no-processor';
 
 export interface MethodAvailability {
@@ -54,6 +80,21 @@ export interface AvailabilityContext {
 
 const PII_CAPABILITIES: ReadonlySet<string> = new Set(['pii_detection', 'pii_redaction']);
 
+/**
+ * Does BDA accept this extension in any of its modalities?
+ *
+ * BDA_LIMITS declares separate format lists for documents (`async`), `video` and
+ * `audio`. Checking only the document list rejected every media file.
+ */
+function bdaAcceptsFormat(ext: string): boolean {
+  const lists: ReadonlyArray<readonly string[]> = [
+    BDA_LIMITS.async.supportedFormats,
+    BDA_LIMITS.video.supportedFormats,
+    BDA_LIMITS.audio.supportedFormats,
+  ];
+  return lists.some((formats) => (formats as readonly string[]).includes(ext));
+}
+
 function normalizeExtension(ext?: string): string | undefined {
   if (!ext) return undefined;
   const e = ext.toLowerCase().replace(/^\./, '');
@@ -62,8 +103,70 @@ function normalizeExtension(ext?: string): string | undefined {
   return e;
 }
 
+/**
+ * Regions in which Amazon Nova Multimodal Embeddings is offered.
+ *
+ * Verified with `bedrock list-foundation-models`:
+ * `amazon.nova-2-multimodal-embeddings-v1:0` is returned in us-east-1 and NOT in
+ * us-west-2, which is where this app is deployed.
+ */
+const EMBEDDINGS_REGIONS: ReadonlySet<string> = new Set(['us-east-1']);
+
 /** Configuration-only availability: does this deployment support the method at all? */
 export function isMethodConfigured(method: ProcessingMethod): MethodAvailability {
+  /*
+   * Nova Embeddings is catalog-only: it has no processor in ANY of the three
+   * route registries (see processor-registry-parity.test.ts, which lists it as
+   * deliberately exempt), and its model is not offered in this region at all.
+   *
+   * It was nonetheless reported `available: true` by GET /api/methods, and both
+   * `embedding_generation` and `knowledge_base_ingestion` map exclusively to it —
+   * so requesting either produced a pipeline whose only method node could never
+   * execute. Verified live: POST /api/pipeline/generate with
+   * ["embedding_generation"] returned methods: ["nova-embeddings"].
+   *
+   * Reporting it unavailable, with the reason, is the honest answer: the method
+   * stays visible in the catalog as a documented option without pretending this
+   * deployment can run it.
+   */
+  if (method === 'nova-embeddings') {
+    if (!EMBEDDINGS_REGIONS.has(config.region)) {
+      return {
+        method,
+        available: false,
+        reason: 'unsupported-region',
+        detail: `Nova Multimodal Embeddings is only offered in ${[...EMBEDDINGS_REGIONS].join(', ')}; this deployment runs in ${config.region}.`,
+      };
+    }
+    return {
+      method,
+      available: false,
+      reason: 'not-implemented',
+      detail: 'Embedding generation is catalogued for comparison but has no runnable processor yet.',
+    };
+  }
+
+  /*
+   * Specialist OCR: needs an endpoint YOU deployed.
+   *
+   * These run on GPU instances that bill hourly whether or not they serve traffic
+   * (ml.g6e.2xlarge $2.24/hr, ml.g7e.4xlarge $7.09/hr), so they are opt-in and off by
+   * default. Reporting unavailable-with-reason keeps them visible in the catalog as
+   * documented, benchmarked options — with their measured F1 and cost — without
+   * pretending this deployment can run them. Same contract as bda-custom.
+   */
+  if (method.startsWith('sagemaker-') && !config.sagemakerOcrEndpoints[method]) {
+    return {
+      method,
+      available: false,
+      reason: 'sagemaker-endpoint-not-configured',
+      detail:
+        'Needs a self-hosted SageMaker endpoint, which is not deployed here. These run '
+        + 'on GPU instances billed hourly even when idle, so they are opt-in '
+        + '(see infrastructure/sagemaker-ocr.tf, disabled by default).',
+    };
+  }
+
   if (method === 'bda-custom' && !config.bdaProjectArn) {
     return {
       method,
@@ -110,10 +213,42 @@ export function getMethodAvailability(
 
   const ext = normalizeExtension(ctx.extension);
   if (ext) {
-    const bdaFormats = BDA_LIMITS.async.supportedFormats as readonly string[];
     const textractFormats = TEXTRACT_LIMITS.analyzeDocument.supportedFormats as readonly string[];
 
-    if (method.startsWith('bda-') && !bdaFormats.includes(ext)) {
+    /*
+     * AUDIO is BDA-only. The Converse API accepts text, image, document and video
+     * content blocks — but not audio — so a direct-LLM method used to receive a
+     * UTF-8 decode of an MP3 container (binary noise) and report a priced
+     * "success" over hallucinated output.
+     *
+     * VIDEO is different: Nova reads it through Converse's video block and Pegasus
+     * through InvokeModel, both verified live. Claude is NOT included — every tier
+     * rejects the video block despite Converse exposing one. Textract has no video
+     * path at all.
+     */
+    const isBda = method.startsWith('bda-');
+    if (AUDIO_EXTENSIONS.test(`.${ext}`) && !isBda) {
+      return {
+        method,
+        available: false,
+        reason: 'unsupported-format',
+        detail: `${METHOD_INFO[method].name} cannot read audio. The Converse API has no audio content block — use a Bedrock Data Automation method.`,
+      };
+    }
+    if (VIDEO_EXTENSIONS.test(`.${ext}`) && !isBda && !VIDEO_CAPABLE_FAMILIES.has(METHOD_INFO[method].family)) {
+      return {
+        method,
+        available: false,
+        reason: 'unsupported-format',
+        detail: `${METHOD_INFO[method].name} cannot read video. Use a multimodal LLM or a Bedrock Data Automation method.`,
+      };
+    }
+
+    // BDA accepts documents, video AND audio, each with its own format list.
+    // Only the document list was consulted, so BDA was rejected for the media it
+    // is specifically the right tool for — leaving media uploads with no runnable
+    // method at all once the direct-LLM methods are (correctly) excluded above.
+    if (method.startsWith('bda-') && !bdaAcceptsFormat(ext)) {
       return {
         method,
         available: false,

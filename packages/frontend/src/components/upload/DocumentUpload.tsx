@@ -11,6 +11,7 @@ import ColumnLayout from '@cloudscape-design/components/column-layout';
 import type { UploadResponse, DocumentType } from '@idp/shared';
 import { getAllAcceptedExtensions, getDocumentType, DOCUMENT_TYPE_INFO } from '@idp/shared';
 import { uploadDocument } from '../../services/api';
+import { UploadDisclaimer } from '../common/DemoDisclaimer';
 
 interface DocumentUploadProps {
   onUploadComplete: (doc: UploadResponse) => void;
@@ -62,6 +63,19 @@ export default function DocumentUpload({ onUploadComplete, bare = false }: Docum
 
   const body = (
       <SpaceBetween size="l">
+        {/*
+          The disclaimer lives HERE, not in a page-wide banner, and above the
+          picker rather than below it.
+          It previously sat in a full-width Alert pinned over every page, with a
+          second shortened copy underneath this control — the same prohibition
+          twice on one screen, and a large block of yellow ahead of the actual
+          task. Stating it once, immediately before the file picker, puts the
+          warning at the moment the user is about to hand over a document. A quiet
+          one-line note (DemoFooterNote) keeps the "no SLA / not an AWS product"
+          part visible on the other steps.
+        */}
+        <UploadDisclaimer />
+
         <FileUpload
           onChange={({ detail }) => {
             setFiles(detail.value);
@@ -85,14 +99,6 @@ export default function DocumentUpload({ onUploadComplete, bare = false }: Docum
           showFileLastModified
           tokenLimit={1}
         />
-        {/*
-          Short reminder only. The full prohibition is stated once in the
-          site-wide DisclaimerBanner; repeating it in full here put the same
-          warning on screen twice, directly above and below the file picker.
-        */}
-        <Box color="text-status-warning" fontSize="body-s">
-          Sample, synthetic or fully redacted documents only — no PII, PHI or financial data.
-        </Box>
 
         {files.length > 0 && !uploadResult && (
           <Button

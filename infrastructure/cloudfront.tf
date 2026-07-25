@@ -18,10 +18,26 @@ resource "aws_s3_bucket_public_access_block" "cloudfront_logs" {
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "cloudfront_logs" {
   bucket = aws_s3_bucket.cloudfront_logs.id
+  /*
+   * `blocked_encryption_types` and `bucket_key_enabled` are declared explicitly to
+   * match what S3 actually returns.
+   *
+   * Without them every `terraform plan` proposed removing `blocked_encryption_types
+   * = ["SSE-C"]` and nulling `bucket_key_enabled` — values AWS sets server-side, not
+   * drift we caused. Applying it would have WEAKENED the bucket (re-permitting
+   * customer-provided-key encryption, which bypasses our KMS policy) and the very
+   * next plan would show the same diff again, because AWS re-applies its default. A
+   * plan that never converges also hides real drift in the noise.
+   *
+   * SSE-C stays blocked deliberately: a client supplying its own key would store
+   * objects this account cannot decrypt or audit.
+   */
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
     }
+    blocked_encryption_types = ["SSE-C"]
+    bucket_key_enabled       = false
   }
 }
 

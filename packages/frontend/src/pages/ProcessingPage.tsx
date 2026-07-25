@@ -121,6 +121,8 @@ export default function ProcessingPage({
                   'textract-llm': 'Textract + LLM Hybrid',
                   embeddings: 'Multimodal Embeddings',
                   guardrails: 'Bedrock Guardrails',
+                  'video-understanding': 'TwelveLabs Pegasus (video)',
+                  'sagemaker-ocr': 'Specialist OCR (self-hosted)',
                 };
 
                 const familyDescriptions: Record<MethodFamily, string> = {
@@ -132,6 +134,10 @@ export default function ProcessingPage({
                   'textract-llm': 'Amazon Textract OCR combined with LLM structuring',
                   embeddings: 'Nova Multimodal Embeddings for semantic search and RAG',
                   guardrails: 'Bedrock Guardrails for safety / policy enforcement',
+                  'video-understanding':
+                    'Purpose-built video understanding — reads visuals, audio and on-screen text with timestamps',
+                  'sagemaker-ocr':
+                    'Specialist document-OCR models on self-hosted SageMaker endpoints (opt-in; GPU billed hourly)',
                 };
 
                 return (

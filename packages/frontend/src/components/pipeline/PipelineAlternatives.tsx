@@ -4,6 +4,7 @@ import SpaceBetween from '@cloudscape-design/components/space-between';
 import Box from '@cloudscape-design/components/box';
 import Button from '@cloudscape-design/components/button';
 import type { PipelineDefinition } from '@idp/shared';
+import { token } from '../../theme/tokens';
 
 interface PipelineAlternativesProps {
   alternatives: PipelineDefinition[];
@@ -39,9 +40,9 @@ export default function PipelineAlternatives({
               key={alt.id}
               style={{
                 padding: '12px',
-                border: `2px solid ${isActive ? '#0972d3' : '#d5dbdb'}`,
+                border: `2px solid ${isActive ? token.borderSelected : token.border}`,
                 borderRadius: '8px',
-                background: isActive ? '#f0f8ff' : '#ffffff',
+                background: isActive ? token.surfaceSelected : token.surface,
                 cursor: disabled ? 'not-allowed' : 'pointer',
                 opacity: disabled ? 0.6 : 1,
               }}

@@ -16,6 +16,45 @@ import { CAPABILITY_INFO, filterModelBackedCapabilities } from '@idp/shared';
 export const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
 export const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|tiff|tif|bmp)$/i;
 export const PDF_EXTENSION = /\.pdf$/i;
+/**
+ * Audio and video. The Converse API takes these as neither a text nor a document
+ * content block, so a direct-LLM method cannot read them at all — only the
+ * managed BDA path can. Used to keep such methods from being offered for media
+ * instead of silently feeding the model a UTF-8 decode of an MP4.
+ */
+export const MEDIA_EXTENSIONS = /\.(mp4|mov|avi|mkv|webm|mp3|wav|flac|m4a|ogg)$/i;
+
+/**
+ * Video containers the Converse API accepts as a `video` content block, mapped to
+ * its `VideoFormat` value.
+ *
+ * Converse genuinely supports video (base64 under 25 MB, or up to 1 GB from S3),
+ * and Nova 2 Lite's service card lists video understanding as a core capability —
+ * so routing every video to BDA was leaving a real capability unimplemented. `avi`
+ * is absent because Converse's VideoFormat enum does not include it.
+ */
+export const CONVERSE_VIDEO_FORMATS: Record<string, string> = {
+  mp4: 'mp4',
+  mov: 'mov',
+  mkv: 'mkv',
+  webm: 'webm',
+  flv: 'flv',
+  mpeg: 'mpeg',
+  mpg: 'mpg',
+  wmv: 'wmv',
+};
+
+/** Converse video format for a file name, or undefined if not a supported video. */
+export function converseVideoFormat(fileName: string): string | undefined {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  return ext ? CONVERSE_VIDEO_FORMATS[ext] : undefined;
+}
+
+/**
+ * Audio is NOT accepted by Converse as a content block — only text, image,
+ * document and video are. Audio therefore has to go through the managed BDA path.
+ */
+export const AUDIO_EXTENSIONS = /\.(mp3|wav|flac|m4a|ogg|amr)$/i;
 
 /**
  * Newer Anthropic models on Bedrock REJECT the `temperature` inference param
@@ -80,7 +119,93 @@ export const CAPABILITY_GUIDANCE: Record<string, string> = {
   document_splitting: 'Identify logical document boundaries and page ranges.',
   language_detection: 'Detect all languages present in the document.',
   pii_detection: 'Identify PII (names, SSN, phone numbers, etc.) and their locations.',
+  /*
+   * Bounding boxes: the coordinate SPACE has to be pinned, or the model is free to
+   * answer in pixels, percentages or its own invented scale — and the answer is
+   * then unusable even when the boxes are visually right. A 0-1000 normalized
+   * integer grid is the technique validated over 336 real scanned pages in the
+   * hybrid vision + spatial reasoning pattern
+   * (~/workspaces/35-hybrid-vision-spatial-reasoning): Nova 2 Lite emits boxes on
+   * that grid natively, and keeping every stage on one space means no conversion
+   * between calls. Without this guidance the capability fell through to the
+   * generic "Extract bounding box data." instruction.
+   */
+  bounding_box: 'Return one entry per detected element as JSON: '
+    + '[{"label": "<what it is>", "bbox": [x1, y1, x2, y2]}]. '
+    + 'Coordinates MUST be integers on a 0-1000 normalized grid — x from 0 (left) '
+    + 'to 1000 (right), y from 0 (top) to 1000 (bottom) — NOT pixels and NOT '
+    + 'percentages. Each box must hug its element tightly: for a text line, y1 at '
+    + 'the cap height of the tallest letter and y2 at the bottom of the lowest '
+    + 'descender (g, j, p, q, y); for a photo, the image frame only, excluding any '
+    + 'caption above or below it. Emit one box per distinct element — a grid of '
+    + 'portraits is many boxes, a single group photo is one.',
+  layout_analysis: 'Identify the page structure in reading order as JSON: titles, '
+    + 'section headers, paragraphs, lists, tables, figures, headers/footers and '
+    + 'page numbers. Give each region a type and its order index, and include a '
+    + 'bbox on a 0-1000 normalized integer grid when position is requested.',
+  signature_detection: 'Report each signature region as JSON with a bbox on a '
+    + '0-1000 normalized integer grid and whether it appears signed or blank. Do '
+    + 'NOT attempt to identify who signed, and do not treat printed names as '
+    + 'signatures.',
+  barcode_qr: 'Report each barcode or QR code as JSON with its symbology if '
+    + 'identifiable and a bbox on a 0-1000 normalized integer grid. Only decode a '
+    + 'payload if the characters are legibly rendered as text; otherwise return the '
+    + 'location with a null value rather than guessing digits.',
+
+  /*
+   * Media capabilities had NO guidance, so each fell through to the generic
+   * "Extract video summarization data." instruction — and that alone was enough to
+   * make the whole feature return nothing.
+   *
+   * Proven by A/B against the live model (us.amazon.nova-2-lite-v1:0), same 9s
+   * video, same bytes, only the prompt differing:
+   *   generic instruction  -> `data: []`, confidence 0
+   *   guidance below       -> full summary, confidence 0.9, all ground-truth
+   *                           strings recovered ("INVOICE 12345", "TOTAL 500 USD",
+   *                           "DUE 2026-08-15")
+   * The model was always capable; we were asking the wrong question. Note the
+   * empty answer was ALSO reported to the user as a priced success, which is why
+   * `isEmptyExtraction` now exists.
+   */
+  video_summarization: 'Summarise the video as JSON: an overall summary, the key '
+    + 'themes and events in order, any speakers you can distinguish, and all '
+    + 'on-screen text verbatim. Give each notable event an approximate timestamp '
+    + '(mm:ss). Describe what is actually visible and audible — do not speculate '
+    + 'about intent or off-screen context.',
+  video_chapter_extraction: 'Divide the video into chapters as JSON: '
+    + '[{"start": "mm:ss", "end": "mm:ss", "title": "<short title>", '
+    + '"summary": "<what happens>"}]. Cut a new chapter where the subject or scene '
+    + 'genuinely changes, not at fixed intervals, and cover the full duration with '
+    + 'no gaps or overlaps.',
+  audio_transcription: 'Transcribe all speech verbatim as JSON segments: '
+    + '[{"start": "mm:ss", "speaker": "<label>", "text": "<verbatim speech>"}]. '
+    + 'Label speakers consistently (Speaker 1, Speaker 2) without inventing names, '
+    + 'transcribe in the language spoken, and mark unintelligible spans [inaudible] '
+    + 'rather than guessing.',
+  audio_summarization: 'Summarise the audio as plain text: what is discussed, by '
+    + 'whom, and any decisions or action items stated. Base it only on what is '
+    + 'actually said.',
+  content_moderation: 'Report policy-relevant content as JSON: '
+    + '[{"category": "<violence|nudity|hate|self-harm|drugs|profanity|other>", '
+    + '"timestamp": "mm:ss", "severity": "<low|medium|high>", '
+    + '"evidence": "<what was seen or heard>"}]. Return an empty list with high '
+    + 'confidence when the content is clean — that is a finding, not a failure.',
 };
+
+/**
+ * Capabilities whose input is a video or audio stream rather than a page.
+ *
+ * The system prompt used to say "document processing AI" and "from the document"
+ * unconditionally, so a video request told the model to read a document that was
+ * not there. That wording alone produced empty extractions (see the A/B above).
+ */
+const MEDIA_PROMPT_CAPABILITIES = new Set([
+  'video_summarization',
+  'video_chapter_extraction',
+  'audio_transcription',
+  'audio_summarization',
+  'content_moderation',
+]);
 
 export function buildSystemPrompt(capabilities: string[], userInstruction?: string): string {
   // Drop capabilities no model can perform (pdf_conversion,
@@ -101,7 +226,23 @@ export function buildSystemPrompt(capabilities: string[], userInstruction?: stri
     ? `\n\nUser's specific requirements (from interview):\n${userInstruction}\n\nTailor your extraction to match these requirements (language, style, detail level, etc.).`
     : '';
 
-  return `You are a document processing AI. Extract ONLY the requested capabilities from the document.
+  /*
+   * Name the medium the model was actually handed.
+   *
+   * "document processing AI … from the document" was unconditional, so a video
+   * request instructed the model to read a document it had not been given. Nova
+   * complied literally and returned `data: []` at confidence 0 — see the A/B in
+   * CAPABILITY_GUIDANCE above, where only this wording and the missing per-capability
+   * guidance changed between an empty answer and a complete one.
+   */
+  const isMedia = effective.some((c) => MEDIA_PROMPT_CAPABILITIES.has(c));
+  const role = isMedia ? 'media processing AI' : 'document processing AI';
+  const subject = isMedia ? 'media file provided' : 'document';
+  const languageRule = isMedia
+    ? '- Match the output language to the spoken or on-screen language'
+    : '- Match the output language to the document language';
+
+  return `You are a ${role}. Extract ONLY the requested capabilities from the ${subject}.
 
 Capabilities to extract:
 ${capInstructions}
@@ -112,7 +253,7 @@ RULES:
 - Each capability must have: data, confidence (0-1), format ("html"|"csv"|"json"|"text")
 - ONLY extract what is asked. Do NOT add extra capabilities
 - Do NOT generate empty or placeholder data. If you cannot extract something, set confidence to 0
-- Match the output language to the document language
+${languageRule}
 - Return ONLY valid YAML. No markdown code blocks, no JSON`;
 }
 

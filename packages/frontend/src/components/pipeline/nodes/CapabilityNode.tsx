@@ -4,6 +4,8 @@ import type { CapabilityNodeConfig } from '@idp/shared';
 import { CAPABILITY_INFO, CATEGORY_INFO } from '@idp/shared';
 import Box from '@cloudscape-design/components/box';
 import ProgressBar from '@cloudscape-design/components/progress-bar';
+import { nodeBorderColor, nodeDivider } from './node-style';
+import { token } from '../../../theme/tokens';
 
 interface CapabilityNodeData {
   config: CapabilityNodeConfig & {
@@ -32,14 +34,6 @@ export default memo(function CapabilityNode({ data }: { data: CapabilityNodeData
   const capInfo = CAPABILITY_INFO[config.capability];
   const categoryInfo = CATEGORY_INFO[capInfo.category];
 
-  const getBorderColor = () => {
-    switch (state) {
-      case 'active': return '#0972d3';
-      case 'complete': return '#037f0c';
-      case 'error': return '#d91515';
-      default: return '#d5dbdb';
-    }
-  };
 
   const familyColor = config.assignedMethodFamily
     ? FAMILY_COLORS[config.assignedMethodFamily] ?? '#5f6b7a'
@@ -50,8 +44,9 @@ export default memo(function CapabilityNode({ data }: { data: CapabilityNodeData
       style={{
         padding: '10px 12px',
         borderRadius: '8px',
-        border: `2px solid ${getBorderColor()}`,
-        background: '#ffffff',
+        border: `2px solid ${nodeBorderColor(state)}`,
+        background: token.surface,
+        color: token.text,
         width: '180px',
         boxShadow: state === 'active' ? '0 0 8px rgba(9,114,211,0.4)' : '0 1px 3px rgba(0,0,0,0.08)',
       }}
@@ -75,7 +70,7 @@ export default memo(function CapabilityNode({ data }: { data: CapabilityNodeData
           borderRadius: '50%',
           background: categoryInfo.color,
         }} />
-        <span style={{ fontSize: '11px', color: '#5f6b7a' }}>
+        <span style={{ fontSize: '11px', color: token.textSecondary }}>
           {categoryInfo.name}
         </span>
       </div>

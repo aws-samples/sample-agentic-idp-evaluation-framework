@@ -101,6 +101,60 @@ for (const catDir of categoryDirs) {
   }
 }
 
+/*
+ * Validate support keys against the method FAMILIES.
+ *
+ * `support:` is keyed by family, and the transposed CAPABILITY_SUPPORT matrix
+ * silently drops any key that is not one — so a typo, or a method id used where a
+ * family belongs, produces a capability that appears in the UI but that no method
+ * supports. Requesting it alone then crashed pipeline generation with a 500.
+ * knowledge_base_ingestion shipped with `nova-embeddings` (a method id) instead of
+ * `embeddings` (its family) and was unroutable for exactly this reason.
+ *
+ * READ from types/processing.ts rather than duplicated here. It cannot be imported
+ * — this script generates generated/skills.ts, which processing.ts imports, so a
+ * real import would be circular — but a duplicated literal is worse than a parse:
+ * the copy went stale the moment two new families (`video-understanding`,
+ * `sagemaker-ocr`) were added, and the build then rejected valid ratings while
+ * claiming they "are not a method family". Parsing the declaration keeps one source
+ * of truth without the cycle.
+ */
+function readMethodFamilies(): Set<string> {
+  const source = readFileSync(
+    join(import.meta.dirname, '..', 'src', 'types', 'processing.ts'),
+    'utf-8',
+  );
+  const block = source.match(/export const METHOD_FAMILIES = \[([\s\S]*?)\] as const;/);
+  if (!block) {
+    throw new Error(
+      'Could not find METHOD_FAMILIES in src/types/processing.ts — support-key '
+      + 'validation cannot be trusted, so failing rather than silently accepting anything.',
+    );
+  }
+  // Quoted entries only, so the comments inside the array are ignored.
+  const families = [...block[1].matchAll(/'([a-z0-9-]+)'/g)].map((m) => m[1]);
+  if (families.length === 0) throw new Error('METHOD_FAMILIES parsed as empty');
+  return new Set(families);
+}
+
+const VALID_SUPPORT_KEYS = readMethodFamilies();
+
+const supportErrors: string[] = [];
+for (const skill of skills) {
+  for (const key of Object.keys(skill.support)) {
+    if (!VALID_SUPPORT_KEYS.has(key)) {
+      supportErrors.push(
+        `  ${skill.id}: "${key}" is not a method family `
+        + `(valid: ${[...VALID_SUPPORT_KEYS].join(', ')})`,
+      );
+    }
+  }
+}
+if (supportErrors.length > 0) {
+  console.error('Invalid support keys in skill definitions:\n' + supportErrors.join('\n'));
+  process.exit(1);
+}
+
 // Sort by category order, then by id
 const CATEGORY_ORDER = [
   'core_extraction', 'visual_analysis', 'document_intelligence',
