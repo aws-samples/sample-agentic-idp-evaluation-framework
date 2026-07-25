@@ -50,9 +50,15 @@ await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 await page.waitForTimeout(2500);
 
+/*
+ * The panel is folded by default (it is a reference table, not the landing task), so it
+ * has to be expanded before it can be photographed or asserted on.
+ */
 const panel = page.locator('text=Processing methods').first();
 await panel.scrollIntoViewIfNeeded().catch(() => {});
-await page.waitForTimeout(900);
+await page.waitForTimeout(400);
+await panel.click().catch(() => {});
+await page.waitForTimeout(1200);
 
 const text = await page.locator('body').innerText();
 

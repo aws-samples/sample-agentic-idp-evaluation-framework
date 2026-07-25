@@ -1118,7 +1118,40 @@ found, because the "why" is what makes it fixable.
       bug, until I listed the live DOM's buttons), and the step-3 canvas does not exist for
       several seconds because the pipeline is model-generated, so a fixed wait clicked into
       a spinner.
-23. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
+23. [x] **Processing-methods panel rebuilt as one flat table; both reference sections
+      folded by default.** The previous layout was boxes inside boxes, four levels deep: an
+      `ExpandableSection variant="container"` (a box) → a div per role group (a box) → a
+      `ColumnLayout` of per-family blocks (a box) → bordered rows inside each. Every level
+      contributed a heading, a blurb and its own padding, so finding one method meant
+      reading three layers of prose per group, and the same information appeared at
+      different nesting depths depending on whether a group happened to hold one family or
+      two (which is why a 1:1 group printed its own name three times in a row).
+      Role and Family are now COLUMNS, not containers — still visible, and now sortable.
+      What that buys, beyond looking flat:
+      - **Sort by price across billing models.** Token-priced, page-priced and two-stage
+        methods were previously incomparable because each family formatted its own units;
+        the sort key is `estimatedCostPerPage`, the one figure common to all three.
+      - **Filter by name/family/role/id** — the id matters because someone reading an API
+        response or an error message searches for `sagemaker-baidu-ocr`, not "Baidu OCR".
+      - **"Available here only"** toggle: 8 of 29 are unavailable on a default deployment,
+        and someone choosing what to run wants the runnable set in one click. They stay
+        listed by default because the catalog is a reference — hiding them is what made
+        "29 methods" disagree with the list in the first place.
+      - The counter reads `visibleMethodRows.length` of `METHOD_ROWS.length`, so a
+        hand-written count can no longer contradict what is rendered.
+      Rows are built from `METHODS` directly rather than by walking the role groups, so the
+      29-vs-22 class of bug is now structurally impossible rather than merely tested for:
+      an ungrouped family renders with an "Other" role label instead of vanishing.
+      Family notes (Guardrails is PII-only, Pegasus cannot read a document, self-hosted OCR
+      bills by GPU hour) moved to a hover on the Family cell — the information was worth
+      keeping, the per-group paragraphs were not.
+      **Folded by default**, along with the support matrix: both are reference tables (29
+      rows, and a 33x29 grid), and expanded they pushed the one thing a first-time visitor
+      needs to do — upload a document — well below the fold, making the landing page read
+      as a spec sheet. Capabilities stays open because it answers "what can this thing even
+      do?". Verified live on both stacks: folded on load, 29 rows on expand, 21 with the
+      availability toggle, filter and sort both working.
+24. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
       ideas from the accelerator study, listed in detail in the section above.
 
 ### Open questions / risks

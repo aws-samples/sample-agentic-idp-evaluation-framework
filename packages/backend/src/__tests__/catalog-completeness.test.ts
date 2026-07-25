@@ -50,10 +50,17 @@ describe('the landing page shows the WHOLE catalog', () => {
   });
 
   it('renders leftovers rather than dropping them', () => {
-    // Belt and braces: even if the check above is somehow bypassed, an unassigned
-    // family must appear in an "Other" bucket instead of disappearing.
+    /*
+     * Belt and braces: an unassigned family must still be visible.
+     *
+     * The guarantee is now structural rather than a fallback bucket. Rows come from
+     * METHODS directly (see the flat-table test below), so an ungrouped family CANNOT
+     * disappear — it renders with whatever role label the map gives it. `UNGROUPED_FAMILIES`
+     * still exists so that label is "Other" instead of blank, and `ROLE_OF_FAMILY` is what
+     * carries it into the row.
+     */
     expect(homePage).toMatch(/UNGROUPED_FAMILIES/);
-    expect(homePage).toMatch(/ALL_FAMILY_GROUPS\.map/);
+    expect(homePage).toMatch(/ROLE_OF_FAMILY\.get\(info\.family\) \?\? 'Other methods'/);
   });
 
   it('counts what it actually renders', () => {
@@ -149,11 +156,72 @@ describe('the landing page shows the WHOLE catalog', () => {
     expect(stepSubtitle('/architecture')).toBe('Step 4 of 4');
   });
 
+  it('renders the methods catalog as one flat table, not nested containers', () => {
+    /*
+     * The panel used to nest four levels deep: an ExpandableSection with
+     * variant="container" (a box), a div per role group (a box), a ColumnLayout of
+     * per-family blocks (a box), each with its own bordered rows. Every level added a
+     * heading, a blurb and padding, so finding one method meant reading three layers of
+     * prose per group — and the same information sat at different nesting depths
+     * depending on whether a group happened to hold one family or two.
+     *
+     * Role and Family are COLUMNS now. That is what keeps the panel flat, so the absence
+     * of the old grouping scaffolding is the property worth pinning.
+     */
+    expect(homePage, 'the methods catalog should be a Table').toMatch(/<Table[\s\S]*?columnDefinitions=\{METHOD_COLUMNS\}/);
+    expect(homePage, 'rows must come from the flattened catalog').toContain('items={visibleMethodRows}');
+    // The per-group / per-family box scaffolding must not come back.
+    expect(homePage).not.toMatch(/ALL_FAMILY_GROUPS\.map\(\(group\)/);
+    expect(homePage).not.toMatch(/FAMILY_ROLE_NOTES\[family\]/);
+  });
+
+  it('builds method rows from METHODS, so none can be dropped by a grouping gap', () => {
+    // The 29-vs-22 bug was a grouping gap. Rows now come from the catalog directly.
+    const rowBlock = homePage.slice(
+      homePage.indexOf('const METHOD_ROWS'),
+      homePage.indexOf('const visibleMethodRows'),
+    );
+    expect(rowBlock).toMatch(/METHODS\.map\(/);
+    expect(rowBlock).toContain('METHOD_INFO[id]');
+  });
+
+  it('folds the two reference tables by default, keeping upload above the fold', () => {
+    /*
+     * "Processing methods" (29 rows) and "Support matrix" (33x29) are reference material.
+     * Expanded, they pushed the one thing a first-time visitor needs to do — upload a
+     * document — far below the fold and made the landing page read as a spec sheet.
+     * Capabilities stays open: it answers "what can this thing even do?".
+     */
+    const section = (title: string) => {
+      const at = homePage.indexOf(`headerText="${title}"`);
+      expect(at, `no section titled ${title}`).toBeGreaterThan(-1);
+      // Look back to the opening tag to see whether defaultExpanded is on it.
+      return homePage.slice(homePage.lastIndexOf('<ExpandableSection', at), at);
+    };
+    expect(section('Processing methods'), 'methods table must be folded').not.toContain('defaultExpanded');
+    expect(section('Support matrix'), 'support matrix must be folded').not.toContain('defaultExpanded');
+    expect(section('Capabilities'), 'capabilities should stay open').toContain('defaultExpanded');
+  });
+
+  it('lets the user find and narrow methods instead of scrolling 29 rows', () => {
+    // A 29-row reference table without a filter is a scroll exercise. The availability
+    // toggle matters because 8 of 29 are unavailable on a default deployment.
+    expect(homePage).toMatch(/<TextFilter/);
+    expect(homePage).toMatch(/Available here only/);
+    // The count must be derived from the rendered rows, not restated by hand — a
+    // hardcoded counter beside a filtered list is the original 29-vs-22 bug.
+    expect(homePage).toMatch(/\$\{visibleMethodRows\.length\} of \$\{METHOD_ROWS\.length\} matches/);
+  });
+
   it('describes every family, so a new one is never an unexplained row', () => {
     // Not every family needs a note, but the two least self-explanatory kinds do:
     // a video-only model and a self-hosted endpoint both behave unlike the rest.
+    // The notes now surface as a hover on the Family cell rather than per-group prose,
+    // but the two least self-explanatory families still need one: a video-only model and
+    // a self-hosted GPU endpoint both behave unlike everything else in the list.
     for (const family of ['video-understanding', 'sagemaker-ocr'] as const) {
       expect(homePage, `${family} has no role note`).toContain(`'${family}':`);
     }
+    expect(homePage, 'family notes must reach the table rows').toContain('note: FAMILY_ROLE_NOTES[info.family]');
   });
 });

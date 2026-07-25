@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ContentLayout from '@cloudscape-design/components/content-layout';
 import Header from '@cloudscape-design/components/header';
@@ -6,8 +6,10 @@ import SpaceBetween from '@cloudscape-design/components/space-between';
 import Container from '@cloudscape-design/components/container';
 import Box from '@cloudscape-design/components/box';
 import ColumnLayout from '@cloudscape-design/components/column-layout';
-import Badge from '@cloudscape-design/components/badge';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
+import Table from '@cloudscape-design/components/table';
+import TextFilter from '@cloudscape-design/components/text-filter';
+import Toggle from '@cloudscape-design/components/toggle';
 import type { UploadResponse } from '@idp/shared';
 import {
   CAPABILITIES,
@@ -15,8 +17,8 @@ import {
   CAPABILITY_CATEGORIES,
   getCapabilitiesByCategory,
   METHODS,
+  METHOD_INFO,
   METHOD_FAMILIES,
-  getMethodsByFamily,
   PRODUCT_NAME,
   PRODUCT_TAGLINE
 } from '@idp/shared';
@@ -134,6 +136,27 @@ const ALL_FAMILY_GROUPS: typeof FAMILY_GROUPS = UNGROUPED_FAMILIES.length > 0
   ]
   : FAMILY_GROUPS;
 
+/**
+ * Which role group a family belongs to, inverted from FAMILY_GROUPS.
+ *
+ * The table needs the lookup per row, and deriving it here means the editorial grouping
+ * above stays the single place it is declared.
+ */
+const ROLE_OF_FAMILY = new Map<MethodFamily, string>(
+  ALL_FAMILY_GROUPS.flatMap((g) => g.families.map((f) => [f, g.title] as const)),
+);
+
+/** Short role label for a table cell — the group titles are written as headings. */
+const ROLE_SHORT: Record<string, string> = {
+  'General-purpose models': 'General-purpose',
+  'Managed extraction pipelines': 'Managed pipeline',
+  'Two-stage hybrids': 'Two-stage hybrid',
+  'Purpose-built media models': 'Media',
+  'Specialist OCR (self-hosted)': 'Specialist OCR',
+  'Specialized services': 'Specialized',
+  'Other methods': 'Other',
+};
+
 /** Per-family note explaining what the family actually is, where it is not obvious. */
 const FAMILY_ROLE_NOTES: Partial<Record<MethodFamily, string>> = {
   guardrails: 'Deterministic PII detection and redaction policy — applies only to PII capabilities, not general extraction.',
@@ -186,6 +209,150 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
     onUploadComplete(doc);
     navigate('/conversation');
   };
+
+  // ─── Processing-methods table ─────────────────────────────────────────────
+  const [methodFilter, setMethodFilter] = useState('');
+  const [availableOnly, setAvailableOnly] = useState(false);
+  const [methodSort, setMethodSort] = useState<{
+    sortingColumn: { sortingField?: string };
+    isDescending: boolean;
+  }>({ sortingColumn: { sortingField: 'role' }, isDescending: false });
+
+  /**
+   * One row per method, flattened from the catalog.
+   *
+   * Built from METHODS directly rather than by walking the role groups, so a method
+   * cannot be dropped by a grouping gap — that is exactly how seven methods once
+   * vanished from this page while the header still counted 29.
+   */
+  const METHOD_ROWS = useMemo(
+    () => METHODS.map((id) => {
+      const info = METHOD_INFO[id];
+      const role = ROLE_OF_FAMILY.get(info.family) ?? 'Other methods';
+      return {
+        id,
+        name: info.shortName,
+        family: info.family,
+        familyName: FAMILY_FULL_NAMES[info.family],
+        role: ROLE_SHORT[role] ?? role,
+        price: priceLabel(info),
+        // Sort key for price: the per-page figure is the only number comparable
+        // across token-priced, page-priced and two-stage methods.
+        costPerPage: info.estimatedCostPerPage,
+        note: FAMILY_ROLE_NOTES[info.family],
+        unavailable: isUnavailable(id),
+        reason: reasonFor(id),
+      };
+    }),
+    [isUnavailable, reasonFor],
+  );
+
+  const visibleMethodRows = useMemo(() => {
+    const q = methodFilter.trim().toLowerCase();
+    const rows = METHOD_ROWS.filter((r) => {
+      if (availableOnly && r.unavailable) return false;
+      if (!q) return true;
+      // Match the id too: someone reading an API response or an error searches for that.
+      return `${r.name} ${r.familyName} ${r.role} ${r.id}`.toLowerCase().includes(q);
+    });
+    const field = methodSort.sortingColumn.sortingField ?? 'role';
+    const dir = methodSort.isDescending ? -1 : 1;
+    return [...rows].sort((a, b) => {
+      if (field === 'costPerPage') return (a.costPerPage - b.costPerPage) * dir;
+      const av = String(a[field as 'name' | 'familyName' | 'role']);
+      const bv = String(b[field as 'name' | 'familyName' | 'role']);
+      // Within a role or family, keep a stable secondary order by name rather than
+      // whatever the catalog happens to list first.
+      return (av.localeCompare(bv) || a.name.localeCompare(b.name)) * dir;
+    });
+  }, [METHOD_ROWS, methodFilter, availableOnly, methodSort]);
+
+  type MethodRow = (typeof METHOD_ROWS)[number];
+
+  const METHOD_COLUMNS = useMemo(() => [
+    {
+      id: 'name',
+      header: 'Method',
+      sortingField: 'name',
+      cell: (r: MethodRow) => (
+        <SpaceBetween direction="horizontal" size="xs" alignItems="center">
+          {/* The family colour, as a 3px rule — the same hue used on the pipeline canvas. */}
+          <div style={{
+            width: 3, height: 15, borderRadius: 2,
+            background: FAMILY_COLORS[r.family], flexShrink: 0,
+          }} />
+          <Box fontWeight="bold" color={r.unavailable ? 'text-status-inactive' : undefined}>
+            {r.name}
+          </Box>
+        </SpaceBetween>
+      ),
+      minWidth: 170,
+    },
+    {
+      id: 'role',
+      header: 'Role',
+      sortingField: 'role',
+      cell: (r: MethodRow) => <Box color="text-body-secondary">{r.role}</Box>,
+      minWidth: 150,
+    },
+    {
+      id: 'family',
+      header: 'Family',
+      sortingField: 'familyName',
+      /*
+       * The family note lives here, on hover, rather than as a paragraph above a group.
+       * Some families genuinely need explaining — Guardrails only applies to PII, Pegasus
+       * cannot read a document at all, self-hosted OCR bills by GPU hour — and printing
+       * those as per-group prose is what made the old panel three layers deep. Only
+       * families that HAVE a note become a trigger, so there is no dead affordance.
+       */
+      cell: (r: MethodRow) => (r.note
+        ? (
+          <Popover
+            dismissButton={false}
+            position="top"
+            size="medium"
+            triggerType="text"
+            content={r.note}
+          >
+            <Box color="text-body-secondary">{r.familyName}</Box>
+          </Popover>
+        )
+        : <Box color="text-body-secondary">{r.familyName}</Box>),
+      minWidth: 180,
+    },
+    {
+      id: 'price',
+      header: 'Pricing',
+      sortingField: 'costPerPage',
+      cell: (r: MethodRow) => <Box color="text-body-secondary">{r.price}</Box>,
+      minWidth: 230,
+    },
+    {
+      id: 'status',
+      header: 'In this deployment',
+      cell: (r: MethodRow) => (r.unavailable
+        ? (
+          /*
+           * The reason, per row, but truncated with the full text on hover. Stating it
+           * in full inline is what made six identical three-line sentences dominate the
+           * old panel; omitting it entirely leaves the user guessing why a method they
+           * can see cannot be used.
+           */
+          <Popover
+            dismissButton={false}
+            position="left"
+            size="medium"
+            triggerType="text"
+            content={r.reason ?? 'Not available in this deployment.'}
+          >
+            <StatusIndicator type="stopped">Not available</StatusIndicator>
+          </Popover>
+        )
+        : <StatusIndicator type="success">Ready</StatusIndicator>),
+      minWidth: 150,
+    },
+  ], []);
 
   return (
     <ContentLayout
@@ -381,12 +548,19 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
 
         {/* Methods, grouped by role rather than as one flat list of peers */}
         <div hidden={catalogsHidden}>
+        {/*
+          Folded by default, like the support matrix below it.
+          These two are REFERENCE tables — 29 methods and a 33x29 grid. Expanded, they
+          pushed the one thing a first-time visitor needs to do (upload a document) far
+          above the fold and made the landing page read as a spec sheet. Capabilities stays
+          open because it answers "what can this thing even do?", which is the question a
+          newcomer actually has.
+        */}
         <ExpandableSection
           variant="container"
-          defaultExpanded
           headerText="Processing methods"
           headerCounter={`(${METHODS.length})`}
-          headerDescription="Grouped by the role each approach plays. Availability reflects this deployment's configuration."
+          headerDescription="Every method this framework can run, what role it plays, and what it costs. Sort or filter to compare; hover a family for what it is good at."
           headerActions={
             <Button
               variant="icon"
@@ -397,126 +571,67 @@ export default function HomePage({ onUploadComplete }: HomePageProps) {
           }
         >
           {/*
-            One row per method in a single-column list per family, rather than a
-            3-column grid of variable-height cards.
-            The grid version had four concrete problems, all visible on one screen:
-              - a family with 6 methods left two columns blank beside it, so a third of
-                the panel was empty while the content scrolled;
-              - the same "needs a SageMaker endpoint" sentence was repeated verbatim on
-                all six OCR rows, three lines each — 18 lines saying one thing;
-              - narrow columns broke words mid-token ("T hese", "deplo yment");
-              - the family heading came from a partial name map, so the two newest
-                families rendered with no title at all.
-            A per-family note carries the shared reason once, and rows carry only what
-            differs: the name, the price, and (rarely) a per-method status.
+            ONE flat table, not a tree of boxes.
+            The previous version nested four levels deep — an ExpandableSection with
+            `variant="container"` (a box), holding a div per role group (a box), holding a
+            ColumnLayout of per-family blocks (a box), each holding its own bordered rows.
+            Every level added a heading, a blurb and its own padding, so a reader hunting
+            one method waded through three layers of prose per group, and the same
+            information appeared at two different nesting levels depending on whether a
+            group happened to hold one family or two.
+            A table answers the actual question — what can I run, on what, for how much —
+            in one scan. `Role` and `Family` become columns rather than containers, so they
+            are still visible and now sortable; grouping that used to cost a box costs a
+            cell. Filtering replaces the per-group "count vs list" mismatch entirely: the
+            counter reads the filtered rows, so it cannot disagree with what is rendered.
           */}
-          <SpaceBetween size="l">
-            {ALL_FAMILY_GROUPS.map((group) => {
-              const families = group.families.filter((f) => getMethodsByFamily(f).length > 0);
-              if (families.length === 0) return null;
-              return (
-                <div key={group.title}>
-                  <SpaceBetween size="s">
-                    <div>
-                      <Box variant="h3">{group.title}</Box>
-                      <Box color="text-body-secondary" fontSize="body-s">{group.blurb}</Box>
-                    </div>
-                    <ColumnLayout columns={families.length > 1 ? 2 : 1} minColumnWidth={340}>
-                      {families.map((family) => {
-                        const methods = getMethodsByFamily(family);
-                        /*
-                         * When every method in a family is unavailable for the SAME
-                         * reason, say it once above the list. That is the normal case
-                         * for the self-hosted OCR family (no endpoint configured), and
-                         * repeating it per row buried the actual content.
-                         */
-                        const reasons = new Set(methods.map((m) => reasonFor(m.id) ?? ''));
-                        const allUnavailable = methods.every((m) => isUnavailable(m.id));
-                        const sharedReason = allUnavailable && reasons.size === 1
-                          ? [...reasons][0] || 'Not available in this deployment'
-                          : null;
-                        /*
-                         * Skip the family header when it would restate the group heading
-                         * directly above it. A one-family group named after that family
-                         * printed "Specialist OCR (self-hosted)" twice in a row, as did
-                         * its blurb and role note — three lines saying the same thing
-                         * before a single row of content.
-                         */
-                        const familyName = FAMILY_FULL_NAMES[family];
-                        const redundantHeader = families.length === 1
-                          && (group.title === familyName || group.title.startsWith(familyName));
-                        return (
-                          <div key={family} style={{ minWidth: 0 }}>
-                            {!redundantHeader && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                                <div style={{
-                                  width: 3, height: 14, borderRadius: 2,
-                                  background: FAMILY_COLORS[family], flexShrink: 0,
-                                }} />
-                                <Box variant="awsui-key-label">{familyName}</Box>
-                                <Badge>{methods.length}</Badge>
-                              </div>
-                            )}
-                            {/*
-                              The role note repeats the group blurb when the group holds a
-                              single family — the blurb is written for the group and the
-                              note for the family, and for a 1:1 group they say the same
-                              thing. Keep the blurb (it is higher up and larger).
-                            */}
-                            {FAMILY_ROLE_NOTES[family] && !redundantHeader && (
-                              <Box color="text-body-secondary" fontSize="body-s" padding={{ bottom: 'xxs' }}>
-                                {FAMILY_ROLE_NOTES[family]}
-                              </Box>
-                            )}
-                            {sharedReason && (
-                              <Box padding={{ bottom: 'xxs' }}>
-                                <StatusIndicator type="stopped">
-                                  <Box variant="span" fontSize="body-s">
-                                    {methods.length > 1 ? `None available here — ${sharedReason}` : sharedReason}
-                                  </Box>
-                                </StatusIndicator>
-                              </Box>
-                            )}
-                            <div style={{ opacity: sharedReason ? 0.7 : 1 }}>
-                              {methods.map((m) => (
-                                <div
-                                  key={m.id}
-                                  style={{
-                                    display: 'flex', justifyContent: 'space-between',
-                                    alignItems: 'baseline', gap: 12,
-                                    padding: '3px 0',
-                                    borderBottom: `1px solid ${token.borderSubtle}`,
-                                    // Only dim individually when the family as a whole
-                                    // is fine — otherwise the shared note already says it.
-                                    opacity: !sharedReason && isUnavailable(m.id) ? 0.6 : 1,
-                                  }}
-                                >
-                                  <Box fontSize="body-s" fontWeight="bold">{m.shortName}</Box>
-                                  <Box fontSize="body-s" color="text-body-secondary" textAlign="right">
-                                    {priceLabel(m)}
-                                  </Box>
-                                </div>
-                              ))}
-                            </div>
-                            {/* A one-off unavailable method inside an otherwise usable family. */}
-                            {!sharedReason && methods.filter((m) => isUnavailable(m.id)).map((m) => (
-                              <Box key={`${m.id}-why`} padding={{ top: 'xxs' }} fontSize="body-s">
-                                <StatusIndicator type="stopped">
-                                  <Box variant="span" fontSize="body-s">
-                                    {m.shortName}: {reasonFor(m.id) ?? 'not available in this deployment'}
-                                  </Box>
-                                </StatusIndicator>
-                              </Box>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </ColumnLayout>
-                  </SpaceBetween>
-                </div>
-              );
+          <Table
+            variant="embedded"
+            items={visibleMethodRows}
+            trackBy="id"
+            sortingColumn={methodSort.sortingColumn}
+            sortingDescending={methodSort.isDescending}
+            onSortingChange={({ detail }) => setMethodSort({
+              sortingColumn: detail.sortingColumn,
+              isDescending: detail.isDescending ?? false,
             })}
-          </SpaceBetween>
+            columnDefinitions={METHOD_COLUMNS}
+            stripedRows
+            wrapLines
+            filter={
+              <SpaceBetween direction="horizontal" size="xs" alignItems="center">
+                <TextFilter
+                  filteringText={methodFilter}
+                  filteringPlaceholder="Find a method"
+                  filteringAriaLabel="Find a processing method"
+                  countText={`${visibleMethodRows.length} of ${METHOD_ROWS.length} matches`}
+                  onChange={({ detail }) => setMethodFilter(detail.filteringText)}
+                />
+                {/*
+                  8 of 29 methods are unavailable on a default deployment (BDA Custom, Nova
+                  Embeddings, six SageMaker OCR models). They stay listed — the catalog is a
+                  reference, and hiding them made "29 methods" disagree with the list — but
+                  someone deciding what to run wants the runnable set, so make that one click.
+                */}
+                <Toggle
+                  checked={availableOnly}
+                  onChange={({ detail }) => setAvailableOnly(detail.checked)}
+                >
+                  Available here only
+                </Toggle>
+              </SpaceBetween>
+            }
+            empty={
+              <Box textAlign="center" color="text-body-secondary" padding={{ vertical: 'l' }}>
+                <SpaceBetween size="xs">
+                  <span>No method matches “{methodFilter}”.</span>
+                  <Button variant="inline-link" onClick={() => { setMethodFilter(''); setAvailableOnly(false); }}>
+                    Clear filters
+                  </Button>
+                </SpaceBetween>
+              </Box>
+            }
+          />
         </ExpandableSection>
         </div>
 
