@@ -9,20 +9,27 @@ capabilities — so the comparison is measured rather than assumed. Finish with 
 deployable project (Python, TypeScript and CDK) wired to the methods you picked.
 
 <!--
-  Recorded from the live deployment by `scripts/record-walkthrough.mjs`, which drives the
-  real app in Chromium — nothing here is mocked or staged, so the animation cannot drift
-  from the product. The mp4 is 3.1 MB against 9.4 MB for the same content as a GIF, so it
-  is listed first; the GIF is the fallback for viewers that will not play video.
+  Steps 1-4 on a real invoice, recorded from a live deployment at 1920x1200 by
+  `scripts/record-walkthrough.mjs`. It drives the real app in Chromium — nothing is mocked
+  or staged, so the recording cannot drift from the product.
+
+  This is a GitHub user-attachments URL, NOT a file in this repo, and that is deliberate:
+  a committed `<video src="docs/images/walkthrough.mp4">` does not render on github.com.
+  Only assets uploaded through GitHub's own UI get a player. Two more constraints that are
+  easy to trip over:
+    - the URL must sit ALONE on its own line. Wrapping it in <p>, <a> or markdown link
+      syntax makes GitHub skip it and render nothing.
+    - it therefore cannot be centred or captioned inline; the caption goes underneath.
+  To replace it: run the record script, drag the resulting mp4 into any issue or PR comment
+  on github.com, and paste the URL it returns here.
 -->
+
+https://github.com/user-attachments/assets/0940fac4-d5b1-4f50-93aa-0056a6a7d387
+
 <p align="center">
-  <a href="docs/images/walkthrough.mp4">
-    <img src="docs/images/walkthrough.gif"
-         alt="The four steps: upload a document, compare every applicable method in parallel, build a pipeline, then generate deployable architecture and code"
-         width="100%">
-  </a>
-  <br>
-  <em>Steps 1–4 on a real invoice, recorded from a live deployment.
-  <a href="docs/images/walkthrough.mp4">Watch as video (3 MB)</a></em>
+  <em>Steps 1–4 on a real invoice — upload, compare every applicable method in parallel,
+  build a pipeline, then generate deployable architecture and code.
+  Recorded from a live deployment.</em>
 </p>
 
 ## What you get

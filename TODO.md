@@ -1242,7 +1242,38 @@ found, because the "why" is what makes it fixable.
       cut off. No z-index fixes that; only escaping the overflow context does, via
       Cloudscape's `renderWithPortal`. Verified: `inOverflowAncestor: false`, x=440 fully
       on-screen, full sentence visible.
-29. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
+29. [x] **README demo re-recorded at 1920x1200 and embedded as real video.** The old asset
+      looked poor for a measurable reason: it was captured at **1280x800 and then
+      downscaled** to 1000 for the mp4 and 760 for the GIF, so every glyph was resampled
+      twice. Probed four capture configurations before changing anything — Playwright's
+      recorder honours a larger viewport exactly (1920x1200 in -> 1920x1200 out), while
+      `--force-device-scale-factor=2` does **not** (still 1280x800), so a higher DPR buys
+      nothing. Capturing at delivery resolution and never downscaling is the whole fix.
+      **Delivery is now an mp4 embedded from a GitHub user-attachments URL**, which is the
+      best option available and has three constraints worth writing down:
+      - A committed `<video src="docs/images/walkthrough.mp4">` **does not render** on
+        github.com. Only assets uploaded through GitHub's own UI get a player, so the file
+        cannot be referenced from the repo at all.
+      - The URL must sit **alone on its own line**. Wrapped in `<p>`, `<a>` or `[](...)`,
+        GitHub renders *nothing* — silently, with no fallback. The caption therefore goes
+        underneath rather than inline.
+      - Publishing is manual by design: run the script, drag the mp4 into any issue or PR
+        comment, paste the returned URL. `scripts/record-walkthrough.mjs` prints those steps
+        on completion.
+      Verified the uploaded URL end to end: authenticated fetch returns **200 video/mp4,
+      1920x1200, 82s**, and its SHA-256 is **byte-identical** to what the script produced.
+      (Anonymous fetch 404s until the URL is referenced from rendered markdown — worth
+      knowing before concluding an upload failed.)
+      **The recordings are now gitignored.** They were committed in `1e56a88` and are
+      referenced by nothing now, so keeping them tracked would put ~27 MB into every clone
+      forever. History is left alone — this is a pushed public repo and rewriting it to save
+      space is not worth the disruption.
+      Also produced: an animated **WebP** fallback via `img2webp` (ffmpeg here has no
+      libwebp — checked the build flags). It is the right modern GIF replacement (24-bit
+      colour, interframe compression, no palette banding on the Cloudscape greys), but at
+      82 seconds it lands at 13 MB, so the mp4 is what the README shows. Three tests pin
+      the embed shape, since both failure modes above are invisible in a local preview.
+30. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
       ideas from the accelerator study, listed in detail in the section above.
 
 ### Open questions / risks

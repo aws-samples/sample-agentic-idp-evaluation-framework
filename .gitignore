@@ -60,3 +60,16 @@ infrastructure/terraform.tfvars
 # Midway auth module — internal-only, not included in public distribution
 packages/backend/src/middleware/midway.ts
 packages/frontend/src/services/midway.ts
+
+# Walkthrough recordings — build artifacts, deliberately NOT committed.
+#
+# The README embeds the video from a GitHub user-attachments URL, because a committed
+# `<video src="docs/images/...">` does not render on github.com; only assets uploaded
+# through GitHub's own UI get a player. So the local files are referenced by nothing, and
+# committing them would put ~27 MB into every clone of this repo forever.
+#
+# Regenerate with `scripts/record-walkthrough.mjs`, then drag the mp4 into any issue or PR
+# comment on github.com and paste the URL it returns into the README.
+docs/images/walkthrough.mp4
+docs/images/walkthrough.webp
+docs/images/walkthrough.gif

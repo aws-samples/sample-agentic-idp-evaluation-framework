@@ -180,6 +180,61 @@ describe('the served docs describe the system that actually exists', () => {
     expect(offenders, `docs name non-existent files: ${offenders.join(' | ')}`).toEqual([]);
   });
 
+  it('embeds the walkthrough video in the one shape GitHub renders', () => {
+    /*
+     * GitHub only turns a video URL into a player when the URL sits ALONE on its own line.
+     * Wrap it in <p>, <a> or markdown link syntax and GitHub silently renders nothing —
+     * no error, no fallback, just a missing demo at the top of the README. And a committed
+     * `<video src="docs/images/walkthrough.mp4">` never renders either: only assets
+     * uploaded through GitHub's own UI get a player.
+     *
+     * Both failure modes are invisible locally (most markdown previewers happily show a
+     * <video> tag), so they need pinning here.
+     */
+    const readme = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'README.md'), 'utf-8');
+    const lines = readme.split('\n');
+
+    const videoLines = lines.filter((l) => /user-attachments\/assets\//.test(l));
+    expect(videoLines.length, 'no walkthrough video URL in the README').toBeGreaterThan(0);
+    for (const line of videoLines) {
+      expect(
+        line.trim(),
+        `the video URL must be bare on its own line, got: ${line.trim().slice(0, 80)}`,
+      ).toMatch(/^https:\/\/github\.com\/user-attachments\/assets\/[\w-]+$/);
+    }
+
+    /*
+     * A <video> tag pointing at a repo file does not render; catch it before it ships.
+     * Comments are stripped first — the README's own HTML comment EXPLAINS this failure
+     * mode, and matching the words inside it flagged the correct file as broken. A checker
+     * that fails on its own documentation trains you to ignore the checker.
+     */
+    const code = readme.replace(/<!--[\s\S]*?-->/g, '');
+    expect(code, 'a committed <video src> does not render on github.com')
+      .not.toMatch(/<video[^>]*src=["']docs\//);
+  });
+
+  it('does not reference walkthrough media as a repo file', () => {
+    /*
+     * The recordings are gitignored build artifacts (~27 MB), so any README reference to
+     * `docs/images/walkthrough.*` as an actual asset would be a broken image for everyone
+     * who clones. Mentions inside an HTML comment are fine — that is where the publishing
+     * instructions live.
+     */
+    const readme = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'README.md'), 'utf-8');
+    const withoutComments = readme.replace(/<!--[\s\S]*?-->/g, '');
+    expect(withoutComments, 'walkthrough media is gitignored and cannot be linked')
+      .not.toMatch(/docs\/images\/walkthrough/);
+  });
+
+  it('keeps the recordings out of git', () => {
+    // 27 MB of unreferenced media in every clone, forever, is the cost of forgetting this.
+    const ignore = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', '.gitignore'), 'utf-8');
+    for (const f of ['walkthrough.mp4', 'walkthrough.webp', 'walkthrough.gif']) {
+      expect(ignore, `${f} must be gitignored`).toContain(f);
+    }
+  });
+
   it('marks the unbuilt docs package so nobody edits the wrong copy', () => {
     // Two prose trees is the root cause of every drift above. The dead one must say so.
     const readme = readFileSync(
