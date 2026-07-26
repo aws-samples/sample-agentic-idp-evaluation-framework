@@ -83,13 +83,181 @@ function resolveFfmpeg() {
 }
 const FFMPEG = resolveFfmpeg();
 
+/**
+ * Run the flow once in an UNRECORDED context and return the comparison strip as a data URL.
+ *
+ * Returns null on any failure — a missing strip degrades the title card to text, which is
+ * still far better than the blank white frame this replaced, so it must never abort the
+ * recording.
+ */
+async function captureComparisonStrip(browserForCapture) {
+  console.log('[0/4] capturing a comparison screenshot for the title card…');
+  const ctx = await browserForCapture.newContext({ viewport: SIZE, deviceScaleFactor: 1 });
+  const p2 = await ctx.newPage();
+  try {
+    await p2.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await p2.waitForTimeout(2000);
+    await p2.locator('input[type=file]').first().setInputFiles(DOC);
+    await p2.waitForTimeout(1500);
+    await p2.locator('button:has-text("Upload and Analyze")').first().click();
+    await p2.waitForURL(/\/conversation/, { timeout: 60000 });
+    await p2.waitForFunction(
+      () => {
+        const b = [...document.querySelectorAll('button')].find((x) => /skip/i.test(x.textContent || ''));
+        return b && !b.disabled;
+      },
+      { timeout: 120000 },
+    );
+    await p2.locator('button:has-text("Skip")').first().click();
+
+    // Wait for the fan-out to finish — "Preview complete" is the marker.
+    const deadline = Date.now() + Number(process.env.PREVIEW_WAIT_MS || 240000);
+    while (Date.now() < deadline) {
+      const t = await p2.locator('body').innerText().catch(() => '');
+      if (/Preview complete/i.test(t)) break;
+      await p2.waitForTimeout(3000);
+    }
+    await p2.waitForTimeout(2500);
+
+    /*
+     * Frame the results panel: the method chips with their measured latencies.
+     *
+     * Do NOT climb the ancestor chain looking for something "tall enough". Measured against
+     * the live DOM, the heading's parent is already a 2538px Cloudscape container spanning
+     * the whole page, so a `height < 320` climb overshot on the first hop and the clip
+     * captured the top of the page — the title card ended up showing the advisor screen
+     * instead of the comparison.
+     *
+     * Anchor on the panel's own bounds instead: take the heading's position and cut a fixed
+     * band downward from it. That is stable regardless of how Cloudscape nests its wrappers.
+     */
+    /*
+     * Scroll the panel to the TOP of the viewport, not merely into view.
+     * `scrollIntoViewIfNeeded` stops as soon as the element is visible, which left the
+     * heading at y=1061 of a 1200px viewport — so the 430px band had only 139px of room and
+     * the crop captured a sliver containing just the heading. Positioning it explicitly
+     * guarantees the chips and the first comparison rows are below it.
+     */
+    const panel = p2.locator('text=Preview complete').first();
+    await panel.evaluate((el) => el.scrollIntoView({ block: 'start', behavior: 'instant' }));
+    await p2.waitForTimeout(300);
+    // Nudge up so the panel's own border and padding are inside the frame.
+    await p2.evaluate(() => window.scrollBy(0, -40));
+    await p2.waitForTimeout(900);
+    const box = await p2.evaluate(() => {
+      const el = [...document.querySelectorAll('*')]
+        .find((x) => /^Preview complete/.test(x.textContent?.trim() ?? '') && x.children.length <= 2);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      if (r.y < 0 || r.y > window.innerHeight) return null;
+      // Start a little above the heading and take the band that holds the chips + the
+      // first rows of the comparison table.
+      const top = Math.max(0, r.y - 28);
+      return {
+        x: Math.max(0, r.x - 40),
+        y: top,
+        width: Math.min(1460, window.innerWidth - Math.max(0, r.x - 40)),
+        height: Math.min(430, window.innerHeight - top),
+      };
+    });
+    if (!box) throw new Error('results panel not on screen after the fan-out');
+    const shot = await p2.screenshot({ clip: box });
+    console.log(`      captured ${Math.round(box.width)}x${Math.round(box.height)} at y=${Math.round(box.y)}`);
+    return `data:image/png;base64,${shot.toString('base64')}`;
+  } catch (e) {
+    console.warn(`      ! could not capture (${String(e.message).slice(0, 90)}) — title card will be text only`);
+    return null;
+  } finally {
+    await ctx.close();
+  }
+}
+
 const browser = await chromium.launch({ headless: true });
+
+/*
+ * ORDER IS LOAD-BEARING: the throwaway screenshot pass runs BEFORE the recorded context
+ * exists.
+ *
+ * Playwright starts capturing the instant `newContext({recordVideo})` returns, so a first
+ * attempt that captured the strip after this line put ~60 seconds of blank white frames at
+ * the head of the video — the exact problem the title card was meant to solve, just longer.
+ * Nothing that waits on the network may happen between the context being created and the
+ * first painted frame.
+ */
+const previewPng = await captureComparisonStrip(browser);
+
 const context = await browser.newContext({
   viewport: SIZE,
   deviceScaleFactor: 1,
   recordVideo: { dir: WORK, size: SIZE },
 });
 const page = await context.newPage();
+
+/**
+ * The opening title card — and, more importantly, the video's THUMBNAIL.
+ *
+ * GitHub renders the embed with `controls` but emits no `poster` attribute, and markdown
+ * gives no way to supply one, so whatever is in frame 0 is the still image every visitor
+ * sees before pressing play. Recording used to start at `page.goto`, so frame 0 was a
+ * blank white rectangle.
+ *
+ * This is drawn into `about:blank` before the app loads, so it costs nothing in the app
+ * and cannot be affected by load timing. It states the problem, the product and the four
+ * steps, so the README's hero communicates even when nobody plays it.
+ */
+async function titleCard(previewPng, ms = 3200) {
+  await page.evaluate(({ steps, previewPng }) => {
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <div style="font:600 22px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:3px;text-transform:uppercase;color:#5b9dff;margin-bottom:26px">
+        ONE IDP Evaluation Framework
+      </div>
+      <div style="font:700 66px/1.12 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:-1.6px;max-width:1360px">
+        Which AWS method should process<br>your documents?
+      </div>
+      <div style="font:400 29px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;opacity:.72;margin-top:26px;max-width:1180px">
+        Stop guessing. Run all 29 on your own document and compare
+        real cost, speed and output.
+      </div>
+      <div style="display:flex;gap:14px;margin-top:40px;font:600 21px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+        ${steps.map((t, i) => `
+          <span style="display:flex;align-items:center;gap:14px">
+            <span style="display:inline-flex;align-items:center;gap:10px;padding:14px 22px;border:1px solid rgba(255,255,255,.22);border-radius:10px;background:rgba(255,255,255,.05)">
+              <span style="color:#5b9dff">${i + 1}</span><span>${t}</span>
+            </span>
+            ${i < steps.length - 1 ? '<span style="opacity:.3">→</span>' : ''}
+          </span>`).join('')}
+      </div>
+      ${previewPng ? `
+      <!--
+        A real frame from this very recording, sitting under the title. The card alone
+        said what the tool is FOR; this shows what it actually produces — 19 methods with
+        measured latencies and a per-capability comparison — so the still frame is
+        evidence rather than a claim. Cropped at the top so it reads as the app continuing
+        below the fold instead of a floating screenshot.
+      -->
+      <div style="margin-top:46px;width:1500px;border-radius:12px 12px 0 0;overflow:hidden;
+                  border:1px solid rgba(255,255,255,.16);border-bottom:none;
+                  box-shadow:0 -8px 60px rgba(0,0,0,.5);mask-image:linear-gradient(to bottom,#000 72%,transparent 100%);
+                  -webkit-mask-image:linear-gradient(to bottom,#000 72%,transparent 100%)">
+        <img src="${previewPng}" style="display:block;width:100%">
+      </div>` : ''}`;
+    Object.assign(el.style, {
+      position: 'fixed', inset: '0', zIndex: '2147483647',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'flex-start', textAlign: 'center',
+      paddingTop: '96px',
+      // A dark card, deliberately: the app itself is near-white, so this reads as a
+      // title rather than as a half-loaded page.
+      background: 'linear-gradient(160deg,#0b1220 0%,#111c2f 55%,#0d1524 100%)',
+      color: '#fff', fontFamily: '-apple-system,BlinkMacSystemFont,sans-serif',
+    });
+    document.documentElement.style.background = '#0b1220';
+    document.body.style.margin = '0';
+    document.body.appendChild(el);
+  }, { steps: ['Upload', 'Analyze & Compare', 'Build Pipeline', 'Architecture & Code'], previewPng });
+  await page.waitForTimeout(ms);
+}
 
 /**
  * A caption card burned into the recording.
@@ -168,11 +336,23 @@ async function clickAny(candidates, what) {
 
 try {
   console.log('[1/4] upload');
+  /*
+   * The title card is painted BEFORE the app loads, so frame 0 is never blank.
+   *
+   * This matters more than it sounds: GitHub renders the video with `controls` but no
+   * `poster` attribute and no way to supply one from markdown, so the browser shows the
+   * FIRST FRAME as the thumbnail. Recording used to begin at `page.goto`, which meant a
+   * completely white frame — the README's hero was an empty rectangle until someone
+   * pressed play. Painting the card into `about:blank` first makes the still frame carry
+   * the pitch on its own.
+   */
+  await page.goto('about:blank');
+  await titleCard(previewPng);
+
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(1200);
 
-  await caption('Which AWS method should process your documents?', 'Stop guessing. Run them all on your own document and compare.', 2600);
   await caption('Step 1 of 4 — Upload', 'One real document. Everything after this is measured on it.');
 
   await page.locator('input[type=file]').first().setInputFiles(DOC);
@@ -269,6 +449,39 @@ try {
   await browser.close();
 }
 
+/**
+ * Mean luma of one frame, 0-255. A cheap, dependency-free frame inspector: downscale to
+ * 8x8 greyscale and average the raw bytes.
+ */
+function meanLuma(file, atSeconds) {
+  const out = execFileSync(FFMPEG, [
+    '-hide_banner', '-loglevel', 'error',
+    '-ss', String(atSeconds), '-i', file, '-frames:v', '1',
+    '-vf', 'format=gray,scale=8:8', '-f', 'rawvideo', '-',
+  ], { maxBuffer: 1 << 20 });
+  if (out.length === 0) return 255;
+  let sum = 0;
+  for (const b of out) sum += b;
+  return Math.round(sum / out.length);
+}
+
+/**
+ * First timestamp whose frame is not a blank white page.
+ *
+ * The app and the title card are both non-blank; only the pre-paint `about:blank` frames
+ * are near-white at 255. Threshold 200 separates them with a wide margin (measured: blank
+ * 240-253, title card 15-75, app UI 228-242 — note the app is BRIGHT too, which is why
+ * this only ever runs over the first second and takes the FIRST non-blank frame rather
+ * than looking for darkness).
+ */
+async function findFirstNonBlankFrame(file) {
+  for (const t of [0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]) {
+    if (meanLuma(file, t) <= 200) return t;
+  }
+  console.warn('      ! no non-blank frame found in the first second; not trimming');
+  return 0;
+}
+
 // ─── Encode ────────────────────────────────────────────────────────────────────
 const raw = readdirSync(WORK)
   .filter((f) => f.endsWith('.webm'))
@@ -299,13 +512,41 @@ console.log('\nencoding mp4 (full capture resolution, no downscale)…');
  * A committed <video src="docs/images/...mp4"> does NOT render on github.com, so the mp4
  * cannot be referenced from the repo — hence the WebP below for the inline case.
  */
+/*
+ * TRIM the leading blank frames, then re-check.
+ *
+ * The title card is painted into `about:blank` before the app loads, but Playwright still
+ * records one or two frames of the empty page before that paint lands — and GitHub uses
+ * frame 0 as the thumbnail, so a single white frame is enough to make the README's hero an
+ * empty rectangle. Measured: the card was fully present from t=0.2s while t=0 was white.
+ *
+ * Relying on the paint winning the race is not good enough (it did on one run and not the
+ * next), so the blank head is cut deterministically here instead. `blackframe`-style
+ * detection would not help: these frames are WHITE. So the trim point is measured directly
+ * by sampling luma, and the result is asserted below — if frame 0 is still blank after the
+ * trim, the script fails loudly rather than shipping a blank thumbnail.
+ */
+const START = await findFirstNonBlankFrame(raw);
+console.log(`      trimming ${START.toFixed(2)}s of blank leader`);
 ff([
+  '-ss', String(START),
   '-i', raw,
   '-filter:v', `setpts=PTS/${SPEEDUP}`,
   '-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', '20',
   '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
   mp4,
 ]);
+
+// Assert the fix held. A blank thumbnail is the whole bug; never ship it silently.
+const firstLuma = meanLuma(mp4, 0);
+if (firstLuma > 200) {
+  throw new Error(
+    `frame 0 of the encoded mp4 is still blank (mean luma ${firstLuma}). GitHub uses it as `
+    + 'the thumbnail, so this would render as an empty rectangle. Raise the trim window in '
+    + 'findFirstNonBlankFrame.',
+  );
+}
+console.log(`      frame 0 mean luma ${firstLuma} (dark title card, not blank)`);
 
 console.log('encoding animated webp…');
 /*

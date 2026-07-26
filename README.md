@@ -13,6 +13,13 @@ deployable project (Python, TypeScript and CDK) wired to the methods you picked.
   `scripts/record-walkthrough.mjs`. It drives the real app in Chromium — nothing is mocked
   or staged, so the recording cannot drift from the product.
 
+  The opening frame is a title card, and that is not decoration: GitHub renders the embed
+  with `controls` but emits NO `poster` attribute, and markdown gives no way to supply one,
+  so whatever is in frame 0 is the thumbnail every visitor sees before pressing play. It
+  used to be a blank white rectangle. The card now carries the pitch plus a real screenshot
+  of the comparison (19 methods with measured latencies) taken from that same run, so the
+  still frame is evidence rather than a claim.
+
   This is a GitHub user-attachments URL, NOT a file in this repo, and that is deliberate:
   a committed `<video src="docs/images/walkthrough.mp4">` does not render on github.com.
   Only assets uploaded through GitHub's own UI get a player. Two more constraints that are
@@ -24,7 +31,7 @@ deployable project (Python, TypeScript and CDK) wired to the methods you picked.
   on github.com, and paste the URL it returns here.
 -->
 
-https://github.com/user-attachments/assets/0940fac4-d5b1-4f50-93aa-0056a6a7d387
+https://github.com/user-attachments/assets/0daf769d-c1aa-4933-8745-7ec91e489b31
 
 <p align="center">
   <em>Steps 1–4 on a real invoice — upload, compare every applicable method in parallel,

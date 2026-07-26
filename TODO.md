@@ -1273,7 +1273,39 @@ found, because the "why" is what makes it fixable.
       colour, interframe compression, no palette banding on the Cloudscape greys), but at
       82 seconds it lands at 13 MB, so the mp4 is what the README shows. Three tests pin
       the embed shape, since both failure modes above are invisible in a local preview.
-30. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
+30. [x] **The video thumbnail is no longer a blank white rectangle.** GitHub renders the
+      embed with `controls` but emits **no `poster` attribute**, and markdown gives no way to
+      supply one — verified by fetching the rendered HTML from the API and inspecting the
+      generated tag (it carries `muted` and `controls`, and nothing else). So **frame 0 IS
+      the thumbnail**, and recording began at `page.goto`, which meant an empty white frame
+      was the README's hero until someone pressed play.
+      Fixed by painting a title card into `about:blank` before the app loads: product name,
+      the question the tool answers, the four steps, and **a real screenshot of the
+      comparison** — 19 methods with their measured latencies — cropped from that same run,
+      so the still frame is evidence rather than a claim.
+      Three mistakes worth recording, because each looked plausible:
+      - **Capture order.** The screenshot needs the comparison screen, which only exists
+        after step 2, so a throwaway unrecorded pass produces it. My first attempt ran that
+        pass AFTER `newContext({recordVideo})` — and Playwright starts capturing the instant
+        that returns, so ~60s of blank frames went into the video and the duration jumped
+        82s → 143s. The pass must run before the recorded context exists.
+      - **Crop anchoring.** Climbing the DOM for an ancestor "tall enough" (`height < 320`)
+        overshot on the first hop: measured against the live page, the heading's parent is
+        already a 2538px Cloudscape container spanning the whole document, so the clip
+        captured the top of the page and the card showed the advisor screen instead of the
+        results. Anchor on the heading's own rect and cut a fixed band downward.
+      - **Scroll position.** `scrollIntoViewIfNeeded` stops as soon as the element is
+        visible, leaving the panel at y=1061 of a 1200px viewport — the 430px band had 139px
+        of room and captured a sliver with just the heading. Scroll it explicitly to the top.
+      And the actual fix in the end was far simpler than the path I took: only **one** frame
+      was ever blank (Playwright painting `about:blank`), so `ffmpeg -ss 0.2` removes it.
+      Note it needs a re-encode — `-c copy` starts from the previous keyframe and puts the
+      white frame straight back. The record script now does this trim automatically and
+      **throws if frame 0 is still blank**, because two runs disagreed (one produced the card,
+      one did not) and a timing race must not fail silently.
+      Verified: uploaded asset is 1920x1200, 80.5s, frame-0 mean luma **75** (blank is ~250),
+      and byte-identical to the local file.
+31. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
       ideas from the accelerator study, listed in detail in the section above.
 
 ### Open questions / risks
