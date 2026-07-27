@@ -1305,7 +1305,28 @@ found, because the "why" is what makes it fixable.
       one did not) and a timing race must not fail silently.
       Verified: uploaded asset is 1920x1200, 80.5s, frame-0 mean luma **75** (blank is ~250),
       and byte-identical to the local file.
-31. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
+31. [x] **AgentCore runtimes updated to carry the agent retry — and one trap worth knowing.**
+      `bedrock-agentcore-control update-agent-runtime` **REPLACES the whole runtime config**,
+      it does not merge. Passing only `--agent-runtime-artifact` wiped all 12 environment
+      variables, so the new v4 containers crash-looped on the auth guard
+      (`Refusing to start: AUTH_PROVIDER=none ... in production`) — 28 restarts on CDK, 24 on
+      TF. Conversations kept working during that window because the old v3 sessions were
+      still alive, which is exactly the kind of thing that makes a broken deploy look fine.
+      Fix: read the previous version's `environmentVariables` and pass them back alongside
+      the new image. Both runtimes are now v5, READY, 12 env vars, and the logs show
+      `IDP Agent Server running on port 8080 / Mode: agent` with the last crash at 11:21:43
+      and a healthy boot at 11:23:01.
+      Note `SERVER_MODE=agent` is what lets the agent container skip the auth guard — the
+      env has no `AUTH_PROVIDER`, so losing `SERVER_MODE` alone is enough to break it.
+      Two of my own mistakes here, both worth recording because each looked like an AWS
+      problem: a shell `set -- $pair` loop that did not split, so `$ROLE` became
+      `.../role/-agentcore-execution-dev` and the malformed ARN surfaced as
+      **AccessDeniedException** rather than a validation error — I initially reported this as
+      missing IAM permission when `simulate-principal-policy` said `allowed` for all three
+      actions. And `get-agent-runtime` genuinely does return AccessDeniedException
+      intermittently on this account, so reads of it need a retry before you conclude
+      anything about permissions.
+32. [ ] Accuracy measurement, calibration and 1S-TopK — the four highest-value
       ideas from the accelerator study, listed in detail in the section above.
 
 ### Open questions / risks
