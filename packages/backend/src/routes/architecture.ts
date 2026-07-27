@@ -6,6 +6,7 @@ import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.
 import { bedrockClient, config } from '../config/aws.js';
 import { buildInferenceConfig } from '../adapters/extraction-shared.js';
 import { estimateMonthlyCost } from '../services/pricing.js';
+import { validateBody } from '../middleware/validate-body.js';
 
 const ARCHITECT_SYSTEM_PROMPT = `You are an AWS Solutions Architect specializing in Intelligent Document Processing (IDP). Based on the processing results, comparison data, and the EXACT pipeline the user assembled (Step 3), create an architecture recommendation.
 
@@ -50,7 +51,7 @@ graph TD
 
 const router = Router();
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({ capabilities: 'array', processingResults: 'array' }), async (req, res) => {
   const body = req.body as ArchitectureRequest;
 
   initSSE(res);

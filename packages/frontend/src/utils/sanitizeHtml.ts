@@ -17,8 +17,27 @@ export function sanitizeHtml(input: string, profile: SanitizeProfile = 'markdown
   if (!input) return '';
   switch (profile) {
     case 'svg':
+      /*
+       * `foreignObject` must be allowed explicitly, or every node label vanishes.
+       *
+       * DOMPurify's SVG profile does not include `<foreignObject>`, and Mermaid renders
+       * flowchart NODE labels inside one (edge labels use plain `<text>`, which the profile
+       * does allow). So diagrams rendered as a grid of empty boxes with the connector
+       * labels still visible — a shape that looks like a Mermaid bug and is actually
+       * sanitiser stripping.
+       *
+       * Measured on a real render: 4 foreignObject elements in, 0 out, and the string
+       * "API Gateway" absent from the result. Adding `html: true` to USE_PROFILES does NOT
+       * fix it — only naming the tag does. Verified in the same probe that a
+       * `<script>` and an `onload=` attribute are still removed with this config, so the
+       * XSS guarantee is unchanged; `foreignObject` is a container, and its contents are
+       * still sanitised by the profile rules.
+       */
       return DOMPurify.sanitize(input, {
         USE_PROFILES: { svg: true, svgFilters: true },
+        ADD_TAGS: ['foreignObject'],
+        // `xmlns` on the inner <div> is what makes the embedded XHTML render at all.
+        ADD_ATTR: ['xmlns'],
       });
     case 'table':
       return DOMPurify.sanitize(input, {

@@ -5,6 +5,7 @@ import { buildInferenceConfig } from '../adapters/extraction-shared.js';
 import { generatePipeline } from '../services/pipeline-generator.js';
 import type { Capability, ProcessingMethod, PipelineGenerateRequest } from '@idp/shared';
 import { CAPABILITY_SUPPORT, METHODS, METHOD_INFO, METHOD_FAMILIES } from '@idp/shared';
+import { validateBody } from '../middleware/validate-body.js';
 
 interface PreviewMethodResult {
   method: string;
@@ -46,7 +47,7 @@ function buildCapabilitySupportRef(capabilities: Capability[]): string {
 
 const router = Router();
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({ capabilities: 'array' }), async (req, res) => {
   const body = req.body as SmartPipelineRequest;
 
   if (!body.capabilities?.length) {

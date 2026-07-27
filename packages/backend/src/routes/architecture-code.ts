@@ -4,6 +4,7 @@ import type { Capability, ProcessorResult, ComparisonResult, ProcessingMethod, P
 import { METHOD_INFO, CAPABILITY_INFO } from '@idp/shared';
 import { bedrockClient, config } from '../config/aws.js';
 import { buildInferenceConfig } from '../adapters/extraction-shared.js';
+import { validateBody } from '../middleware/validate-body.js';
 
 interface CodeGenRequest {
   capabilities: Capability[];
@@ -380,7 +381,7 @@ function extractTag(raw: string, tag: string): string | null {
 
 const router = Router();
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({ capabilities: 'array', processingResults: 'array' }), async (req, res) => {
   const body = req.body as CodeGenRequest;
 
   if (!body.capabilities?.length) {

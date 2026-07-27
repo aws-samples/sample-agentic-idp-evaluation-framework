@@ -175,6 +175,33 @@ if (existsSync(frontendDist)) {
 // Error handling
 app.use(errorHandler);
 
+/*
+ * Last line of defence: never let one request's bug take the server down for everyone.
+ *
+ * `errorHandler` above only catches errors Express routes to it — a throw inside an async
+ * handler that has already started streaming, or in a callback outside the request cycle,
+ * bypasses it entirely and reaches the process. With no handler here, Node's default is to
+ * PRINT THE STACK AND EXIT.
+ *
+ * That is exactly what happened in production: one unguarded `body.message.substring(...)`
+ * on a malformed POST killed the process, every other user's in-flight SSE stream died, and
+ * the browser showed "I encountered an issue processing your request" — indistinguishable
+ * from a model failure. The specific trigger is now validated at the edge
+ * (middleware/validate-body.ts), but the class of bug is not, so it is contained here too.
+ *
+ * Deliberately LOGS AND KEEPS SERVING rather than exiting. The usual argument for exiting
+ * is that state may be corrupt — but this process holds no mutable shared state worth
+ * protecting: every request is independent, and the alternative is a guaranteed outage for
+ * all users instead of one failed request. ECS still restarts the task if it stops passing
+ * health checks, so a genuinely wedged process is still recovered.
+ */
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] uncaught exception — staying up:', err instanceof Error ? err.stack : err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] unhandled promise rejection — staying up:', reason instanceof Error ? reason.stack : reason);
+});
+
 app.listen(config.port, () => {
   const mode = existsSync(frontendDist) ? 'production (serving frontend)' : 'development';
   console.log(`ONE IDP Backend running on port ${config.port} [${mode}]`);

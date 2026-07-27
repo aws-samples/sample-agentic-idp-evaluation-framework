@@ -165,6 +165,33 @@ describe('sanitizeMermaid repairs what a model actually writes', () => {
       .toBeGreaterThan(table.indexOf("['(['"));
   });
 
+  it('lets the SVG sanitiser keep node labels', () => {
+    /*
+     * Every node rendered as an EMPTY BOX while the edge labels showed fine.
+     *
+     * Mermaid puts flowchart node labels inside `<foreignObject>` (edge labels use plain
+     * `<text>`), and DOMPurify's SVG profile does not include that tag — so the sanitiser
+     * silently deleted every label. Measured on a real render: 4 foreignObject elements in,
+     * 0 out, and the string "API Gateway" absent from the output. Adding `html: true` to
+     * USE_PROFILES does NOT fix it; only naming the tag does.
+     *
+     * The XSS guarantee is unchanged — verified in the same probe that a `<script>` and an
+     * `onload=` attribute are still stripped with this config. `foreignObject` is only a
+     * container; its contents remain subject to the profile rules.
+     */
+    const sanitizer = readFileSync(
+      join(import.meta.dirname, '..', '..', '..', 'frontend', 'src', 'utils', 'sanitizeHtml.ts'),
+      'utf-8',
+    );
+    const svgCase = sanitizer.slice(sanitizer.indexOf("case 'svg'"), sanitizer.indexOf("case 'table'"));
+    expect(svgCase, 'foreignObject must be allowed or all node labels vanish')
+      .toMatch(/ADD_TAGS:\s*\[[^\]]*'foreignObject'/);
+    // The embedded XHTML needs its xmlns to render.
+    expect(svgCase).toMatch(/ADD_ATTR:\s*\[[^\]]*'xmlns'/);
+    // And the profile itself must stay — dropping it would allow arbitrary HTML.
+    expect(svgCase).toMatch(/USE_PROFILES:\s*\{\s*svg:\s*true/);
+  });
+
   it('is the function the component actually renders with', () => {
     // The repair is useless if render() is called with the raw chart.
     expect(source).toContain('mermaid.render(id, sanitizeMermaid(chart))');

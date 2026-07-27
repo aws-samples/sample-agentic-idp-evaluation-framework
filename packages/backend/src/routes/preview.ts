@@ -26,6 +26,7 @@ import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.
 import { trackActivity, trackRunResults } from '../services/activity-tracker.js';
 import { extractUpstreamText } from '../services/pipeline-text-extractor.js';
 import { randomUUID } from 'crypto';
+import { validateBody } from '../middleware/validate-body.js';
 
 interface PreviewRequest {
   documentId: string;
@@ -176,7 +177,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, method: string): Promis
 
 const router = Router();
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({ documentId: 'string', s3Uri: 'string', capabilities: 'array' }), async (req, res) => {
   const body = req.body as PreviewRequest;
 
   if (!body.documentId || !body.capabilities?.length) {

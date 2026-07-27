@@ -209,6 +209,28 @@ export async function runSocraticAgentStrands(
     messageContent = `A document has been uploaded. ${userMessage}\n\nAnalyze the document using the analyze_document tool.`;
   }
 
+  /*
+   * Retry a transient Bedrock failure before giving up on the user.
+   *
+   * Measured live: Bedrock intermittently answers this agent with
+   * `InternalServerException` (HTTP 500, `$fault: 'server'`) — two identical uploads, one
+   * succeeded and one failed. The AWS SDK already retries 3 times internally, but its
+   * backoff totalled 172ms, which is far too fast for a server-side blip to clear. When
+   * those attempts were exhausted the only handling was to emit "I encountered an issue
+   * processing your request", which reads as a dead end: the document is fine, the model
+   * is fine, and retrying by hand usually works.
+   *
+   * The retry is only safe while NOTHING has been emitted yet. Once text has streamed to
+   * the client, restarting would duplicate it mid-sentence in the transcript, so
+   * `emittedAnything` gates it — a late failure still falls through to the message below.
+   */
+  const MAX_ATTEMPTS = 3;
+  const RETRYABLE = /InternalServerException|ServiceUnavailable|ThrottlingException|ModelError|500/i;
+
+  let emittedAnything = false;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
   // Stream the agent response via SSE
   try {
     let fullText = '';
@@ -224,11 +246,13 @@ export async function runSocraticAgentStrands(
       ) {
         const chunk = e.event.delta.text as string;
         fullText += chunk;
+        emittedAnything = true;
         emitSSE(res, { type: 'text', data: chunk } as ConversationEvent);
       }
 
       // Tool call start — BeforeToolCallEvent
       if (e.type === 'beforeToolCallEvent' && e.toolUse?.name) {
+        emittedAnything = true;
         emitSSE(res, {
           type: 'tool_use',
           data: { name: e.toolUse.name, input: e.toolUse.input },
@@ -268,11 +292,45 @@ export async function runSocraticAgentStrands(
     }
 
     // Recommendation is emitted via the tool result handler above — no need to parse from text
+    return; // success
   } catch (err) {
-    console.error('[Strands Socratic Agent Error]', err);
-    emitSSE(res, {
-      type: 'text',
-      data: '\n\nI encountered an issue processing your request. Please try again.',
-    } as ConversationEvent);
+    lastError = err;
+    const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    const transient = RETRYABLE.test(message) || RETRYABLE.test(String((err as any)?.cause ?? ''));
+
+    console.error(
+      `[Strands Socratic Agent Error] attempt ${attempt}/${MAX_ATTEMPTS}`
+      + ` transient=${transient} emitted=${emittedAnything}:`,
+      err,
+    );
+
+    // Retry only a transient failure, and only while the transcript is still clean.
+    if (transient && !emittedAnything && attempt < MAX_ATTEMPTS) {
+      // 1s then 2s. The SDK's own retries covered 172ms; a server-side blip needs longer.
+      await new Promise((r) => setTimeout(r, attempt * 1000));
+      continue;
+    }
+    break;
   }
+  }
+
+  /*
+   * Out of attempts. Say what actually happened rather than blaming the request.
+   *
+   * "I encountered an issue processing your request" implied the document or the question
+   * was at fault. It is a Bedrock-side error, so name it and point at the action that
+   * works — and keep "Skip questions, use defaults" discoverable, because that path does
+   * not need the agent at all.
+   */
+  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? 'unknown');
+  const isTransient = RETRYABLE.test(detail) || RETRYABLE.test(String((lastError as any)?.cause ?? ''));
+  emitSSE(res, {
+    type: 'text',
+    data: isTransient
+      ? `\n\nBedrock returned a temporary error after ${MAX_ATTEMPTS} attempts, so the`
+        + ' advisor could not answer. Your document uploaded fine — send your message again,'
+        + ' or use "Skip questions, use defaults" to go straight to the comparison.'
+      : `\n\nThe advisor could not complete that request: ${detail}.`
+        + ' You can use "Skip questions, use defaults" to continue to the comparison.',
+  } as ConversationEvent);
 }

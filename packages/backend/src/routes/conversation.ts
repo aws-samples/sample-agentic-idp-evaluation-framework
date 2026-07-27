@@ -4,13 +4,14 @@ import { InvokeAgentRuntimeCommand } from '@aws-sdk/client-bedrock-agentcore';
 import { config, agentCoreClient } from '../config/aws.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import { trackActivity } from '../services/activity-tracker.js';
+import { validateBody } from '../middleware/validate-body.js';
 
 const router = Router();
 
 // AgentCore invocation timeout (10s to get first response, then fall back)
 const AGENTCORE_TIMEOUT_MS = 10_000;
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({ documentId: 'string', message: 'string', history: 'array', s3Uri: 'string?' }), async (req, res) => {
   const body = req.body as ConversationRequest;
 
   const userAlias = (req as any).authUser?.alias ?? 'anonymous';

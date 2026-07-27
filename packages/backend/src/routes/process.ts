@@ -22,6 +22,7 @@ import {
   SageMakerQwen3VlProcessor,
 } from '../processors/sagemaker-ocr.js';
 import { getMethodAvailability } from '../services/method-availability.js';
+import { validateBody } from '../middleware/validate-body.js';
 
 const PROCESSOR_MAP: Partial<Record<ProcessingMethod, () => ProcessorBase>> & Record<string, () => ProcessorBase> = {
   'bda-standard': () => new BdaStandardProcessor(),
@@ -65,7 +66,7 @@ function estimatePageCount(buffer: Buffer): number {
 
 const router = Router();
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({ documentId: 'string', s3Uri: 'string', capabilities: 'array' }), async (req, res) => {
   const body = req.body as ProcessRequest;
 
   initSSE(res);

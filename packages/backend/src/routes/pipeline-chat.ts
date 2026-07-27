@@ -6,6 +6,7 @@ import { generatePipeline } from '../services/pipeline-generator.js';
 import { initSSE, emitSSE, startKeepalive, endSSE } from '../services/streaming.js';
 import type { Capability, ProcessingMethod, PipelineDefinition, PipelineGenerateRequest } from '@idp/shared';
 import { METHODS, METHOD_INFO, CAPABILITY_SUPPORT, METHOD_FAMILIES, CAPABILITIES } from '@idp/shared';
+import { validateBody } from '../middleware/validate-body.js';
 
 interface PipelineChatRequest {
   message: string;
@@ -18,7 +19,7 @@ interface PipelineChatRequest {
 
 const router = Router();
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({ capabilities: 'array' }), async (req, res) => {
   const body = req.body as PipelineChatRequest;
 
   if (!body.message || !body.currentPipeline || !body.capabilities?.length) {
